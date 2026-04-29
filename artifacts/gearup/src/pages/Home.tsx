@@ -24,9 +24,9 @@ export default function Home() {
           <div className="flex justify-center flex-col items-center gap-4">
              <button
                 onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                className="text-white/20 hover:text-mint-muted transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2"
+                className="text-white/20 hover:text-mint-muted transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2 cursor-pointer"
               >
-                {authMode === 'login' ? null : <>Existing Operator?<br/></>}
+                {authMode === 'login' ? null : <>Existing User?<br/></>}
                 <span className="text-[#A855F7]">{authMode === 'login' ? "Create New Account" : "Log In"}</span>
               </button>
           </div>

@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -50,6 +48,7 @@ export default function LoginForm() {
           />
         </div>
         {error && <p className="text-[#A855F7] text-xs font-bold text-center px-4">{error}</p>}
+        {error && <p className="text-[#A855F7] text-[11px] font-medium text-center -mt-2">Forgot password?</p>}
         <button 
           type="submit" 
           disabled={loading}
