@@ -1,8 +1,15 @@
 {
-  "buildCommand": "pnpm build",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @workspace/gearup run build",
   "installCommand": "pnpm install",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "outputDirectory": "artifacts/gearup/dist/public",
+  "framework": null,
+  "build": {
+    "env": {
+      "BASE_PATH": "/",
+      "PORT": "5173"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
