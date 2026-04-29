@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if false; // No bulk user listing
+      allow create: if isOwner(userId) && 
+                      incoming().keys().hasAll(['phoneNumber', 'walletBalance', 'createdAt']) &&
+                      incoming().walletBalance == 0;
+      allow update: if isOwner(userId) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'kycStatus']);
+    }
+
+    // Listings
+    match /listings/{listingId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && 
+                      incoming().ownerId == request.auth.uid &&
+                      incoming().status == 'AVAILABLE';
+      allow update: if isSignedIn() && (
+                      // Only owner can update details
+                      (isOwner(existing().ownerId) && incoming().ownerId == request.auth.uid) ||
+                      // System/Renter can update status during booking (simple for now)
+                      (incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+                    );
+      allow delete: if isOwner(existing().ownerId);
+    }
+
+    // Rentals
+    match /rentals/{rentalId} {
+      allow get: if isSignedIn() && (isOwner(existing().ownerId) || isOwner(existing().renterId));
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.renterId == request.auth.uid);
+      allow create: if isSignedIn() && 
+                      incoming().renterId == request.auth.uid &&
+                      incoming().status == 'REQUESTED';
+      allow update: if isSignedIn() && (
+                      isOwner(existing().ownerId) || isOwner(existing().renterId)
+                    );
+    }
+
+    // Notifications
+    match /notifications/{noteId} {
+      allow read: if isOwner(existing().userId);
+      allow write: if isSignedIn(); // Allow system or other users to trigger notes
+    }
+  }
+}
