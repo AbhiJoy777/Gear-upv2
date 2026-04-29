@@ -26,9 +26,8 @@ export default function Home() {
                 onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
                 className="text-white/20 hover:text-mint-muted transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2"
               >
-                {authMode === 'login' ? "Need Credentials?" : "Existing Operator?"}
-                <br/>
-                <span className="text-[#A855F7]">{authMode === 'login' ? "Create Account" : "Log In"}</span>
+                {authMode === 'login' ? null : <>Existing Operator?<br/></>}
+                <span className="text-[#A855F7]">{authMode === 'login' ? "Create New Account" : "Log In"}</span>
               </button>
           </div>
         </div>

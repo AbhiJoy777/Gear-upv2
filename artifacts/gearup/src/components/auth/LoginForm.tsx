@@ -25,7 +25,7 @@ export default function LoginForm() {
 
   return (
     <div className="max-w-[400px] w-full py-16 px-10 bg-[#121212] rounded-3xl border border-white/5 mx-auto">
-      <h2 className="text-3xl font-black mb-10 text-center uppercase tracking-tighter text-white">Login to GearUp</h2>
+      <h2 className="text-3xl font-black mb-10 text-center uppercase tracking-tighter text-white">Login</h2>
       <form onSubmit={handleLogin} className="space-y-6 flex flex-col">
         <div className="w-full">
           <label className="block text-xs font-medium text-white mb-2">Email Address</label>
