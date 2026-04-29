@@ -32,7 +32,7 @@ export default function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full h-12 bg-transparent border border-white/5 rounded-xl px-4 text-white placeholder:text-[#707070] focus:border-[#A855F7] outline-none transition-all"
-            placeholder="operator@gearup.hyd"
+            placeholder=""
             required
           />
         </div>
