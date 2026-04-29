@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "pnpm --filter @workspace/gearup run build",
   "installCommand": "pnpm install",
-  "outputDirectory": "artifacts/gearup/dist/public",
+  "outputDirectory": "dist/public",
   "framework": null,
   "build": {
     "env": {
