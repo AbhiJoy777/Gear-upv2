@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "GearUp"
+version = "1.0.0"
+id = "artifacts/gearup"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26099
+
+[services.development]
+run = "pnpm --filter @workspace/gearup run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gearup", "run", "build" ]
+publicDir = "artifacts/gearup/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26099"
+BASE_PATH = "/"
