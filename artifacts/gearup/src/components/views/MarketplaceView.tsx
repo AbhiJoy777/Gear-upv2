@@ -90,7 +90,7 @@ const MarketplaceView = memo(() => {
           <Loader2 className="w-10 h-10 text-[#A855F7] animate-spin" />
         </div>
       ) : filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, idx) => (
               <motion.div
@@ -121,7 +121,7 @@ const MarketplaceView = memo(() => {
                     <Camera size={64} className="text-white-[0.02] group-hover:scale-110 group-hover:text-white/10 transition-all duration-700 relative z-0" opacity={0.1} />
                   )}
                 </div>
-                <div className="p-6 flex flex-1 flex-col z-10 bg-[#121212] relative">
+                <div className="p-5 flex flex-1 flex-col z-10 bg-[#121212] relative">
                   <div className="flex flex-col mb-2">
                     {item.isGaming && (
                        <span className="text-[#2DD4BF] text-[10px] font-bold tracking-widest uppercase mb-1 flex items-center gap-1.5">
@@ -129,9 +129,9 @@ const MarketplaceView = memo(() => {
                          GAMING RIG
                        </span>
                     )}
-                    <h3 className="font-semibold text-[18px] text-white group-hover:text-[#2DD4BF] transition-colors tracking-tight line-clamp-1 duration-300">{item.title}</h3>
+                    <h3 className="font-semibold text-[15px] text-white group-hover:text-[#2DD4BF] transition-colors tracking-tight line-clamp-1 duration-300">{item.title}</h3>
                   </div>
-                <p className="text-[#707070] text-[13px] mb-6 line-clamp-2 font-medium leading-relaxed flex-1 flex flex-col gap-1.5">
+                <p className="text-[#707070] text-[12px] mb-4 line-clamp-2 font-medium leading-relaxed flex-1 flex flex-col gap-1.5">
                   <span>{item.category} <span className="opacity-50 mx-1">•</span> {item.location || 'Hyderabad'}</span>
                   {item.logisticsType && (
                     <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-max px-2 py-1 rounded-[6px] border border-white/[0.05]">
@@ -140,12 +140,12 @@ const MarketplaceView = memo(() => {
                     </span>
                   )}
                 </p>
-                  <div className="flex items-center justify-between mt-auto pt-4 border-t-[0.5px] border-white/[0.04]">
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
                     <div className="flex flex-col">
-                      <span className="text-[11px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
-                      <span className="text-[18px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
+                      <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
+                      <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-5 py-2.5 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[13px] font-semibold disabled:opacity-50">
+                    <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
                       {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}
                     </button>
                   </div>

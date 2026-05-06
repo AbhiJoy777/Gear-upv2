@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
 
 type Tab = 'listings' | 'rentals';
@@ -145,9 +145,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                         <Camera size={48} className="text-white/10" />
                       )}
                     </div>
-                    <div className="p-6 pb-8 flex-1 flex flex-col">
-                      <h3 className="font-semibold text-[16px] text-white tracking-tight line-clamp-1">{item.title}</h3>
-                      <p className="text-[#707070] text-[13px] mt-1 mb-6 uppercase border-b border-white/5 pb-2">{item.category}</p>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{item.title}</h3>
+                      <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
                       
                       {activeRental && activeRental.actualStartTime && (
                         <div className="mb-6 p-4 bg-[#2DD4BF]/10 rounded-[16px] border border-[#2DD4BF]/20">
@@ -238,10 +238,20 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             ))}
                             <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
                                <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
-                               <button
-                                 onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
-                                 className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
-                               >Edit Listing</button>
+                               <div className="flex items-center gap-3">
+                                 <button
+                                   onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
+                                   className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                                 >Edit</button>
+                                 <button
+                                   onClick={async (e) => {
+                                     e.stopPropagation();
+                                     if (!window.confirm('Delete this listing? This cannot be undone.')) return;
+                                     try { await deleteDoc(doc(db, 'listings', item.id)); } catch (err) { console.error(err); }
+                                   }}
+                                   className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
+                                 >Delete</button>
+                               </div>
                             </div>
                          </div>
                        )}
@@ -277,11 +287,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     transition={{ delay: idx * 0.05 }}
                     className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full select-none"
                   >
-                    <div className="aspect-video bg-[#0A0A0A] p-6 relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
+                    <div className="h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
                       <Camera size={48} className="text-white/10" />
                     </div>
-                    <div className="p-6 pb-8 flex-1 flex flex-col">
-                      <h3 className="font-semibold text-[16px] text-white tracking-tight line-clamp-1">{rental.gearTitle}</h3>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{rental.gearTitle}</h3>
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 flex items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
@@ -341,7 +351,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                          </div>
                       )}
 
-                      <div className="flex items-center justify-between mt-auto pt-5 border-t border-white/10">
+                      <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
                          <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{rental.totalPrice}</span>
                          <div className="flex items-center gap-1.5">
                             <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">{rental.durationDays} Days</span>
