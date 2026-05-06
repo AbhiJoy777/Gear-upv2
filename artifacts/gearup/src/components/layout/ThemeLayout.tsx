@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'wouter';
@@ -10,15 +8,17 @@ import DashboardView from '../views/DashboardView';
 import WalletView from '../views/WalletView';
 import ProfileView from '../views/ProfileView';
 import ListGearModal from '../modals/ListGearModal';
+import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 
 export type AppTab = 'marketplace' | 'dashboard' | 'wallet' | 'profile';
 
 export function ThemeLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [pathname, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<AppTab>('marketplace');
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+  const [profileModalDismissed, setProfileModalDismissed] = useState(false);
 
   React.useEffect(() => {
     const handleOpen = () => { setEditItem(null); setIsListModalOpen(true); };
@@ -38,6 +38,15 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
       setLocation('/');
     }
   }, [pathname, setLocation]);
+
+  // Show profile completion when user is logged in, profile is loaded, and fields are missing
+  const profileIncomplete =
+    !loading &&
+    user !== null &&
+    profile !== null &&
+    (!profile?.username || !profile?.fullName || !profile?.phone);
+
+  const showProfileCompletion = profileIncomplete && !profileModalDismissed;
 
   if (loading && !user) {
     return (
@@ -79,7 +88,14 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
-      <ListGearModal isOpen={isListModalOpen} onClose={() => { setIsListModalOpen(false); setEditItem(null); }} editItem={editItem} />
+      <ListGearModal
+        isOpen={isListModalOpen}
+        onClose={() => { setIsListModalOpen(false); setEditItem(null); }}
+        editItem={editItem}
+      />
+      {showProfileCompletion && (
+        <ProfileCompletionModal onSkip={() => setProfileModalDismissed(true)} />
+      )}
     </div>
   );
 }
