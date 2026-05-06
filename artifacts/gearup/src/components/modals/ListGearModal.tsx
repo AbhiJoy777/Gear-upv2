@@ -4,6 +4,7 @@ import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, Ch
 import { db } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 const CATS = [
   { name: 'Laptops', Icon: Laptop },
@@ -149,6 +150,7 @@ function detectGpuPlatform(model: string): string {
 
 export default function ListGearModal({ isOpen, onClose, editItem }: any) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [load, setLoad] = useState(false);
   
@@ -364,9 +366,11 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
           createdAt: serverTimestamp()
         });
       }
+      showToast(editItem ? 'Listing updated successfully!' : 'Listing published!', 'success');
       onClose(); reset();
     } catch (e) {
       console.error(e);
+      showToast('Failed to save listing. Please try again.', 'error');
     } finally {
       setLoad(false);
     }

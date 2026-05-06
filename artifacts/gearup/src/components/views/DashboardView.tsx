@@ -7,11 +7,13 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
+import { useToast } from '@/context/ToastContext';
 
 type Tab = 'listings' | 'rentals';
 
 const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) => void }) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('listings');
   const [listings, setListings] = useState<any[]>([]);
   const [rentals, setRentals] = useState<any[]>([]);
@@ -247,7 +249,12 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                    onClick={async (e) => {
                                      e.stopPropagation();
                                      if (!window.confirm('Delete this listing? This cannot be undone.')) return;
-                                     try { await deleteDoc(doc(db, 'listings', item.id)); } catch (err) { console.error(err); }
+                                     try {
+                                       await deleteDoc(doc(db, 'listings', item.id));
+                                       showToast('Listing deleted.', 'success');
+                                     } catch (err) {
+                                       showToast('Failed to delete listing.', 'error');
+                                     }
                                    }}
                                    className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
                                  >Delete</button>

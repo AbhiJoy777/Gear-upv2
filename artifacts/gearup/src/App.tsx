@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/context/ToastContext";
 import { ThemeLayout } from "@/components/layout/ThemeLayout";
 import Home from "@/pages/Home";
 import LoginPage from "@/pages/Login";
@@ -21,9 +22,11 @@ function App() {
   return (
     <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <AuthProvider>
-        <ThemeLayout>
-          <Router />
-        </ThemeLayout>
+        <ToastProvider>
+          <ThemeLayout>
+            <Router />
+          </ThemeLayout>
+        </ToastProvider>
       </AuthProvider>
     </WouterRouter>
   );

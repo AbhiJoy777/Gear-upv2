@@ -1,30 +1,26 @@
 import React, { useState } from 'react';
 import { auth, googleProvider } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { useToast } from '@/context/ToastContext';
 
 export default function SignupForm() {
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      showToast('Passwords do not match.', 'error');
       return;
     }
     setLoading(true);
-    setError('');
     try {
-     await createUserWithEmailAndPassword(auth, email, password);
+      await createUserWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered. Try logging in or use Google sign-in.");
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+      showToast(err.message || 'Failed to create account.', 'error');
     } finally {
       setLoading(false);
     }
@@ -36,8 +32,8 @@ export default function SignupForm() {
       <form onSubmit={handleSignup} className="space-y-6 flex flex-col">
         <div className="w-full">
           <label className="block text-xs font-medium text-white mb-2">Email Address</label>
-          <input 
-            type="email" 
+          <input
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full h-12 bg-transparent border border-white/5 rounded-xl px-4 text-white placeholder:text-[#707070] focus:border-[#A855F7] outline-none transition-all"
@@ -47,8 +43,8 @@ export default function SignupForm() {
         </div>
         <div className="w-full">
           <label className="block text-xs font-medium text-white mb-2">Password</label>
-          <input 
-            type="password" 
+          <input
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full h-12 bg-transparent border border-white/5 rounded-xl px-4 text-white placeholder:text-[#707070] focus:border-[#A855F7] outline-none transition-all"
@@ -58,8 +54,8 @@ export default function SignupForm() {
         </div>
         <div className="w-full">
           <label className="block text-xs font-medium text-white mb-2">Confirm Password</label>
-          <input 
-            type="password" 
+          <input
+            type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full h-12 bg-transparent border border-white/5 rounded-xl px-4 text-white placeholder:text-[#707070] focus:border-[#A855F7] outline-none transition-all"
@@ -67,9 +63,8 @@ export default function SignupForm() {
             required
           />
         </div>
-        {error && <p className="text-[#A855F7] text-xs font-bold text-center px-4">{error}</p>}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading}
           className="w-full h-12 flex items-center justify-center bg-[#A855F7] text-white font-semibold rounded-xl hover:bg-[#9333EA] active:scale-95 transition-all text-sm mt-6 border-none cursor-pointer"
         >
@@ -78,11 +73,10 @@ export default function SignupForm() {
         <button
           type="button"
           onClick={async () => {
-            setError('');
             try {
               await signInWithPopup(auth, googleProvider);
             } catch (err: any) {
-              setError('Google sign-in failed. Please try again.');
+              showToast('Google sign-in failed. Please try again.', 'error');
             }
           }}
           className="w-full h-12 flex items-center justify-center gap-2 bg-transparent text-white font-semibold rounded-xl border border-white/10 hover:border-white/30 active:scale-95 transition-all text-sm cursor-pointer"

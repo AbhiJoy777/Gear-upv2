@@ -4,6 +4,7 @@ import { X, Calendar, MapPin, Truck, ArrowLeft, Clock, Zap } from 'lucide-react'
 import { db } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 const DURATIONS = [
   { days: 1, label: '1 Day', labelShort: '1 Day', discountPercent: 0 },
@@ -15,6 +16,7 @@ const DURATIONS = [
 
 export default function BookingModal({ item, onClose }: { item: any, onClose: () => void }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [duration, setDuration] = useState<number | 'Custom' | null>(null);
   const [startDate, setStartDate] = useState('');
@@ -85,9 +87,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
         status: 'RESERVED'
       });
       
+      showToast('Booking request sent! The owner will review it shortly.', 'success');
       onClose();
     } catch (err) {
       console.error('Booking error: ', err);
+      showToast('Failed to submit booking. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
