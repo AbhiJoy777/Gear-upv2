@@ -18,9 +18,13 @@ export default function SignupForm() {
     setLoading(true);
     setError('');
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+     await createUserWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === "auth/email-already-in-use") {
+        setError("This email is already registered. Try logging in or use Google sign-in.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

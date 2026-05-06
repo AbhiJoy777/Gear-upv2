@@ -18,11 +18,17 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const [pathname, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<AppTab>('marketplace');
   const [isListModalOpen, setIsListModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
 
   React.useEffect(() => {
-    const handleOpen = () => setIsListModalOpen(true);
+    const handleOpen = () => { setEditItem(null); setIsListModalOpen(true); };
+    const handleEdit = (e: any) => { setEditItem(e.detail.item); setIsListModalOpen(true); };
     window.addEventListener('open-list-modal', handleOpen);
-    return () => window.removeEventListener('open-list-modal', handleOpen);
+    window.addEventListener('open-edit-modal', handleEdit);
+    return () => {
+      window.removeEventListener('open-list-modal', handleOpen);
+      window.removeEventListener('open-edit-modal', handleEdit);
+    };
   }, []);
 
   const handleTabChange = useCallback((tab: AppTab) => {
@@ -73,7 +79,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
-      <ListGearModal isOpen={isListModalOpen} onClose={() => setIsListModalOpen(false)} />
+      <ListGearModal isOpen={isListModalOpen} onClose={() => { setIsListModalOpen(false); setEditItem(null); }} editItem={editItem} />
     </div>
   );
 }

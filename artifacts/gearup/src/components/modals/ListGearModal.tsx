@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, MapPin, Truck } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 
 const CATS = [
@@ -139,7 +139,15 @@ const GpuModelSelect = ({ val, set, platform, disabled }: any) => {
   );
 };
 
-export default function ListGearModal({ isOpen, onClose }: any) {
+function detectGpuPlatform(model: string): string {
+  if (!model || model === 'Integrated') return 'Integrated';
+  if (model.startsWith('RTX') || model.startsWith('GTX')) return 'Nvidia';
+  if (model.startsWith('RX') || model.startsWith('Radeon')) return 'AMD';
+  if (model.includes('Arc')) return 'Intel Arc';
+  return 'Nvidia';
+}
+
+export default function ListGearModal({ isOpen, onClose, editItem }: any) {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [load, setLoad] = useState(false);
@@ -336,17 +344,26 @@ export default function ListGearModal({ isOpen, onClose }: any) {
         specData.model = otherCpu ?? '';
       }
 
-      await addDoc(collection(db, 'listings'), {
+      const payload: any = {
         title, category: c, pricePerDay: base,
-        tier, status: 'AVAILABLE', ownerId: user.uid, imageUrl: imgs[0] || '',
-        images: imgs, location: 'Hyderabad', description: 'Premium Gear',
+        tier, imageUrl: imgs[0] || '',
+        images: imgs,
         specs: specData,
         score: totalScore,
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
         logisticsType: logisticsType === 'Self-Pickup' ? 'pickup' : 'delivery',
         logisticsAdjustment: logisticsType === 'Self-Pickup' ? -50 : 50,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-      });
+        updatedAt: serverTimestamp()
+      };
+      if (editItem) {
+        await updateDoc(doc(db, 'listings', editItem.id), payload);
+      } else {
+        await addDoc(collection(db, 'listings'), {
+          ...payload, status: 'AVAILABLE', ownerId: user.uid,
+          location: 'Hyderabad', description: 'Premium Gear',
+          createdAt: serverTimestamp()
+        });
+      }
       onClose(); reset();
     } catch (e) {
       console.error(e);
@@ -366,6 +383,54 @@ export default function ListGearModal({ isOpen, onClose }: any) {
   };
   
   const close = () => { onClose(); reset(); };
+
+  useEffect(() => {
+    if (!isOpen || !editItem) return;
+    const specs = editItem.specs || {};
+    setC(editItem.category || '');
+    setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
+    setLogisticsType(editItem.logisticsType === 'delivery' ? 'Owner Delivery' : 'Self-Pickup');
+    if (['Laptops', 'Desktops'].includes(editItem.category)) {
+      const cpuParts = (specs.cpu || '').split(' ');
+      setCpuPlatform(cpuParts[0] || '');
+      setCpuModel(cpuParts.slice(1).join(' ') || '');
+      setRam(specs.ram || '');
+      if (specs.gpuType === 'Integrated') {
+        setGpuPlatform('Integrated'); setGpuModel(''); setVram('');
+      } else {
+        const gpuM = specs.gpuType || '';
+        setGpuModel(gpuM);
+        setGpuPlatform(detectGpuPlatform(gpuM));
+        setVram(specs.vram || '');
+      }
+      if (editItem.category === 'Desktops' && specs.peripherals) {
+        setIncMouse(specs.peripherals.mouse || false);
+        setIncKeyboard(specs.peripherals.keyboard || false);
+        setIncHeadset(specs.peripherals.headset || false);
+        if (specs.peripherals.monitor) {
+          setIncMonitor(true);
+          setMonSize(specs.peripherals.monitor.size || '');
+          setMonRefresh(specs.peripherals.monitor.refresh || '');
+          setMonRes(specs.peripherals.monitor.res || '');
+        }
+      }
+    } else if (editItem.category === 'GPUs') {
+      setGpuPlatform(specs.gpuPlatform || '');
+      setGpuModel(specs.gpuModel || '');
+      setVram(specs.vram || '');
+    } else if (editItem.category === 'Consoles') {
+      setOtherCpu(specs.model || '');
+      setNumControllers(specs.controllers || '');
+    } else if (editItem.category === 'Monitors') {
+      setMonSize(specs.monitorSize || '');
+      setMonRefresh(specs.refreshRate || '');
+      setMonRes(specs.resolution || '');
+    } else if (editItem.category === 'Controllers') {
+      setControllerPlatform(specs.controllerPlatform || '');
+      setControllerModel(specs.controllerModel || '');
+    }
+    setStep(1);
+  }, [isOpen, editItem]);
 
   useEffect(() => {
     if (gpuPlatform === 'Integrated') {
@@ -410,7 +475,7 @@ export default function ListGearModal({ isOpen, onClose }: any) {
         >
           {/* Header */}
           <div className="px-5 md:px-8 py-5 md:py-6 flex justify-between items-center shrink-0 relative rounded-t-[24px] md:rounded-t-[40px] overflow-hidden">
-            <h2 className="text-[18px] font-bold text-white tracking-tight">List Your Gear</h2>
+            <h2 className="text-[18px] font-bold text-white tracking-tight">{editItem ? 'Edit Listing' : 'List Your Gear'}</h2>
             <button onClick={close} className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-all">
               <X size={20} />
             </button>
@@ -676,7 +741,7 @@ export default function ListGearModal({ isOpen, onClose }: any) {
               </button>
             ) : (
               <button onClick={submit} disabled={!isValid() || load} className="px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 cursor-pointer">
-                {load ? 'Publishing...' : 'Publish Listing'}
+                {load ? (editItem ? 'Saving...' : 'Publishing...') : (editItem ? 'Save Changes' : 'Publish Listing')}
               </button>
             )}
           </div>

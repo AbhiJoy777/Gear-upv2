@@ -133,7 +133,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     transition={{ delay: idx * 0.05 }}
                     className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full select-none"
                   >
-                    <div className="aspect-video bg-[#0A0A0A] p-6 relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
+                    <div className="h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
                       {item.tier && (
                         <span className={`absolute top-4 right-4 text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-[24px] border-[0.5px] z-10 uppercase ${getTierColor(item.tier)}`}>
                           {item.tier} TIER
@@ -238,7 +238,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             ))}
                             <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
                                <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
-                               <span className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors">Edit Listing</span>
+                               <button
+                                 onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
+                                 className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                               >Edit Listing</button>
                             </div>
                          </div>
                        )}
