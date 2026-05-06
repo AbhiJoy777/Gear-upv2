@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
 import { useToast } from '@/context/ToastContext';
+import ConfirmModal from '../modals/ConfirmModal';
 
 type Tab = 'listings' | 'rentals';
 
@@ -23,6 +24,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [selectedRental, setSelectedRental] = useState<any>(null);
   const [rentalRole, setRentalRole] = useState<'owner' | 'renter'>('owner');
   const [initialHandshakeStep, setInitialHandshakeStep] = useState<any>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -246,16 +248,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                    className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
                                  >Edit</button>
                                  <button
-                                   onClick={async (e) => {
-                                     e.stopPropagation();
-                                     if (!window.confirm('Delete this listing? This cannot be undone.')) return;
-                                     try {
-                                       await deleteDoc(doc(db, 'listings', item.id));
-                                       showToast('Listing deleted.', 'success');
-                                     } catch (err) {
-                                       showToast('Failed to delete listing.', 'error');
-                                     }
-                                   }}
+                                   onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
                                    className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
                                  >Delete</button>
                                </div>
@@ -401,6 +394,23 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           />
         )}
       </AnimatePresence>
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete listing?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          const id = deleteTarget!;
+          setDeleteTarget(null);
+          try {
+            await deleteDoc(doc(db, 'listings', id));
+            showToast('Listing deleted.', 'success');
+          } catch (err) {
+            showToast('Failed to delete listing.', 'error');
+          }
+        }}
+      />
     </div>
   );
 });
