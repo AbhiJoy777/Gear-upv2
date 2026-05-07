@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
 import { useToast } from '@/context/ToastContext';
 import ConfirmModal from '../modals/ConfirmModal';
+import ChatModal from '../modals/ChatModal';
+
 
 type Tab = 'listings' | 'rentals';
 
@@ -25,6 +27,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [rentalRole, setRentalRole] = useState<'owner' | 'renter'>('owner');
   const [initialHandshakeStep, setInitialHandshakeStep] = useState<any>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [chatRental, setChatRental] = useState<any>(null);
+
+  const canChat = (status: string) =>
+    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL'].includes(status);
+
 
   useEffect(() => {
     if (!user) return;
@@ -220,6 +227,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 >
                                   <Navigation size={14} /> {item.logisticsType === 'delivery' ? 'Navigate to Delivery' : 'Track Borrower'}
                                 </button>
+                                {canChat(r.status) && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setChatRental(r); }}
+                                    className="w-full bg-white/5 text-white/80 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
+                                  >
+                                    <MessageCircle size={14} /> Chat
+                                  </button>
+                                )}
+
 
                                 <button 
                                   onClick={async (e) => { 
@@ -325,8 +341,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                         </div>
                       )}
 
-                      {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
-                         <div className="flex flex-col gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                           {canChat(rental.status) && (
+                              <div className="flex flex-col gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                                 <button
+                                   onClick={(e) => { e.stopPropagation(); setChatRental(rental); }}
+                                   className="w-full bg-white/5 text-white/80 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
+                                 >
+                                   <MessageCircle size={16} /> Chat
+                                 </button>
+
                             {rental.status === 'PAYMENT_PENDING' ? (
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
@@ -391,6 +414,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               setSelectedRental(null);
               setInitialHandshakeStep(undefined);
             }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {chatRental && (
+          <ChatModal
+            rental={chatRental}
+            onClose={() => setChatRental(null)}
           />
         )}
       </AnimatePresence>

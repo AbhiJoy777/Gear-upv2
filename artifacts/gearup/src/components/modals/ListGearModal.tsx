@@ -6,6 +6,7 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
+const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const CATS = [
   { name: 'Laptops', Icon: Laptop },
   { name: 'Desktops', Icon: Monitor },
@@ -148,7 +149,7 @@ function detectGpuPlatform(model: string): string {
   return 'Nvidia';
 }
 
-export default function ListGearModal({ isOpen, onClose, editItem }: any) {
+export default function ListGearModal({ isOpen, onClose, editItem, selectedCity }: any) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
@@ -169,6 +170,8 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
   const [numControllers, setNumControllers] = useState('');
 
   const [logisticsType, setLogisticsType] = useState('Self-Pickup');
+  const [city, setCity] = useState(selectedCity || 'Hyderabad');
+
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -355,14 +358,17 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
         logisticsType: logisticsType === 'Self-Pickup' ? 'pickup' : 'delivery',
         logisticsAdjustment: logisticsType === 'Self-Pickup' ? -50 : 50,
+        city,
         updatedAt: serverTimestamp()
+
       };
       if (editItem) {
         await updateDoc(doc(db, 'listings', editItem.id), payload);
       } else {
         await addDoc(collection(db, 'listings'), {
           ...payload, status: 'AVAILABLE', ownerId: user.uid,
-          location: 'Hyderabad', description: 'Premium Gear',
+          location: city, description: 'Premium Gear',
+
           createdAt: serverTimestamp()
         });
       }
@@ -383,6 +389,8 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
     setMonSize(''); setMonRefresh(''); setMonRes('');
     setControllerPlatform(''); setControllerModel('');
     setLogisticsType('Self-Pickup');
+    setCity(selectedCity || 'Hyderabad');
+
     setImgs([]); 
   };
   
@@ -394,6 +402,7 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
     setC(editItem.category || '');
     setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
     setLogisticsType(editItem.logisticsType === 'delivery' ? 'Owner Delivery' : 'Self-Pickup');
+    setCity(editItem.city || editItem.location || 'Hyderabad');
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -515,6 +524,21 @@ export default function ListGearModal({ isOpen, onClose, editItem }: any) {
                 <div className="grid grid-cols-1 gap-4 pb-2">
                   {(c === 'Laptops' || c === 'Desktops') ? (
                     <div className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
+                        <select
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none cursor-pointer"
+                        >
+                          {CITIES.map((cityName) => (
+                            <option key={cityName} value={cityName} className="bg-[#121212] text-white">
+                              {cityName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <Select label="CPU Platform" val={cpuPlatform} set={setCpuPlatform} opts={CPU_PLATFORMS} />
                         <Select label="CPU Model" val={cpuModel} set={setCpuModel} opts={cpuPlatform === 'Intel' ? INTEL_CPUS : cpuPlatform === 'AMD' ? AMD_CPUS : []} disabled={!cpuPlatform} />

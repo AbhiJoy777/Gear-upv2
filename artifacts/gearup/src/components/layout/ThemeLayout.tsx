@@ -19,6 +19,12 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [profileModalDismissed, setProfileModalDismissed] = useState(false);
+  const [selectedCity, setSelectedCity] = useState('Hyderabad');
+
+  React.useEffect(() => {
+    if (profile?.city) setSelectedCity(profile.city);
+  }, [profile?.city]);
+
 
   React.useEffect(() => {
     const handleOpen = () => { setEditItem(null); setIsListModalOpen(true); };
@@ -62,7 +68,8 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col text-white font-sans">
-      <Header />
+      <Header selectedCity={selectedCity} onCityChange={setSelectedCity} />
+
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
         <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
@@ -70,7 +77,8 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
             {pathname === '/' ? (
               <div className="relative">
                 <div key="marketplace" className={activeTab === 'marketplace' ? 'block' : 'hidden'}>
-                  <MarketplaceView />
+                  <MarketplaceView selectedCity={selectedCity} />
+
                 </div>
                 <div key="dashboard" className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
                   <DashboardView />
@@ -92,7 +100,9 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
         isOpen={isListModalOpen}
         onClose={() => { setIsListModalOpen(false); setEditItem(null); }}
         editItem={editItem}
+        selectedCity={selectedCity}
       />
+
       {showProfileCompletion && (
         <ProfileCompletionModal onSkip={() => setProfileModalDismissed(true)} />
       )}

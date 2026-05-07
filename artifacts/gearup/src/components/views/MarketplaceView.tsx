@@ -10,7 +10,8 @@ import BookingModal from '../modals/BookingModal';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
 
-const MarketplaceView = memo(() => {
+const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
+
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [fetchingItems, setFetchingItems] = useState(true);
@@ -48,9 +49,13 @@ const MarketplaceView = memo(() => {
     return 'text-white border-white/20 bg-white/5';
   };
 
-  const filteredItems = selectedCategory === 'All Gear' 
-    ? items 
-    : items.filter(item => item.category === selectedCategory);
+  const filteredItems = items.filter((item) => {
+    const itemCity = item.city || 'Hyderabad';
+    const cityMatches = itemCity === selectedCity;
+    const categoryMatches = selectedCategory === 'All Gear' || item.category === selectedCategory;
+    return cityMatches && categoryMatches;
+  });
+
 
   return (
     <div className="p-6 md:p-10 space-y-10">
@@ -132,7 +137,9 @@ const MarketplaceView = memo(() => {
                     <h3 className="font-semibold text-[15px] text-white group-hover:text-[#2DD4BF] transition-colors tracking-tight line-clamp-1 duration-300">{item.title}</h3>
                   </div>
                 <p className="text-[#707070] text-[12px] mb-4 line-clamp-2 font-medium leading-relaxed flex-1 flex flex-col gap-1.5">
-                  <span>{item.category} <span className="opacity-50 mx-1">•</span> {item.location || 'Hyderabad'}</span>
+                  <span>{item.category} <span className="opacity-50 mx-1">•</span> {item.city || 'Hyderabad'}</span>
+
+
                   {item.logisticsType && (
                     <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-max px-2 py-1 rounded-[6px] border border-white/[0.05]">
                       {item.logisticsType === 'Owner Delivery' || item.logisticsType === 'delivery' ? <Truck size={12} className="text-[#A855F7]" /> : <MapPin size={12} className="text-[#A855F7]" />}
@@ -161,7 +168,8 @@ const MarketplaceView = memo(() => {
              <Camera size={48} className="text-[#A855F7]/40 mb-6 mx-auto" />
              <h3 className="text-[20px] font-bold text-white mb-2 tracking-tight text-center">Vault is Empty</h3>
              <p className="text-[#707070] text-[13px] text-center max-w-sm mb-8 font-medium leading-relaxed">
-               No {selectedCategory !== 'All Gear' ? selectedCategory : 'Gear'} listed in Hyderabad yet. Be the first explorer to list high-end gear.
+                No {selectedCategory !== 'All Gear' ? selectedCategory : 'Gear'} listed in {selectedCity} yet. Be the first explorer to list high-end gear.
+
              </p>
              <button onClick={() => window.dispatchEvent(new CustomEvent('open-list-modal'))} className="cursor-pointer flex items-center justify-center gap-2.5 px-6 py-3.5 bg-[#A855F7] text-white font-bold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide mx-auto">
                <PlusCircle size={18} />

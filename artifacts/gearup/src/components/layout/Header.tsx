@@ -7,7 +7,10 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
-const Header = memo(() => {
+const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
+
+const Header = memo(({ selectedCity, onCityChange }: { selectedCity: string; onCityChange: (city: string) => void }) => {
+
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -33,7 +36,8 @@ const Header = memo(() => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#707070] group-focus-within:text-white transition-all" />
           <input 
             type="text" 
-            placeholder="Search Hyderabad Hardware..." 
+            placeholder={`Search ${selectedCity} Hardware...`} 
+
             className="w-full h-[36px] bg-[#080808] border-[0.5px] border-white/[0.04] rounded-[24px] px-10 text-[13px] focus:outline-none focus:border-white/20 transition-all text-white placeholder:text-[#707070] font-medium"
           />
         </div>
@@ -43,6 +47,18 @@ const Header = memo(() => {
       </div>
 
       <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <select
+          value={selectedCity}
+          onChange={(e) => onCityChange(e.target.value)}
+          className="hidden sm:block h-[32px] bg-[#080808] border-[0.5px] border-white/[0.04] rounded-[24px] px-3 text-[12px] text-white focus:outline-none focus:border-white/20 cursor-pointer"
+        >
+          {CITIES.map((city) => (
+            <option key={city} value={city} className="bg-[#080808] text-white">
+              {city}
+            </option>
+          ))}
+        </select>
+
         <button 
           onClick={() => window.dispatchEvent(new CustomEvent('open-list-modal'))}
           className="cursor-pointer w-[32px] h-[32px] flex items-center justify-center text-white border-[0.5px] border-white/20 rounded-full hover:bg-white/5 hover:border-white/50 hover:shadow-[0_0_10px_rgba(255,255,255,0.15)] transition-all active:scale-95"

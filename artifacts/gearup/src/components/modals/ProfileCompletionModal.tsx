@@ -6,6 +6,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
+const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 interface Props {
   onSkip: () => void;
 }
@@ -16,6 +17,7 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('Hyderabad');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -31,6 +33,7 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
         username: username.trim(),
         fullName: fullName.trim(),
         phone: phone.trim(),
+        city,
         updatedAt: serverTimestamp(),
       });
       showToast('Profile saved!', 'success');
@@ -113,9 +116,25 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
                   maxLength={20}
                 />
               </div>
-            </div>
+              </div>
 
-            <div className="flex items-center gap-3 pt-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className={inputClass}
+                >
+                  {CITIES.map((cityName) => (
+                    <option key={cityName} value={cityName} className="bg-[#0A0A0A] text-white">
+                      {cityName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+
               <button
                 type="submit"
                 disabled={saving}
