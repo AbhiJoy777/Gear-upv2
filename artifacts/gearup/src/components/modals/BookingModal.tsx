@@ -69,6 +69,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
         timeSlot: timeSlot,
         status: 'REQUESTED',
         totalPrice: finalTotalPrice,
+        pricePerDay: item.pricePerDay || 0,
         logisticsType: item.logisticsType || 'pickup',
         logisticsAdjustment: logisticsAdj,
         createdAt: serverTimestamp(),

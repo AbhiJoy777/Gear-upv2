@@ -50,7 +50,7 @@ const Header = memo(({ selectedCity, onCityChange }: { selectedCity: string; onC
         <select
           value={selectedCity}
           onChange={(e) => onCityChange(e.target.value)}
-          className="hidden sm:block h-[32px] bg-[#080808] border-[0.5px] border-white/[0.04] rounded-[24px] px-3 text-[12px] text-white focus:outline-none focus:border-white/20 cursor-pointer"
+          className="h-[32px] w-[104px] sm:w-auto bg-[#080808] border-[0.5px] border-white/[0.04] rounded-[24px] px-2 sm:px-3 text-[11px] sm:text-[12px] text-white focus:outline-none focus:border-white/20 cursor-pointer"
         >
           {CITIES.map((city) => (
             <option key={city} value={city} className="bg-[#080808] text-white">
