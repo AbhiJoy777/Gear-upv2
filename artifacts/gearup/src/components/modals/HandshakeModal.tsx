@@ -106,7 +106,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              // Payment Logic: Update statuses and wallets
              await updateDoc(doc(db, 'rentals', rental.id), {
                status: 'ACTIVE_RENTAL',
-               actualStartTime: serverTimestamp()
+               actualStartTime: serverTimestamp(),
+               returnDueAt: null
              });
              
              await updateDoc(doc(db, 'listings', rental.gearId), {
@@ -315,7 +316,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                         try {
                            await updateDoc(doc(db, 'rentals', rental.id), {
                              status: 'ACTIVE_RENTAL',
-                             actualStartTime: serverTimestamp()
+                             actualStartTime: serverTimestamp(),
+                             returnDueAt: null
                            });
                            await updateDoc(doc(db, 'listings', rental.gearId), {
                              status: 'IN_USE'

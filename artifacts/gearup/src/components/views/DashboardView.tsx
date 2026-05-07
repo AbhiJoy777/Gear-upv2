@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
 import { useToast } from '@/context/ToastContext';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -29,8 +29,98 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [chatRental, setChatRental] = useState<any>(null);
 
+  const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+
   const canChat = (status: string) =>
-    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL'].includes(status);
+    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+
+  const getRentalEndDate = (rental: any) => {
+    if (!rental?.actualStartTime || !rental?.durationDays) return null;
+    const start = rental.actualStartTime.toDate ? rental.actualStartTime.toDate() : new Date(rental.actualStartTime);
+    return new Date(start.getTime() + rental.durationDays * 24 * 60 * 60 * 1000);
+  };
+
+  const getLateDays = (rental: any) => {
+    const end = getRentalEndDate(rental);
+    if (!end) return 0;
+    const diff = Date.now() - end.getTime();
+    if (diff <= 0) return 0;
+    return Math.floor(diff / (24 * 60 * 60 * 1000));
+  };
+
+  const getDailyRent = (rental: any) => {
+    if (rental.pricePerDay) return rental.pricePerDay;
+    if (rental.totalPrice && rental.durationDays) return Math.ceil(rental.totalPrice / rental.durationDays);
+    return 0;
+  };
+
+  const getExtraAmountDue = (rental: any) => {
+    const lateDays = getLateDays(rental);
+    return lateDays * (getDailyRent(rental) + 100);
+  };
+
+  const moveToReturnDue = async (rental: any) => {
+    if (!rental?.id || rental.status !== 'ACTIVE_RENTAL') return;
+    try {
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        status: 'RETURN_DUE',
+        returnDueAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to move rental to return due.', 'error');
+    }
+  };
+
+  const handleReturnGear = async (rental: any) => {
+    const lateDays = getLateDays(rental);
+    const extraAmountDue = getExtraAmountDue(rental);
+
+    try {
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        status: 'RETURNED',
+        returnedAt: serverTimestamp(),
+        lateDays,
+        extraAmountDue,
+      });
+      await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
+      await addDoc(collection(db, 'notifications'), {
+        userId: rental.ownerId,
+        title: 'Gear Returned',
+        message: `${rental.gearTitle} has been marked returned.${extraAmountDue > 0 ? ` Extra amount due: Rs ${extraAmountDue}.` : ''}`,
+        type: 'return',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Return marked complete.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to mark return complete.', 'error');
+    }
+  };
+
+  const cancelRental = async (rental: any, cancelledBy: 'owner' | 'renter') => {
+    try {
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        status: 'CANCELLED',
+        cancelledBy,
+        cancelledAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
+      await addDoc(collection(db, 'notifications'), {
+        userId: cancelledBy === 'owner' ? rental.renterId : rental.ownerId,
+        title: cancelledBy === 'owner' ? 'Renting Cancelled' : 'Borrowing Cancelled',
+        message: `${rental.gearTitle} rental was cancelled before handoff.`,
+        type: 'cancelled',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      showToast('Rental cancelled.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to cancel rental.', 'error');
+    }
+  };
 
 
   useEffect(() => {
@@ -61,6 +151,24 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       unsubscribeOwnerRentals();
     };
   }, [user]);
+
+  useEffect(() => {
+    const active = [...rentals, ...ownerRentals].filter((r) => r.status === 'ACTIVE_RENTAL');
+    if (active.length === 0) return;
+
+    const checkExpiredRentals = () => {
+      active.forEach((rental) => {
+        const end = getRentalEndDate(rental);
+        if (end && end.getTime() <= Date.now()) {
+          moveToReturnDue(rental);
+        }
+      });
+    };
+
+    checkExpiredRentals();
+    const interval = window.setInterval(checkExpiredRentals, 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, [rentals, ownerRentals]);
 
   const handleAccept = async (e: React.MouseEvent, rentalId: string, gearId: string) => {
     e.stopPropagation();
@@ -134,7 +242,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
                 {listings.map((item, idx) => {
                   const pendingRental = ownerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
-                  const activeRental = ownerRentals.find(r => r.gearId === item.id && r.status === 'ACTIVE_RENTAL');
+                  const activeRental = ownerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
+                  const lockedRental = ownerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
                   
                   return (
                   <motion.div
@@ -161,23 +270,45 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
                       
                       {activeRental && activeRental.actualStartTime && (
-                        <div className="mb-6 p-4 bg-[#2DD4BF]/10 rounded-[16px] border border-[#2DD4BF]/20">
-                          <p className="text-[10px] uppercase font-bold text-[#2DD4BF] tracking-wider mb-1">Rental Active</p>
+                        <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
+                          activeRental.status === 'RETURN_DUE'
+                            ? 'bg-red-500/10 border-red-500/20'
+                            : 'bg-[#2DD4BF]/10 border-[#2DD4BF]/20'
+                        }`}>
+                          <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                            activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'
+                          }`}>
+                            {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
+                          </p>
                           <div className="flex items-center gap-2 text-white font-mono text-sm">
-                            <Box size={14} className="text-[#2DD4BF]" />
+                            <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
-                              Expires in: {(() => {
-                                const start = activeRental.actualStartTime.toDate ? activeRental.actualStartTime.toDate() : new Date(activeRental.actualStartTime);
-                                const end = new Date(start.getTime() + activeRental.durationDays * 24 * 60 * 60 * 1000);
-                                const now = new Date();
-                                const diff = end.getTime() - now.getTime();
-                                if (diff <= 0) return 'Late';
+                              {(() => {
+                                const end = getRentalEndDate(activeRental);
+                                if (!end) return 'Timer unavailable';
+                                const diff = end.getTime() - Date.now();
+
+                                if (activeRental.status === 'RETURN_DUE' || diff <= 0) {
+                                  const lateDays = getLateDays(activeRental);
+                                  const extra = getExtraAmountDue(activeRental);
+                                  return lateDays > 0 ? `Late by ${lateDays}d - Due Rs ${extra}` : 'Return due now';
+                                }
+
                                 const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                                 const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                return `${days}d ${hours}h`;
+                                return `Expires in: ${days}d ${hours}h`;
                               })()}
                             </span>
                           </div>
+
+                          {activeRental.status === 'ACTIVE_RENTAL' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveToReturnDue(activeRental); }}
+                              className="w-full bg-white/5 text-white/70 font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-white/10 hover:text-white transition-all border border-white/10"
+                            >
+                              <AlertTriangle size={13} /> Expire for testing
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -203,6 +334,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                 </div>
                                 
+                                {r.status === 'ACCEPTED' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); cancelRental(r, 'owner'); }}
+                                    className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
+                                  >
+                                    <Ban size={14} /> Cancel Renting
+                                  </button>
+                                )}
+
                                 {r.status === 'ACCEPTED' ? (
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); openHandshake(r, 'owner'); }}
@@ -258,16 +398,18 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             ))}
                             <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
                                <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
-                               <div className="flex items-center gap-3">
-                                 <button
-                                   onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
-                                   className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
-                                 >Edit</button>
-                                 <button
-                                   onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
-                                   className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
-                                 >Delete</button>
-                               </div>
+                               {!lockedRental && (
+                                 <div className="flex items-center gap-3">
+                                   <button
+                                     onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
+                                     className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                                   >Edit</button>
+                                   <button
+                                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
+                                     className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
+                                   >Delete</button>
+                                 </div>
+                               )}
                             </div>
                          </div>
                        )}
@@ -314,23 +456,43 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       
                       <div className="py-3 border-y border-white/5 mb-6 flex items-center justify-between">
                         <span className="text-[11px] text-white/40 font-bold uppercase tracking-widest">Status</span>
-                        <span className={`text-[12px] font-bold ${rental.status === 'ACCEPTED' ? 'text-[#F97316]' : 'text-[#2DD4BF]'}`}>
-                          {rental.status === 'ACCEPTED' ? 'Owner Securing Gear...' : rental.status === 'PROOF_RECORDED' ? 'Ready for Handover' : rental.status}
+                        <span className={`text-[12px] font-bold ${
+                          rental.status === 'ACCEPTED' ? 'text-[#F97316]' : rental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'
+                        }`}>
+                          {rental.status === 'ACCEPTED'
+                            ? 'Owner Securing Gear...'
+                            : rental.status === 'PROOF_RECORDED'
+                              ? 'Ready for Handover'
+                              : rental.status === 'RETURN_DUE'
+                                ? 'Return Due'
+                                : rental.status}
                         </span>
                       </div>
                       
-                      {rental.status === 'ACTIVE_RENTAL' && rental.actualStartTime && (
-                        <div className="mb-6 p-4 bg-[#A855F7]/10 rounded-[16px] border border-[#A855F7]/20">
-                          <p className="text-[10px] uppercase font-bold text-[#A855F7] tracking-wider mb-1">Time Remaining</p>
+                      {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) && rental.actualStartTime && (
+                        <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
+                          rental.status === 'RETURN_DUE'
+                            ? 'bg-red-500/10 border-red-500/20'
+                            : 'bg-[#A855F7]/10 border-[#A855F7]/20'
+                        }`}>
+                          <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                            rental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#A855F7]'
+                          }`}>
+                            {rental.status === 'RETURN_DUE' ? 'Return Phase' : 'Time Remaining'}
+                          </p>
                           <div className="flex items-center gap-2 text-white font-mono text-lg">
-                            <Box size={16} className="text-[#A855F7]" />
+                            <Box size={16} className={rental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#A855F7]'} />
                             <span>
                               {(() => {
-                                const start = rental.actualStartTime.toDate ? rental.actualStartTime.toDate() : new Date(rental.actualStartTime);
-                                const end = new Date(start.getTime() + rental.durationDays * 24 * 60 * 60 * 1000);
-                                const now = new Date();
-                                const diff = end.getTime() - now.getTime();
-                                if (diff <= 0) return 'Late';
+                                const end = getRentalEndDate(rental);
+                                if (!end) return 'Timer unavailable';
+                                const diff = end.getTime() - Date.now();
+
+                                if (rental.status === 'RETURN_DUE' || diff <= 0) {
+                                  const lateDays = getLateDays(rental);
+                                  return lateDays > 0 ? `Late ${lateDays}d` : 'Return due now';
+                                }
+
                                 const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                                 const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                                 const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -338,6 +500,34 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               })()}
                             </span>
                           </div>
+
+                          {rental.status === 'RETURN_DUE' && (
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-[12px]">
+                              <p className="text-[11px] text-red-300 font-bold uppercase tracking-wider mb-1">Remaining Amount Due</p>
+                              <p className="text-white text-[15px] font-bold">Rs {getExtraAmountDue(rental)}</p>
+                              <p className="text-white/40 text-[11px] mt-1">
+                                Extra rent Rs {getDailyRent(rental)} + Rs 100 late fee per delayed day.
+                              </p>
+                            </div>
+                          )}
+
+                          {rental.status === 'ACTIVE_RENTAL' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); moveToReturnDue(rental); }}
+                              className="w-full bg-white/5 text-white/70 font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-white/10 hover:text-white transition-all border border-white/10"
+                            >
+                              <AlertTriangle size={13} /> Expire for testing
+                            </button>
+                          )}
+
+                          {rental.status === 'RETURN_DUE' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleReturnGear(rental); }}
+                              className="w-full bg-[#2DD4BF] text-black font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#14b8a6] transition-all"
+                            >
+                              <RotateCcw size={14} /> Return Gear
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -350,7 +540,17 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                    <MessageCircle size={16} /> Chat
                                  </button>
 
-                            {rental.status === 'PAYMENT_PENDING' ? (
+                            {rental.status === 'ACCEPTED' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); cancelRental(rental, 'renter'); }}
+                                className="w-full bg-red-500/10 text-red-400 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
+                              >
+                                <Ban size={16} /> Cancel Borrowing
+                              </button>
+                            )}
+
+                            {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
+                              rental.status === 'PAYMENT_PENDING' ? (
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
                                   className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10"
@@ -370,6 +570,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   <Navigation size={16} /> 
                                   {rental.logisticsType === 'delivery' ? 'Track Delivery' : 'Navigate to Pickup'}
                                 </button>
+                              )
                             )}
                          </div>
                       )}
