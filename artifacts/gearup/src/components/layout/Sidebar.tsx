@@ -1,28 +1,33 @@
 
 
 import React, { memo } from 'react';
-import { Package, Wallet, User as UserIcon, ShoppingBag, Plus } from 'lucide-react';
+import { Package, Wallet, User as UserIcon, ShoppingBag, ShieldCheck } from 'lucide-react';
 import { AppTab } from './ThemeLayout';
 
-const NavLinks: { name: string; icon: any; id: AppTab }[] = [
+const BASE_NAV_LINKS: { name: string; icon: any; id: AppTab }[] = [
   { name: 'Marketplace', icon: ShoppingBag, id: 'marketplace' },
   { name: 'My Dashboard', icon: Package, id: 'dashboard' },
   { name: 'Wallet', icon: Wallet, id: 'wallet' },
   { name: 'Profile', icon: UserIcon, id: 'profile' },
 ];
 
+const ADMIN_NAV_LINK = { name: 'Admin', icon: ShieldCheck, id: 'admin' as AppTab };
+
 interface SidebarProps {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
+  isAdmin?: boolean;
 }
 
-const Sidebar = memo(({ activeTab, onTabChange }: SidebarProps) => {
+const Sidebar = memo(({ activeTab, onTabChange, isAdmin = false }: SidebarProps) => {
+  const navLinks = isAdmin ? [...BASE_NAV_LINKS, ADMIN_NAV_LINK] : BASE_NAV_LINKS;
+
   return (
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-20 lg:w-[260px] bg-[#080808] border-r-[1px] border-white/5 flex-col py-8 shrink-0 z-40">
         <nav className="flex-1 px-4 space-y-2">
-          {NavLinks.map((link) => (
+          {navLinks.map((link) => (
             <button 
               key={link.id}
               onClick={() => onTabChange(link.id)}
@@ -44,7 +49,7 @@ const Sidebar = memo(({ activeTab, onTabChange }: SidebarProps) => {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[#080808]/95 border-t-[1px] border-white/5 backdrop-blur-2xl flex items-center justify-around px-2 z-50 pointer-events-auto">
-        {NavLinks.map((link) => (
+        {navLinks.map((link) => (
           <button 
             key={link.id}
             onClick={() => onTabChange(link.id)}

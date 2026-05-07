@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function ProfileCompletionModal({ onSkip }: Props) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
@@ -34,6 +34,8 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
         fullName: fullName.trim(),
         phone: phone.trim(),
         city,
+        role: profile?.role || 'user',
+        verificationStatus: profile?.verificationStatus || 'not_started',
         updatedAt: serverTimestamp(),
       });
       showToast('Profile saved!', 'success');

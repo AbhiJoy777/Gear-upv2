@@ -7,10 +7,11 @@ import MarketplaceView from '../views/MarketplaceView';
 import DashboardView from '../views/DashboardView';
 import WalletView from '../views/WalletView';
 import ProfileView from '../views/ProfileView';
+import AdminView from '../views/AdminView';
 import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 
-export type AppTab = 'marketplace' | 'dashboard' | 'wallet' | 'profile';
+export type AppTab = 'marketplace' | 'dashboard' | 'wallet' | 'profile' | 'admin';
 
 export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -20,6 +21,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const [editItem, setEditItem] = useState<any>(null);
   const [profileModalDismissed, setProfileModalDismissed] = useState(false);
   const [selectedCity, setSelectedCity] = useState('Hyderabad');
+  const isAdmin = profile?.role === 'admin';
 
   React.useEffect(() => {
     if (profile?.city) setSelectedCity(profile.city);
@@ -71,7 +73,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
       <Header selectedCity={selectedCity} onCityChange={setSelectedCity} />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
         <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
           <div className="min-h-full">
             {pathname === '/' ? (
@@ -89,6 +91,11 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
                 <div key="profile" className={activeTab === 'profile' ? 'block' : 'hidden'}>
                   <ProfileView />
                 </div>
+                {isAdmin && (
+                  <div key="admin" className={activeTab === 'admin' ? 'block' : 'hidden'}>
+                    <AdminView />
+                  </div>
+                )}
               </div>
             ) : (
               children
