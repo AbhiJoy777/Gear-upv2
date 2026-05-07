@@ -30,6 +30,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [chatRental, setChatRental] = useState<any>(null);
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+  const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
@@ -334,7 +335,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                 </div>
                                 
-                                {r.status === 'ACCEPTED' && (
+                                {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); cancelRental(r, 'owner'); }}
                                     className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
@@ -540,7 +541,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                    <MessageCircle size={16} /> Chat
                                  </button>
 
-                            {rental.status === 'ACCEPTED' && (
+                            {CANCELLABLE_RENTAL_STATUSES.includes(rental.status) && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); cancelRental(rental, 'renter'); }}
                                 className="w-full bg-red-500/10 text-red-400 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
