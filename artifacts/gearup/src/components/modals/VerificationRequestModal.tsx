@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
-const ID_TYPES = ['Aadhaar', 'PAN', 'Driving License', 'Passport'];
+const ID_TYPES = ['Aadhaar', 'PAN', 'Driving License'];
 
 export default function VerificationRequestModal({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAuth();
@@ -14,7 +14,6 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
   const [fullName, setFullName] = useState(profile?.fullName || profile?.name || profile?.username || '');
   const [idType, setIdType] = useState(ID_TYPES[0]);
   const [idNumber, setIdNumber] = useState('');
-  const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,7 +52,6 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
         fullName: fullName.trim(),
         idType,
         idNumber: idNumber.trim(),
-        note: note.trim(),
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -73,7 +71,7 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
     }
   };
 
-  const inputClass = 'w-full bg-[#0A0A0A] border border-white/10 rounded-[16px] px-4 py-3.5 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors';
+  const inputClass = 'w-full bg-[#0A0A0A] border border-white/10 rounded-[14px] px-4 py-3 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors';
 
   return (
     <AnimatePresence>
@@ -92,7 +90,7 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative z-10 w-full max-w-[500px] bg-[#121212] border border-white/10 rounded-[32px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
         >
-          <div className="px-6 py-5 flex items-center justify-between border-b border-white/5">
+          <div className="px-5 md:px-6 py-4 flex items-center justify-between border-b border-white/5">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-[#A855F7]/10 flex items-center justify-center">
                 <ShieldCheck size={18} className="text-[#A855F7]" />
@@ -108,7 +106,7 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
           </div>
 
           <form onSubmit={handleSubmit}>
-            <div className="p-6 space-y-5">
+            <div className="px-5 md:px-6 py-5 space-y-4">
               <div>
                 <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">Full Legal Name</label>
                 <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
@@ -130,19 +128,9 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
                 <input value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">Optional Note</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={4}
-                  className={`${inputClass} resize-none`}
-                  placeholder="Anything the admin should know?"
-                />
-              </div>
             </div>
 
-            <div className="px-6 py-5 border-t border-white/5 flex justify-end gap-3">
+            <div className="px-5 md:px-6 py-4 border-t border-white/5 flex justify-end gap-3">
               <button type="button" onClick={onClose} className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all">
                 Cancel
               </button>
