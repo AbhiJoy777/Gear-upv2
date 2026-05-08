@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, X, Users, Package, ShieldCheck, ClipboardList } from 'lucide-react';
+import { Check, X, Users, Package, ShieldCheck, ClipboardList, Flag } from 'lucide-react';
 import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -27,6 +27,7 @@ const AdminView = memo(() => {
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [listings, setListings] = useState<any[]>([]);
   const [rentals, setRentals] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -41,12 +42,16 @@ const AdminView = memo(() => {
     const unsubRentals = onSnapshot(collection(db, 'rentals'), (snapshot) => {
       setRentals(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
     });
+    const unsubReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
+      setReports(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+    });
 
     return () => {
       unsubUsers();
       unsubListings();
       unsubVerificationRequests();
       unsubRentals();
+      unsubReports();
     };
   }, []);
 
@@ -75,6 +80,21 @@ const AdminView = memo(() => {
 
   const pendingRequests = verificationRequests.filter((item) => item.status === 'pending');
   const activeRentals = rentals.filter((item) => item.status === 'ACTIVE_RENTAL');
+  const activeReports = reports.filter((item) => ['open', 'reviewing'].includes(item.status || 'open'));
+
+  const updateReportStatus = async (reportId: string, status: 'reviewing' | 'resolved' | 'rejected') => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'reports', reportId), {
+        status,
+        updatedAt: serverTimestamp(),
+      });
+      showToast(`Report marked ${status}.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update report.', 'error');
+    }
+  };
 
   const statCards = [
     { label: 'Total Users', value: usersList.length, Icon: Users },
@@ -105,6 +125,60 @@ const AdminView = memo(() => {
           </motion.div>
         ))}
       </div>
+
+      <section className="space-y-4">
+        <h3 className="text-[14px] font-black uppercase tracking-widest text-white/70">Open Reports</h3>
+        <div className="grid gap-3">
+          {activeReports.length === 0 ? (
+            <div className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-5 text-[#707070] text-[13px]">
+              No open reports.
+            </div>
+          ) : (
+            activeReports.map((report) => {
+              const relatedListing = listings.find((item) => item.id === report.listingId);
+              const relatedRental = rentals.find((item) => item.id === report.rentalId);
+              return (
+                <div key={report.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Flag size={14} className="text-red-400" />
+                      <p className="text-white font-semibold text-[14px]">{report.reason || 'Report'}</p>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border border-red-500/20 bg-red-500/10 text-red-400">
+                        {report.status || 'open'}
+                      </span>
+                    </div>
+                    <p className="text-[#707070] text-[12px]">Reporter: {report.reporterEmail || report.reporterId || 'Unknown user'}</p>
+                    <p className="text-white/45 text-[12px] leading-relaxed max-w-3xl">{report.description || 'No description provided.'}</p>
+                    <p className="text-white/30 text-[11px]">
+                      {relatedRental?.gearTitle || relatedListing?.title || report.rentalId || report.listingId || 'User behavior report'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => updateReportStatus(report.id, 'reviewing')}
+                      className="px-3 py-2 bg-[#F97316]/10 text-[#F97316] font-bold rounded-[12px] text-[12px] border border-[#F97316]/20 hover:bg-[#F97316]/20 transition-all"
+                    >
+                      Reviewing
+                    </button>
+                    <button
+                      onClick={() => updateReportStatus(report.id, 'resolved')}
+                      className="px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] hover:bg-[#14b8a6] transition-all"
+                    >
+                      Resolve
+                    </button>
+                    <button
+                      onClick={() => updateReportStatus(report.id, 'rejected')}
+                      className="px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] border border-red-500/20 hover:bg-red-500/20 transition-all"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
 
       <section className="space-y-4">
         <h3 className="text-[14px] font-black uppercase tracking-widest text-white/70">Pending Verification Requests</h3>

@@ -3,8 +3,8 @@
 import React, { useEffect, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
-import { collection, query, limit, onSnapshot, where, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Camera, Box, PlusCircle, Loader2, ChevronRight, Zap, MapPin, Truck } from 'lucide-react';
+import { collection, query, limit, onSnapshot, where } from 'firebase/firestore';
+import { Camera, PlusCircle, Loader2, MapPin, Truck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 
