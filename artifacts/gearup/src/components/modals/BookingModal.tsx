@@ -56,8 +56,9 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate) return;
     setLoading(true);
+    let bookingStep = 'rental create';
     try {
-      await addDoc(collection(db, 'rentals'), {
+      const rentalPayload = {
         gearId: item.id,
         gearTitle: item.title,
         renterId: user.uid,
@@ -73,8 +74,17 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
         logisticsType: item.logisticsType || 'pickup',
         logisticsAdjustment: logisticsAdj,
         createdAt: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, 'rentals'), rentalPayload);
+
+      bookingStep = 'listing reserve';
+      await updateDoc(doc(db, 'listings', item.id), {
+        status: 'RESERVED',
+        updatedAt: serverTimestamp(),
       });
 
+      bookingStep = 'notification create';
       await addDoc(collection(db, 'notifications'), {
         userId: item.ownerId,
         actorId: user.uid,
@@ -85,15 +95,12 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
         read: false,
         createdAt: serverTimestamp(),
       });
-
-      await updateDoc(doc(db, 'listings', item.id), {
-        status: 'RESERVED'
-      });
       
       showToast('Booking request sent! The owner will review it shortly.', 'success');
       onClose();
     } catch (err) {
       console.error('Booking request failed:', {
+        step: bookingStep,
         error: err,
         code: (err as any)?.code,
         message: (err as any)?.message,

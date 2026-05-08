@@ -81,6 +81,17 @@ service cloud.firestore {
 
     function validRequestedRental() {
       return signedIn()
+        && request.resource.data.keys().hasAll([
+          'gearId',
+          'gearTitle',
+          'renterId',
+          'ownerId',
+          'startDate',
+          'durationDays',
+          'status',
+          'totalPrice',
+          'createdAt'
+        ])
         && request.resource.data.renterId == request.auth.uid
         && request.resource.data.status == 'REQUESTED'
         && exists(listingPath(request.resource.data.gearId))
@@ -132,7 +143,7 @@ service cloud.firestore {
         && request.resource.data.status == 'RESERVED'
         && resource.data.ownerId != request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
     }
 
     // Users: protect private profiles and prevent normal users from self-upgrading role.
