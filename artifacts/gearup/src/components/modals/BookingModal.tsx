@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, MapPin, Truck, ArrowLeft, Clock, Zap } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
@@ -54,43 +54,75 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const finalTotalPrice = discountedBasePrice + logisticsAdj;
 
   const handleConfirm = async () => {
-    if (!user || finalDays <= 0 || !startDate) return;
+    if (!user || finalDays <= 0 || !startDate || loading) return;
     setLoading(true);
     try {
-      await addDoc(collection(db, 'rentals'), {
-        gearId: item.id,
-        gearTitle: item.title,
-        renterId: user.uid,
-        renterEmail: user.email,
-        ownerId: item.ownerId,
-        ownerEmail: item.ownerEmail || 'GearUp Partner',
-        startDate: new Date(startDate),
-        durationDays: finalDays,
-        timeSlot: timeSlot,
-        status: 'REQUESTED',
-        totalPrice: finalTotalPrice,
-        pricePerDay: item.pricePerDay || 0,
-        logisticsType: item.logisticsType || 'pickup',
-        logisticsAdjustment: logisticsAdj,
-        createdAt: serverTimestamp(),
+      const existingRentalQuery = query(
+        collection(db, 'rentals'),
+        where('renterId', '==', user.uid)
+      );
+      const existingRentalSnapshot = await getDocs(existingRentalQuery);
+      const duplicateRequest = existingRentalSnapshot.docs.some((doc) => {
+        const rental = doc.data();
+        return rental.gearId === item.id
+          && ['REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status);
       });
+      if (duplicateRequest) {
+        showToast('You already requested this gear.', 'error');
+        return;
+      }
 
-      await addDoc(collection(db, 'notifications'), {
-        userId: item.ownerId,
-        title: 'New Booking Request',
-        message: `${user.email} requested to book ${item.title} for ${finalDays} days.`,
-        type: 'request',
-        read: false,
-        createdAt: serverTimestamp(),
-      });
+      await runTransaction(db, async (transaction) => {
+        const listingRef = doc(db, 'listings', item.id);
+        const listingSnap = await transaction.get(listingRef);
 
-      await updateDoc(doc(db, 'listings', item.id), {
-        status: 'RESERVED'
+        if (!listingSnap.exists() || listingSnap.data().status !== 'AVAILABLE') {
+          throw new Error('GEAR_UNAVAILABLE');
+        }
+
+        const rentalRef = doc(collection(db, 'rentals'));
+        transaction.set(rentalRef, {
+          gearId: item.id,
+          gearTitle: item.title,
+          renterId: user.uid,
+          renterEmail: user.email,
+          ownerId: item.ownerId,
+          ownerEmail: item.ownerEmail || 'GearUp Partner',
+          startDate: new Date(startDate),
+          durationDays: finalDays,
+          timeSlot: timeSlot,
+          status: 'REQUESTED',
+          totalPrice: finalTotalPrice,
+          pricePerDay: item.pricePerDay || 0,
+          logisticsType: item.logisticsType || 'pickup',
+          logisticsAdjustment: logisticsAdj,
+          createdAt: serverTimestamp(),
+        });
+
+        transaction.update(listingRef, {
+          status: 'RESERVED',
+          reservedBy: user.uid,
+          reservedRentalId: rentalRef.id,
+          updatedAt: serverTimestamp(),
+        });
+
+        transaction.set(doc(collection(db, 'notifications')), {
+          userId: item.ownerId,
+          title: 'New Booking Request',
+          message: `${user.email} requested to book ${item.title} for ${finalDays} days.`,
+          type: 'request',
+          read: false,
+          createdAt: serverTimestamp(),
+        });
       });
       
       showToast('Booking request sent! The owner will review it shortly.', 'success');
       onClose();
     } catch (err) {
+      if ((err as Error)?.message === 'GEAR_UNAVAILABLE') {
+        showToast('This gear is no longer available.', 'error');
+        return;
+      }
       console.error('Booking error: ', err);
       showToast('Failed to submit booking. Please try again.', 'error');
     } finally {

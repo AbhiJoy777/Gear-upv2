@@ -51,9 +51,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const filteredItems = items.filter((item) => {
     const itemCity = item.city || 'Hyderabad';
+    const isAvailable = !item.status || item.status === 'AVAILABLE';
     const cityMatches = itemCity === selectedCity;
     const categoryMatches = selectedCategory === 'All Gear' || item.category === selectedCategory;
-    return cityMatches && categoryMatches;
+    return isAvailable && cityMatches && categoryMatches;
   });
 
 
