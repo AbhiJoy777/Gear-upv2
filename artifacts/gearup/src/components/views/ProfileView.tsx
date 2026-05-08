@@ -7,7 +7,19 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 
+const VERIFICATION_LABELS: Record<string, string> = {
+  not_started: 'Not started',
+  pending: 'Pending',
+  verified: 'Verified',
+  rejected: 'Rejected',
+};
 
+const VERIFICATION_STYLES: Record<string, string> = {
+  not_started: 'text-white/50 border-white/10 bg-white/5',
+  pending: 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10',
+  verified: 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10',
+  rejected: 'text-red-400 border-red-500/20 bg-red-500/10',
+};
 
 const ProfileView = memo(() => {
   const { user, profile } = useAuth();
@@ -39,6 +51,8 @@ const ProfileView = memo(() => {
         username: form.name,
         email: form.email,
         phone: form.phone,
+        role: profile?.role || 'user',
+        verificationStatus: profile?.verificationStatus || 'not_started',
       }, { merge: true });
 
       showToast('Profile updated successfully.', 'success');
@@ -51,8 +65,10 @@ const ProfileView = memo(() => {
     }
   };
 
+  const verificationStatus = profile?.verificationStatus || 'not_started';
+
   const menuItems = [
-    { icon: Shield, label: 'Identity Verification', status: 'Pending' },
+    { icon: Shield, label: 'Identity Verification', status: VERIFICATION_LABELS[verificationStatus] || 'Not started' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
@@ -78,6 +94,10 @@ const ProfileView = memo(() => {
             <Phone size={14} />
             {form.phone || 'No phone number added'}
           </p>
+          <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border text-[11px] font-bold uppercase tracking-wider ${VERIFICATION_STYLES[verificationStatus] || VERIFICATION_STYLES.not_started}`}>
+            <Shield size={13} />
+            {VERIFICATION_LABELS[verificationStatus] || 'Not started'}
+          </div>
         </div>
 
         <button
