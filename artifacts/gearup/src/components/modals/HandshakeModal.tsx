@@ -6,7 +6,7 @@ import { X, Camera, MapPin, QrCode, ShieldCheck, Map as MapIcon, Loader2, Naviga
 import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 
 interface HandshakeModalProps {
@@ -27,6 +27,42 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [loading, setLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  const logFirestoreError = (stepName: string, err: unknown) => {
+    console.error('Handover failed:', {
+      step: stepName,
+      code: (err as any)?.code,
+      message: (err as any)?.message,
+      error: err,
+    });
+  };
+
+  const completeHandover = async () => {
+    let stepName = 'updating rental';
+    try {
+      console.log('STEP: updating rental');
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        status: 'ACTIVE_RENTAL',
+        actualStartTime: serverTimestamp(),
+        returnDueAt: null,
+        updatedAt: serverTimestamp(),
+      });
+
+      stepName = 'updating listing';
+      console.log('STEP: updating listing');
+      await updateDoc(doc(db, 'listings', rental.gearId), {
+        status: 'ACTIVE_RENTAL',
+        activeRentalId: rental.id,
+        updatedAt: serverTimestamp(),
+      });
+
+      console.log('STEP: wallet transfer skipped on client');
+      onClose();
+    } catch (err) {
+      logFirestoreError(stepName, err);
+      showToast('Could not complete handover. Please try again.', 'error');
+    }
+  };
   
   useEffect(() => {
     if (initialStep) {
@@ -107,26 +143,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
            setScanning(false);
            setLoading(true);
            try {
-             // Payment Logic: Update statuses and wallets
-             await updateDoc(doc(db, 'rentals', rental.id), {
-               status: 'ACTIVE_RENTAL',
-               actualStartTime: serverTimestamp(),
-               returnDueAt: null
-             });
-             
-             await updateDoc(doc(db, 'listings', rental.gearId), {
-               status: 'IN_USE'
-             });
-
-             // Move funds (hypothetical wallet logic)
-             await updateDoc(doc(db, 'users', rental.ownerId), {
-               walletBalance: increment(rental.totalPrice)
-             });
-
-             onClose();
-           } catch (err) {
-             console.error(err);
-             showToast('Could not complete handover. Please try again.', 'error');
+             await completeHandover();
            } finally {
              setLoading(false);
            }
@@ -319,21 +336,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                       onClick={async () => {
                         setLoading(true);
                         try {
-                           await updateDoc(doc(db, 'rentals', rental.id), {
-                             status: 'ACTIVE_RENTAL',
-                             actualStartTime: serverTimestamp(),
-                             returnDueAt: null
-                           });
-                           await updateDoc(doc(db, 'listings', rental.gearId), {
-                             status: 'IN_USE'
-                           });
-                           await updateDoc(doc(db, 'users', rental.ownerId), {
-                             walletBalance: increment(rental.totalPrice)
-                           });
-                           onClose();
-                        } catch (err) {
-                           console.error(err);
-                           showToast('Could not complete handover. Please try again.', 'error');
+                           await completeHandover();
                         } finally {
                            setLoading(false);
                         }
