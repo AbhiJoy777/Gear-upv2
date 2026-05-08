@@ -24,6 +24,7 @@ const AdminView = memo(() => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [listings, setListings] = useState<any[]>([]);
   const [rentals, setRentals] = useState<any[]>([]);
 
@@ -34,6 +35,9 @@ const AdminView = memo(() => {
     const unsubListings = onSnapshot(collection(db, 'listings'), (snapshot) => {
       setListings(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
     });
+    const unsubVerificationRequests = onSnapshot(collection(db, 'verificationRequests'), (snapshot) => {
+      setVerificationRequests(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+    });
     const unsubRentals = onSnapshot(collection(db, 'rentals'), (snapshot) => {
       setRentals(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
     });
@@ -41,11 +45,12 @@ const AdminView = memo(() => {
     return () => {
       unsubUsers();
       unsubListings();
+      unsubVerificationRequests();
       unsubRentals();
     };
   }, []);
 
-  const updateVerification = async (targetUser: any, status: 'verified' | 'rejected') => {
+  const updateVerification = async (targetUser: any, status: 'verified' | 'rejected', request?: any) => {
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', targetUser.id), {
@@ -54,6 +59,13 @@ const AdminView = memo(() => {
         verifiedAt: serverTimestamp(),
         verifiedBy: user.uid,
       });
+      if (request?.id) {
+        await updateDoc(doc(db, 'verificationRequests', request.id), {
+          status,
+          reviewedAt: serverTimestamp(),
+          reviewedBy: user.uid,
+        });
+      }
       showToast(`Verification marked ${status}.`, 'success');
     } catch (err) {
       console.error(err);
@@ -61,12 +73,12 @@ const AdminView = memo(() => {
     }
   };
 
-  const pendingUsers = usersList.filter((item) => item.verificationStatus === 'pending');
+  const pendingRequests = verificationRequests.filter((item) => item.status === 'pending');
   const activeRentals = rentals.filter((item) => item.status === 'ACTIVE_RENTAL');
 
   const statCards = [
     { label: 'Total Users', value: usersList.length, Icon: Users },
-    { label: 'Pending Verification', value: pendingUsers.length, Icon: ShieldCheck },
+    { label: 'Pending Verification', value: pendingRequests.length, Icon: ShieldCheck },
     { label: 'Total Listings', value: listings.length, Icon: Package },
     { label: 'Active Rentals', value: activeRentals.length, Icon: ClipboardList },
   ];
@@ -93,6 +105,45 @@ const AdminView = memo(() => {
           </motion.div>
         ))}
       </div>
+
+      <section className="space-y-4">
+        <h3 className="text-[14px] font-black uppercase tracking-widest text-white/70">Pending Verification Requests</h3>
+        <div className="grid gap-3">
+          {pendingRequests.length === 0 ? (
+            <div className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-5 text-[#707070] text-[13px]">
+              No pending verification requests.
+            </div>
+          ) : (
+            pendingRequests.map((request) => {
+              const targetUser = usersList.find((item) => item.id === request.uid) || { id: request.uid };
+              return (
+                <div key={request.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-white font-semibold text-[14px]">{request.fullName || 'Unnamed applicant'}</p>
+                    <p className="text-[#707070] text-[12px]">{request.userEmail || request.uid}</p>
+                    <p className="text-white/50 text-[12px]">{request.idType}: {request.idNumber}</p>
+                    {request.note && <p className="text-white/35 text-[12px] italic">{request.note}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updateVerification(targetUser, 'verified', request)}
+                      className="px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 hover:bg-[#14b8a6] transition-all"
+                    >
+                      <Check size={14} /> Approve
+                    </button>
+                    <button
+                      onClick={() => updateVerification(targetUser, 'rejected', request)}
+                      className="px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                    >
+                      <X size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
 
       <section className="space-y-4">
         <h3 className="text-[14px] font-black uppercase tracking-widest text-white/70">Users</h3>
