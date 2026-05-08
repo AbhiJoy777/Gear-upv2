@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { useToast } from '@/context/ToastContext';
 
 interface HandshakeModalProps {
   rental: any;
@@ -18,6 +19,7 @@ interface HandshakeModalProps {
 type HandshakeStep = 'proof_of_life' | 'tracking' | 'logistics' | 'qr_handover' | 'payment_scan';
 
 export default function HandshakeModal({ rental, onClose, userRole, initialStep }: HandshakeModalProps) {
+  const { showToast } = useToast();
   const [step, setStep] = useState<HandshakeStep>(initialStep || 'tracking');
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(15);
@@ -68,6 +70,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
       onClose(); // Automatically close as requested
     } catch (err) {
       console.error(err);
+      showToast('Could not record proof. Please try again.', 'error');
     } finally {
       setLoading(false);
       setRecording(false);
@@ -85,6 +88,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
       setStep(userRole === 'owner' ? 'qr_handover' : 'payment_scan');
     } catch (err) {
       console.error(err);
+      showToast('Could not save return logistics. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -122,6 +126,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              onClose();
            } catch (err) {
              console.error(err);
+             showToast('Could not complete handover. Please try again.', 'error');
            } finally {
              setLoading(false);
            }
@@ -328,6 +333,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                            onClose();
                         } catch (err) {
                            console.error(err);
+                           showToast('Could not complete handover. Please try again.', 'error');
                         } finally {
                            setLoading(false);
                         }
