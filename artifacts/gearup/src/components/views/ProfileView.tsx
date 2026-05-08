@@ -6,6 +6,7 @@ import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save } from
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
+import VerificationRequestModal from '../modals/VerificationRequestModal';
 
 const VERIFICATION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -26,6 +27,7 @@ const ProfileView = memo(() => {
   const { logout } = useAuthActions();
   const { showToast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
+  const [verificationOpen, setVerificationOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -66,9 +68,18 @@ const ProfileView = memo(() => {
   };
 
   const verificationStatus = profile?.verificationStatus || 'not_started';
+  const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
+  const verificationAction =
+    verificationStatus === 'not_started'
+      ? 'Start Verification'
+      : verificationStatus === 'pending'
+        ? 'Verification Pending'
+        : verificationStatus === 'verified'
+          ? 'Verified'
+          : 'Retry Verification';
 
   const menuItems = [
-    { icon: Shield, label: 'Identity Verification', status: VERIFICATION_LABELS[verificationStatus] || 'Not started' },
+    { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
@@ -116,7 +127,12 @@ const ProfileView = memo(() => {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
-            className="bg-[#121212] p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between group cursor-pointer hover:border-[#A855F7]/30 transition-all"
+            onClick={() => {
+              if (item.interactive && canRequestVerification) setVerificationOpen(true);
+            }}
+            className={`bg-[#121212] p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between group transition-all ${
+              item.interactive && canRequestVerification ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+            }`}
           >
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-black/40 rounded-lg text-white/50 group-hover:text-[#A855F7] transition-colors">
@@ -125,8 +141,10 @@ const ProfileView = memo(() => {
               <span className="font-medium text-white tracking-tight text-[13px]">{item.label}</span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[11px] font-semibold tracking-wider text-[#707070]">{item.status}</span>
-              <ChevronRight size={16} className="text-white/20" />
+              <span className={`text-[11px] font-semibold tracking-wider ${
+                item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
+              }`}>{item.status}</span>
+              {item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
             </div>
           </motion.div>
         ))}
@@ -227,6 +245,12 @@ const ProfileView = memo(() => {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {verificationOpen && (
+          <VerificationRequestModal onClose={() => setVerificationOpen(false)} />
         )}
       </AnimatePresence>
     </div>
