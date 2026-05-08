@@ -108,9 +108,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                status: 'ACTIVE_RENTAL',
                actualStartTime: serverTimestamp(),
                returnDueAt: null
-             });
-             
-             await updateDoc(doc(db, 'listings', rental.gearId), {
+            });
+
+            await updateDoc(doc(db, 'listings', rental.gearId), {
                status: 'IN_USE'
              });
 

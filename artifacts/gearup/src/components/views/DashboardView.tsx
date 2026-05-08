@@ -503,7 +503,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                     e.stopPropagation(); 
                                     try {
                                       await updateDoc(doc(db, 'rentals', r.id), { status: 'LOGISTICS_PENDING' });
-                                      openHandshake(r, 'owner', 'logistics'); 
+                                      openHandshake(r, 'owner', 'logistics');
                                     } catch (err) { console.error(err); }
                                   }}
                                   disabled={r.status === 'ACCEPTED'}

@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Temporary development rules: app access requires Firebase Auth.
+    // Rebuild strict collection-level rules after the core app flow is stable.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
