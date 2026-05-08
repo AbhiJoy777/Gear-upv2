@@ -56,9 +56,8 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate) return;
     setLoading(true);
-    let bookingStep = 'rental create';
     try {
-      const rentalPayload = {
+      await addDoc(collection(db, 'rentals'), {
         gearId: item.id,
         gearTitle: item.title,
         renterId: user.uid,
@@ -74,37 +73,25 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
         logisticsType: item.logisticsType || 'pickup',
         logisticsAdjustment: logisticsAdj,
         createdAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, 'rentals'), rentalPayload);
-
-      bookingStep = 'listing reserve';
-      await updateDoc(doc(db, 'listings', item.id), {
-        status: 'RESERVED',
-        updatedAt: serverTimestamp(),
       });
 
-      bookingStep = 'notification create';
       await addDoc(collection(db, 'notifications'), {
         userId: item.ownerId,
-        actorId: user.uid,
-        listingId: item.id,
         title: 'New Booking Request',
         message: `${user.email} requested to book ${item.title} for ${finalDays} days.`,
         type: 'request',
         read: false,
         createdAt: serverTimestamp(),
       });
+
+      await updateDoc(doc(db, 'listings', item.id), {
+        status: 'RESERVED'
+      });
       
       showToast('Booking request sent! The owner will review it shortly.', 'success');
       onClose();
     } catch (err) {
-      console.error('Booking request failed:', {
-        step: bookingStep,
-        error: err,
-        code: (err as any)?.code,
-        message: (err as any)?.message,
-      });
+      console.error('Booking error: ', err);
       showToast('Failed to submit booking. Please try again.', 'error');
     } finally {
       setLoading(false);

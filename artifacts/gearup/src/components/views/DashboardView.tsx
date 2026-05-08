@@ -92,7 +92,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const handleReturnGear = async (rental: any) => {
-    if (!user) return;
     const lateDays = getLateDays(rental);
     const extraAmountDue = getExtraAmountDue(rental);
 
@@ -106,9 +105,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
       await addDoc(collection(db, 'notifications'), {
         userId: rental.ownerId,
-        actorId: user.uid,
-        rentalId: rental.id,
-        listingId: rental.gearId,
         title: 'Gear Returned',
         message: `${rental.gearTitle} has been marked returned.${extraAmountDue > 0 ? ` Extra amount due: Rs ${extraAmountDue}.` : ''}`,
         type: 'return',
@@ -123,7 +119,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const cancelRental = async (rental: any, cancelledBy: 'owner' | 'renter') => {
-    if (!user) return;
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'CANCELLED',
@@ -133,9 +128,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
       await addDoc(collection(db, 'notifications'), {
         userId: cancelledBy === 'owner' ? rental.renterId : rental.ownerId,
-        actorId: user.uid,
-        rentalId: rental.id,
-        listingId: rental.gearId,
         title: cancelledBy === 'owner' ? 'Renting Cancelled' : 'Borrowing Cancelled',
         message: `${rental.gearTitle} rental was cancelled before handoff.`,
         type: 'cancelled',
@@ -373,7 +365,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   const pendingRental = ownerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
                   const activeRental = ownerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
                   const lockedRental = ownerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
-                  const handoverRental = ownerRentals.find(r => r.gearId === item.id && ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status));
                   
                   return (
                   <motion.div
@@ -458,24 +449,24 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                          </div>
                        ) : (
                          <div className="flex flex-col gap-3 mt-auto pt-5">
-                            {handoverRental && (
-                              <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                            {ownerRentals.filter(r => r.gearId === item.id && ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)).map(r => (
+                              <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                 </div>
                                 
-                                {CANCELLABLE_RENTAL_STATUSES.includes(handoverRental.status) && (
+                                {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); cancelRental(handoverRental, 'owner'); }}
+                                    onClick={(e) => { e.stopPropagation(); cancelRental(r, 'owner'); }}
                                     className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
                                   >
                                     <Ban size={14} /> Cancel Renting
                                   </button>
                                 )}
 
-                                {handoverRental.status === 'ACCEPTED' ? (
+                                {r.status === 'ACCEPTED' ? (
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); openHandshake(handoverRental, 'owner'); }}
+                                    onClick={(e) => { e.stopPropagation(); openHandshake(r, 'owner'); }}
                                     className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)] cursor-pointer relative z-10"
                                   >
                                     <ShieldCheck size={14} /> Record Proof of Life
@@ -487,19 +478,19 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 )}
                                 
                                 <button 
-                                  onClick={(e) => { e.stopPropagation(); openHandshake(handoverRental, 'owner', 'tracking'); }}
-                                  disabled={handoverRental.status === 'ACCEPTED'}
+                                  onClick={(e) => { e.stopPropagation(); openHandshake(r, 'owner', 'tracking'); }}
+                                  disabled={r.status === 'ACCEPTED'}
                                   className={`w-full font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 ${
-                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(handoverRental.status)
+                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
                                       ? 'bg-[#F97316] hover:bg-[#FB923C] text-white' 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
                                   <Navigation size={14} /> {item.logisticsType === 'delivery' ? 'Navigate to Delivery' : 'Track Borrower'}
                                 </button>
-                                {canChat(handoverRental.status) && (
+                                {canChat(r.status) && (
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); setChatRental(handoverRental); }}
+                                    onClick={(e) => { e.stopPropagation(); setChatRental(r); }}
                                     className="w-full bg-white/5 text-white/80 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
                                   >
                                     <MessageCircle size={14} /> Chat
@@ -511,13 +502,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   onClick={async (e) => { 
                                     e.stopPropagation(); 
                                     try {
-                                      await updateDoc(doc(db, 'rentals', handoverRental.id), { status: 'LOGISTICS_PENDING' });
-                                      openHandshake(handoverRental, 'owner', 'logistics');
+                                      await updateDoc(doc(db, 'rentals', r.id), { status: 'LOGISTICS_PENDING' });
+                                      openHandshake(r, 'owner', 'logistics');
                                     } catch (err) { console.error(err); }
                                   }}
-                                  disabled={handoverRental.status === 'ACCEPTED'}
+                                  disabled={r.status === 'ACCEPTED'}
                                   className={`w-full font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border cursor-pointer relative z-10 ${
-                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(handoverRental.status)
+                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
                                       ? 'border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30'
                                       : 'border-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
@@ -525,7 +516,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   <Check size={14} /> Confirm Handover
                                 </button>
                               </div>
-                            )}
+                            ))}
                             <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
                                <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
                                {!lockedRental && (
@@ -661,8 +652,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                         </div>
                       )}
 
-                      {canChat(rental.status) && (
-                        <div className="flex flex-col gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                           {canChat(rental.status) && (
+                              <div className="flex flex-col gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                                 <button
+                                   onClick={(e) => { e.stopPropagation(); setChatRental(rental); }}
+                                   className="w-full bg-white/5 text-white/80 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
+                                 >
+                                   <MessageCircle size={16} /> Chat
+                                 </button>
+
                             {CANCELLABLE_RENTAL_STATUSES.includes(rental.status) && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); cancelRental(rental, 'renter'); }}
@@ -695,14 +693,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 </button>
                               )
                             )}
-
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setChatRental(rental); }}
-                              className="w-full bg-white/5 text-white/80 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
-                            >
-                              <MessageCircle size={16} /> Chat
-                            </button>
-                        </div>
+                         </div>
                       )}
 
                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
