@@ -11,6 +11,7 @@ import { useToast } from '@/context/ToastContext';
 import ConfirmModal from '../modals/ConfirmModal';
 import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
+import { createTransaction } from '@/lib/transactions';
 
 
 type Tab = 'listings' | 'rentals' | 'history';
@@ -103,6 +104,18 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
         extraAmountDue,
       });
       await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
+      if (extraAmountDue > 0) {
+        await createTransaction({
+          userId: rental.renterId,
+          rentalId: rental.id,
+          listingId: rental.gearId,
+          type: 'late_fee',
+          amount: extraAmountDue,
+          direction: 'debit',
+          status: 'pending',
+          description: `Late fee due for ${rental.gearTitle}`,
+        });
+      }
       await addDoc(collection(db, 'notifications'), {
         userId: rental.ownerId,
         title: 'Gear Returned',

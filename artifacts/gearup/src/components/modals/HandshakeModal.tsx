@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { recordRentalPaymentTransactions } from '@/lib/transactions';
 
 interface HandshakeModalProps {
   rental: any;
@@ -90,6 +91,28 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     }
   };
 
+  const completeHandover = async () => {
+    await updateDoc(doc(db, 'rentals', rental.id), {
+      status: 'ACTIVE_RENTAL',
+      actualStartTime: serverTimestamp(),
+      returnDueAt: null
+    });
+
+    await updateDoc(doc(db, 'listings', rental.gearId), {
+      status: 'IN_USE'
+    });
+
+    await updateDoc(doc(db, 'users', rental.ownerId), {
+      walletBalance: increment(rental.totalPrice)
+    });
+
+    await updateDoc(doc(db, 'users', rental.renterId), {
+      walletBalance: increment(-rental.totalPrice)
+    });
+
+    await recordRentalPaymentTransactions(rental);
+  };
+
   // QR Scanning
   useEffect(() => {
     let scanner: Html5QrcodeScanner | null = null;
@@ -103,22 +126,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
            setScanning(false);
            setLoading(true);
            try {
-             // Payment Logic: Update statuses and wallets
-             await updateDoc(doc(db, 'rentals', rental.id), {
-               status: 'ACTIVE_RENTAL',
-               actualStartTime: serverTimestamp(),
-               returnDueAt: null
-             });
-             
-             await updateDoc(doc(db, 'listings', rental.gearId), {
-               status: 'IN_USE'
-             });
-
-             // Move funds (hypothetical wallet logic)
-             await updateDoc(doc(db, 'users', rental.ownerId), {
-               walletBalance: increment(rental.totalPrice)
-             });
-
+             await completeHandover();
              onClose();
            } catch (err) {
              console.error(err);
@@ -133,7 +141,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
         scanner.clear().catch(console.error);
       }
     };
-  }, [step, scanning, rental.id, rental.gearId, rental.ownerId, rental.totalPrice, onClose]);
+  }, [step, scanning, rental.id, onClose]);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -314,17 +322,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                       onClick={async () => {
                         setLoading(true);
                         try {
-                           await updateDoc(doc(db, 'rentals', rental.id), {
-                             status: 'ACTIVE_RENTAL',
-                             actualStartTime: serverTimestamp(),
-                             returnDueAt: null
-                           });
-                           await updateDoc(doc(db, 'listings', rental.gearId), {
-                             status: 'IN_USE'
-                           });
-                           await updateDoc(doc(db, 'users', rental.ownerId), {
-                             walletBalance: increment(rental.totalPrice)
-                           });
+                           await completeHandover();
                            onClose();
                         } catch (err) {
                            console.error(err);
