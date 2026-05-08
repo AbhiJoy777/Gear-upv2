@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import HandshakeModal from '../modals/HandshakeModal';
 import { useToast } from '@/context/ToastContext';
 import ConfirmModal from '../modals/ConfirmModal';
 import ChatModal from '../modals/ChatModal';
+import ReportIssueModal from '../modals/ReportIssueModal';
 
 
 type Tab = 'listings' | 'rentals';
@@ -28,12 +29,20 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [initialHandshakeStep, setInitialHandshakeStep] = useState<any>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [chatRental, setChatRental] = useState<any>(null);
+  const [reportContext, setReportContext] = useState<any>(null);
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+
+  const openRentalReport = (rental: any) => {
+    setReportContext({
+      rental,
+      againstUserId: rental.ownerId === user?.uid ? rental.renterId : rental.ownerId,
+    });
+  };
 
   const getRentalEndDate = (rental: any) => {
     if (!rental?.actualStartTime || !rental?.durationDays) return null;
@@ -376,6 +385,12 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                     <MessageCircle size={14} /> Chat
                                   </button>
                                 )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openRentalReport(r); }}
+                                  className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
+                                >
+                                  <Flag size={14} /> Report Issue
+                                </button>
 
 
                                 <button 
@@ -550,6 +565,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               </button>
                             )}
 
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openRentalReport(rental); }}
+                              className="w-full bg-white/5 text-red-300 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/10 cursor-pointer relative z-10"
+                            >
+                              <Flag size={16} /> Report Issue
+                            </button>
+
                             {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
                               rental.status === 'PAYMENT_PENDING' ? (
                                <button 
@@ -644,6 +666,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           }
         }}
       />
+      <AnimatePresence>
+        {reportContext && (
+          <ReportIssueModal
+            context={reportContext}
+            onClose={() => setReportContext(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 });

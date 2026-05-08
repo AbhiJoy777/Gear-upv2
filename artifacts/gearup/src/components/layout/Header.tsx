@@ -6,6 +6,7 @@ import Logo from '@/components/common/Logo';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import NotificationInboxModal from '../modals/NotificationInboxModal';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 
@@ -13,6 +14,7 @@ const Header = memo(({ selectedCity, onCityChange }: { selectedCity: string; onC
 
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -65,13 +67,14 @@ const Header = memo(({ selectedCity, onCityChange }: { selectedCity: string; onC
         >
           <Plus size={18} />
         </button>
-        <button className="cursor-pointer p-2 text-[#707070] hover:text-white transition-colors relative active:scale-95">
+        <button onClick={() => setShowNotifications(true)} className="cursor-pointer p-2 text-[#707070] hover:text-white transition-colors relative active:scale-95">
           <Bell size={20} />
           {unreadCount > 0 && (
             <span className="absolute top-2 right-2 w-2 h-2 bg-[#A855F7] rounded-full shadow-[0_0_8px_#A855F7]"></span>
           )}
         </button>
       </div>
+      {showNotifications && <NotificationInboxModal onClose={() => setShowNotifications(false)} />}
     </header>
   );
 });

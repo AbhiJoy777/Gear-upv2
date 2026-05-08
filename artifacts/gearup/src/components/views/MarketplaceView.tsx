@@ -4,9 +4,10 @@ import React, { useEffect, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
 import { collection, query, limit, onSnapshot, where, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Camera, Box, PlusCircle, Loader2, ChevronRight, Zap, MapPin, Truck } from 'lucide-react';
+import { Camera, PlusCircle, Loader2, MapPin, Truck, Flag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
+import ReportIssueModal from '../modals/ReportIssueModal';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
 
@@ -16,6 +17,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [items, setItems] = useState<any[]>([]);
   const [fetchingItems, setFetchingItems] = useState(true);
   const [bookingItem, setBookingItem] = useState<any | null>(null);
+  const [reportItem, setReportItem] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Gear');
 
   useEffect(() => {
@@ -152,9 +154,20 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-                      {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {item.ownerId !== user?.uid && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setReportItem(item); }}
+                          className="cursor-pointer w-9 h-9 flex items-center justify-center bg-red-500/10 border border-red-500/20 text-red-400 rounded-full hover:bg-red-500/20 active:scale-95 transition-all"
+                          title="Report listing"
+                        >
+                          <Flag size={14} />
+                        </button>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
+                        {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -180,6 +193,12 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       )}
       {bookingItem && (
          <BookingModal item={bookingItem} onClose={() => setBookingItem(null)} />
+      )}
+      {reportItem && (
+        <ReportIssueModal
+          context={{ listing: reportItem, againstUserId: reportItem.ownerId }}
+          onClose={() => setReportItem(null)}
+        />
       )}
     </div>
   );
