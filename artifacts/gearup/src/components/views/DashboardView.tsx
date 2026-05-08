@@ -13,7 +13,7 @@ import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 
 
-type Tab = 'listings' | 'ownerHistory' | 'rentals' | 'rentalHistory';
+type Tab = 'listings' | 'rentals' | 'history';
 
 const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) => void }) => {
   const { user } = useAuth();
@@ -39,8 +39,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
 
   const openRentalReport = (rental: any) => {
+    const reporterRole = rental.historyRole || (rental.ownerId === user?.uid ? 'owner' : 'borrower');
     setReportContext({
       rental,
+      reporterRole,
       againstUserId: rental.ownerId === user?.uid ? rental.renterId : rental.ownerId,
     });
   };
@@ -220,8 +222,20 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const liveRentals = rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status));
-  const ownerHistory = ownerRentals.filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status));
-  const rentalHistory = rentals.filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status));
+  const historyRentals = [
+    ...ownerRentals
+      .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
+      .map((rental) => ({ ...rental, historyRole: 'owner' })),
+    ...rentals
+      .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
+      .map((rental) => ({ ...rental, historyRole: 'borrower' })),
+  ].sort((a, b) => {
+    const getTime = (value: any) => {
+      const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+      return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+    };
+    return getTime(b.returnedAt || b.cancelledAt) - getTime(a.returnedAt || a.cancelledAt);
+  });
 
   const renderHistoryCards = (items: any[]) => {
     if (items.length === 0) {
@@ -246,7 +260,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
           return (
             <motion.div
-              key={rental.id}
+              key={`${rental.historyRole}-${rental.id}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
@@ -255,7 +269,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-semibold text-[15px] text-white/90 tracking-tight line-clamp-1">{rental.gearTitle || 'Rental'}</h3>
-                  <p className="text-[#707070] text-[12px] mt-1">{rental.ownerEmail || rental.renterEmail || 'GearUp record'}</p>
+                  <p className="text-[#707070] text-[12px] mt-1">
+                    {rental.historyRole === 'owner' ? 'You listed this' : 'You borrowed this'}
+                  </p>
                 </div>
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                   returned
@@ -308,9 +324,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       <div className="flex gap-8 border-b border-white/5 pb-0">
         {[
           { key: 'listings', label: 'My Listings' },
-          { key: 'ownerHistory', label: 'History' },
           { key: 'rentals', label: 'My Rentals' },
-          { key: 'rentalHistory', label: 'History' },
+          { key: 'history', label: 'History' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -538,8 +553,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </button>
               </div>
             )
-          ) : activeTab === 'ownerHistory' ? (
-            renderHistoryCards(ownerHistory)
           ) : activeTab === 'rentals' ? (
             loadingRentals ? (
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
@@ -710,7 +723,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               </div>
             )
           ) : (
-            renderHistoryCards(rentalHistory)
+            renderHistoryCards(historyRentals)
           )}
         </motion.div>
       </AnimatePresence>

@@ -6,21 +6,17 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
-const REPORT_REASONS = [
-  'Gear damaged',
-  'Gear not returned',
-  'Fake listing',
-  'Wrong item',
-  'Payment issue',
-  'Unsafe behavior',
-  'Other',
-];
+const REPORT_REASONS: Record<'borrower' | 'owner', string[]> = {
+  borrower: ['Wrong item', 'Unsafe behavior', 'Other'],
+  owner: ['Gear damaged', 'Gear not returned', 'Unsafe behavior', 'Other'],
+};
 
 interface ReportIssueModalProps {
   context: {
     rental?: any;
     listing?: any;
     againstUserId?: string | null;
+    reporterRole?: 'borrower' | 'owner';
   };
   onClose: () => void;
 }
@@ -28,7 +24,9 @@ interface ReportIssueModalProps {
 export default function ReportIssueModal({ context, onClose }: ReportIssueModalProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [reason, setReason] = useState(REPORT_REASONS[0]);
+  const reporterRole = context.reporterRole || 'borrower';
+  const availableReasons = REPORT_REASONS[reporterRole];
+  const [reason, setReason] = useState(availableReasons[0]);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +48,7 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
         againstUserId: context.againstUserId || null,
         listingId: listing?.id || rental?.gearId || null,
         rentalId: rental?.id || null,
+        reporterRole,
         reason,
         description: description.trim(),
         status: 'open',
@@ -107,7 +106,7 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
               onChange={(e) => setReason(e.target.value)}
               className="w-full bg-[#0A0A0A] border border-white/10 rounded-[14px] px-4 py-3 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors"
             >
-              {REPORT_REASONS.map((item) => (
+              {availableReasons.map((item) => (
                 <option key={item} value={item} className="bg-[#0A0A0A] text-white">
                   {item}
                 </option>
