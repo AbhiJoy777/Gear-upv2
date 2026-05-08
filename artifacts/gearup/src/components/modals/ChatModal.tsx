@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Send, MessageCircle, Flag } from 'lucide-react';
+import { X, Send, MessageCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import ReportIssueModal from './ReportIssueModal';
 
 export default function ChatModal({ rental, onClose }: { rental: any; onClose: () => void }) {
   const { user, profile } = useAuth();
@@ -13,7 +12,6 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (!rental?.id) return;
@@ -75,21 +73,12 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowReport(true)}
-              className="p-2 text-red-400/70 hover:text-red-300 hover:bg-red-500/10 rounded-full transition-all"
-              title="Report issue"
-            >
-              <Flag size={18} />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
@@ -140,15 +129,6 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
           </button>
         </div>
       </motion.div>
-      {showReport && (
-        <ReportIssueModal
-          context={{
-            rental,
-            againstUserId: rental.ownerId === user?.uid ? rental.renterId : rental.ownerId,
-          }}
-          onClose={() => setShowReport(false)}
-        />
-      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 
 
-type Tab = 'listings' | 'rentals';
+type Tab = 'listings' | 'ownerHistory' | 'rentals' | 'rentalHistory';
 
 const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) => void }) => {
   const { user } = useAuth();
@@ -33,6 +33,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
+  const HISTORY_RENTAL_STATUSES = ['RETURNED', 'CANCELLED'];
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
@@ -42,6 +43,12 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       rental,
       againstUserId: rental.ownerId === user?.uid ? rental.renterId : rental.ownerId,
     });
+  };
+
+  const formatHistoryDate = (value: any) => {
+    const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return 'Not recorded';
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getRentalEndDate = (rental: any) => {
@@ -212,21 +219,110 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     return 'text-white border-white/20 bg-white/5';
   };
 
+  const liveRentals = rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status));
+  const ownerHistory = ownerRentals.filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status));
+  const rentalHistory = rentals.filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status));
+
+  const renderHistoryCards = (items: any[]) => {
+    if (items.length === 0) {
+      return (
+        <div className="space-y-6">
+          <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
+            <ShieldCheck size={56} className="text-white/20" />
+          </div>
+          <h3 className="text-[18px] font-semibold text-white tracking-tight">No History Yet</h3>
+          <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
+            Completed and cancelled rental records will appear here.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
+        {items.map((rental, idx) => {
+          const lateFee = rental.extraAmountDue || 0;
+          const returned = rental.status === 'RETURNED';
+
+          return (
+            <motion.div
+              key={rental.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className="bg-[#101010] border-[0.5px] border-white/[0.04] rounded-[24px] p-5 flex flex-col gap-4 opacity-90"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-[15px] text-white/90 tracking-tight line-clamp-1">{rental.gearTitle || 'Rental'}</h3>
+                  <p className="text-[#707070] text-[12px] mt-1">{rental.ownerEmail || rental.renterEmail || 'GearUp record'}</p>
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                  returned
+                    ? 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10'
+                    : 'text-white/45 border-white/10 bg-white/5'
+                }`}>
+                  {returned ? 'Returned' : 'Cancelled'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-[12px]">
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Start</p>
+                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.actualStartTime)}</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Return</p>
+                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.returnedAt || rental.cancelledAt)}</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Total Paid</p>
+                  <p className="text-white/70 mt-1">Rs {rental.totalPrice || 0}</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Late Fee</p>
+                  <p className="text-white/70 mt-1">Rs {lateFee}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                <span className="text-[11px] text-white/35">
+                  Proof-of-life: <span className="text-white/60">{rental.proofOfLifeUrl ? 'Recorded' : 'Not recorded'}</span>
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); openRentalReport(rental); }}
+                  className="bg-red-500/10 text-red-400 font-bold px-3 py-2 rounded-[12px] text-[11px] flex items-center justify-center gap-1.5 transition-all border border-red-500/20 hover:bg-red-500/20"
+                >
+                  <Flag size={13} /> Report Issue
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 md:p-10 space-y-4">
       <div className="flex gap-8 border-b border-white/5 pb-0">
-        {(['listings', 'rentals'] as const).map((tab) => (
+        {[
+          { key: 'listings', label: 'My Listings' },
+          { key: 'ownerHistory', label: 'History' },
+          { key: 'rentals', label: 'My Rentals' },
+          { key: 'rentalHistory', label: 'History' },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as Tab)}
             className="cursor-pointer relative pb-4 group"
           >
             <span className={`text-sm font-semibold tracking-wide transition-colors ${
-              activeTab === tab ? 'text-white' : 'text-[#707070] group-hover:text-white'
+              activeTab === tab.key ? 'text-white' : 'text-[#707070] group-hover:text-white'
             }`}>
-              {tab === 'listings' ? 'My Listings' : 'My Rentals'}
+              {tab.label}
             </span>
-            {activeTab === tab && (
+            {activeTab === tab.key && (
               <motion.div 
                 layoutId="dashboardTab"
                 className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#A855F7]"
@@ -385,12 +481,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                     <MessageCircle size={14} /> Chat
                                   </button>
                                 )}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openRentalReport(r); }}
-                                  className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
-                                >
-                                  <Flag size={14} /> Report Issue
-                                </button>
 
 
                                 <button 
@@ -448,12 +538,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </button>
               </div>
             )
-          ) : (
+          ) : activeTab === 'ownerHistory' ? (
+            renderHistoryCards(ownerHistory)
+          ) : activeTab === 'rentals' ? (
             loadingRentals ? (
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
-            ) : rentals.length > 0 ? (
+            ) : liveRentals.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
-                {rentals.map((rental, idx) => (
+                {liveRentals.map((rental, idx) => (
                   <motion.div
                     key={rental.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -565,13 +657,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               </button>
                             )}
 
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openRentalReport(rental); }}
-                              className="w-full bg-white/5 text-red-300 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/10 cursor-pointer relative z-10"
-                            >
-                              <Flag size={16} /> Report Issue
-                            </button>
-
                             {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
                               rental.status === 'PAYMENT_PENDING' ? (
                                <button 
@@ -624,6 +709,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </button>
               </div>
             )
+          ) : (
+            renderHistoryCards(rentalHistory)
           )}
         </motion.div>
       </AnimatePresence>
