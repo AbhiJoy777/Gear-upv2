@@ -98,6 +98,43 @@ service cloud.firestore {
         && request.resource.data.read == false;
     }
 
+    function bookingNotificationIsSafe() {
+      return notificationCreateIsSafe()
+        && request.resource.data.type == 'request'
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.keys().hasAll(['listingId', 'actorId'])
+        && exists(listingPath(request.resource.data.listingId))
+        && get(listingPath(request.resource.data.listingId)).data.ownerId == request.resource.data.userId
+        && request.resource.data.userId != request.auth.uid;
+    }
+
+    function rentalNotificationIsSafe() {
+      return notificationCreateIsSafe()
+        && ['return', 'cancelled'].hasAny([request.resource.data.type])
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.keys().hasAll(['rentalId', 'listingId', 'actorId'])
+        && exists(rentalPath(request.resource.data.rentalId))
+        && get(rentalPath(request.resource.data.rentalId)).data.gearId == request.resource.data.listingId
+        && (
+          get(rentalPath(request.resource.data.rentalId)).data.ownerId == request.auth.uid
+          || get(rentalPath(request.resource.data.rentalId)).data.renterId == request.auth.uid
+        )
+        && (
+          get(rentalPath(request.resource.data.rentalId)).data.ownerId == request.resource.data.userId
+          || get(rentalPath(request.resource.data.rentalId)).data.renterId == request.resource.data.userId
+        )
+        && request.resource.data.userId != request.auth.uid;
+    }
+
+    function renterCanReserveListing() {
+      return signedIn()
+        && resource.data.status == 'AVAILABLE'
+        && request.resource.data.status == 'RESERVED'
+        && resource.data.ownerId != request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status']);
+    }
+
     // Users: protect private profiles and prevent normal users from self-upgrading role.
     match /users/{uid} {
       allow get: if isSelf(uid) || isAdmin();
@@ -114,9 +151,14 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && listingStatusIsAllowed(request.resource.data.status);
       allow update: if signedIn()
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == resource.data.ownerId
-        && (!resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt == resource.data.createdAt);
+        && (
+          (
+            resource.data.ownerId == request.auth.uid
+            && request.resource.data.ownerId == resource.data.ownerId
+            && (!resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt == resource.data.createdAt)
+          )
+          || renterCanReserveListing()
+        );
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
     }
 
@@ -133,7 +175,7 @@ service cloud.firestore {
     // Notifications: users can only read and mark their own notifications.
     match /notifications/{notificationId} {
       allow get, list: if notificationOwnerIsSelf();
-      allow create: if notificationCreateIsSafe();
+      allow create: if bookingNotificationIsSafe() || rentalNotificationIsSafe();
       allow update: if notificationOwnerIsSelf()
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read']);

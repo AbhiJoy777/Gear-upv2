@@ -92,6 +92,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const handleReturnGear = async (rental: any) => {
+    if (!user) return;
     const lateDays = getLateDays(rental);
     const extraAmountDue = getExtraAmountDue(rental);
 
@@ -105,6 +106,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
       await addDoc(collection(db, 'notifications'), {
         userId: rental.ownerId,
+        actorId: user.uid,
+        rentalId: rental.id,
+        listingId: rental.gearId,
         title: 'Gear Returned',
         message: `${rental.gearTitle} has been marked returned.${extraAmountDue > 0 ? ` Extra amount due: Rs ${extraAmountDue}.` : ''}`,
         type: 'return',
@@ -119,6 +123,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const cancelRental = async (rental: any, cancelledBy: 'owner' | 'renter') => {
+    if (!user) return;
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'CANCELLED',
@@ -128,6 +133,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       await updateDoc(doc(db, 'listings', rental.gearId), { status: 'AVAILABLE' });
       await addDoc(collection(db, 'notifications'), {
         userId: cancelledBy === 'owner' ? rental.renterId : rental.ownerId,
+        actorId: user.uid,
+        rentalId: rental.id,
+        listingId: rental.gearId,
         title: cancelledBy === 'owner' ? 'Renting Cancelled' : 'Borrowing Cancelled',
         message: `${rental.gearTitle} rental was cancelled before handoff.`,
         type: 'cancelled',

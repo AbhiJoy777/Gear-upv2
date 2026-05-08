@@ -77,6 +77,8 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
       await addDoc(collection(db, 'notifications'), {
         userId: item.ownerId,
+        actorId: user.uid,
+        listingId: item.id,
         title: 'New Booking Request',
         message: `${user.email} requested to book ${item.title} for ${finalDays} days.`,
         type: 'request',
@@ -91,7 +93,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
       showToast('Booking request sent! The owner will review it shortly.', 'success');
       onClose();
     } catch (err) {
-      console.error('Booking error: ', err);
+      console.error('Booking request failed:', {
+        error: err,
+        code: (err as any)?.code,
+        message: (err as any)?.message,
+      });
       showToast('Failed to submit booking. Please try again.', 'error');
     } finally {
       setLoading(false);
