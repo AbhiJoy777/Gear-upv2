@@ -170,6 +170,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [numControllers, setNumControllers] = useState('');
 
   const [logisticsType, setLogisticsType] = useState('Self-Pickup');
+  const [houseOrBuilding, setHouseOrBuilding] = useState('');
   const [city, setCity] = useState(selectedCity || 'Hyderabad');
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
@@ -301,7 +302,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       return !incMonitor || (!!monSize && !!monRefresh && !!monRes);
     }
     if (step === 4) return imgs.length > 0;
-    if (step === 5) return !!city && !!area.trim() && !!landmark.trim();
+    if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
     return true;
   };
 
@@ -354,9 +355,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
       const location = {
         city,
+        houseOrBuilding: houseOrBuilding.trim(),
         area: area.trim(),
         landmark: landmark.trim(),
         instructions: pickupInstructions.trim(),
+        serviceRadiusKm: 50,
       };
 
       const payload: any = {
@@ -366,7 +369,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         specs: specData,
         score: totalScore,
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
-        logisticsType: logisticsType === 'Self-Pickup' ? 'pickup' : 'delivery',
+        logisticsType,
         logisticsAdjustment: logisticsType === 'Self-Pickup' ? -50 : 50,
         city,
         location,
@@ -400,6 +403,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setMonSize(''); setMonRefresh(''); setMonRes('');
     setControllerPlatform(''); setControllerModel('');
     setLogisticsType('Self-Pickup');
+    setHouseOrBuilding('');
     setCity(selectedCity || 'Hyderabad');
     setArea('');
     setLandmark('');
@@ -415,9 +419,10 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     const specs = editItem.specs || {};
     setC(editItem.category || '');
     setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
-    setLogisticsType(editItem.logisticsType === 'delivery' ? 'Owner Delivery' : 'Self-Pickup');
+    setLogisticsType(editItem.logisticsType === 'delivery' || editItem.logisticsType === 'Owner Delivery' ? 'Owner Delivery' : 'Self-Pickup');
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
     setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
+    setHouseOrBuilding(existingLocation.houseOrBuilding || '');
     setArea(existingLocation.area || '');
     setLandmark(existingLocation.landmark || '');
     setPickupInstructions(existingLocation.instructions || '');
@@ -708,6 +713,18 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                     </div>
 
                     <div>
+                      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">House / Building</label>
+                      <input
+                        value={houseOrBuilding}
+                        onChange={(e) => setHouseOrBuilding(e.target.value)}
+                        placeholder="Flat 402, GearUp Towers"
+                        className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Area / Locality</label>
                       <input
                         value={area}
@@ -716,16 +733,16 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                         className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Landmark</label>
-                    <input
-                      value={landmark}
-                      onChange={(e) => setLandmark(e.target.value)}
-                      placeholder="Near metro gate / main road"
-                      className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                    />
+                    <div>
+                      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Landmark</label>
+                      <input
+                        value={landmark}
+                        onChange={(e) => setLandmark(e.target.value)}
+                        placeholder="Near metro gate / main road"
+                        className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                      />
+                    </div>
                   </div>
 
                   <div>

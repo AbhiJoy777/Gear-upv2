@@ -39,12 +39,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
 
-  const pickupLabel = (rental: any) => {
-    const location = rental.pickupLocation || {};
-    const city = location.city || 'Hyderabad';
+  const isOwnerDelivery = (type: string) => type === 'delivery' || type === 'Owner Delivery';
+
+  const locationLabel = (rental: any) => {
+    const location = isOwnerDelivery(rental.logisticsType) ? rental.deliveryLocation || {} : rental.pickupLocation || {};
+    const city = location.city || '';
     const area = location.area || '';
+    const house = location.houseOrBuilding || '';
     const landmark = location.landmark || '';
-    return [area, city, landmark].filter(Boolean).join(' • ');
+    return [house, area, city, landmark].filter(Boolean).join(' • ');
   };
 
   const dedupeRentalCards = (items: any[]) => {
@@ -433,9 +436,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           }`}>
                             {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
                           </p>
-                          {pickupLabel(activeRental) && (
+                          {locationLabel(activeRental) && (
                             <p className="text-[11px] text-white/45 flex items-center gap-1.5">
-                              <MapPin size={12} className="text-[#A855F7]" /> {pickupLabel(activeRental)}
+                              <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
                             </p>
                           )}
                           <div className="flex items-center gap-2 text-white font-mono text-sm">
@@ -490,8 +493,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
-                                  {pickupLabel(r) && (
-                                    <p className="text-[11px] text-white/45 text-center mt-1">{pickupLabel(r)}</p>
+                                  {locationLabel(r) && (
+                                    <p className="text-[11px] text-white/45 text-center mt-1">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
                                   )}
                                 </div>
                                 
@@ -526,7 +529,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
-                                  <Navigation size={14} /> {item.logisticsType === 'delivery' ? 'Navigate to Delivery' : 'Track Borrower'}
+                                  <Navigation size={14} /> {isOwnerDelivery(item.logisticsType) ? 'Navigate to Delivery' : 'Track Borrower'}
                                 </button>
                                 {canChat(r.status) && (
                                   <button
@@ -614,9 +617,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 flex items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
-                      {rental.status !== 'REQUESTED' && pickupLabel(rental) && (
+                      {rental.status !== 'REQUESTED' && locationLabel(rental) && (
                         <p className="text-white/45 text-[12px] mb-4 flex items-center gap-1.5">
-                          <MapPin size={13} className="text-[#A855F7]" /> {pickupLabel(rental)}
+                          <MapPin size={13} className="text-[#A855F7]" /> {isOwnerDelivery(rental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(rental)}
                         </p>
                       )}
                       
@@ -734,7 +737,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   }`}
                                >
                                   <Navigation size={16} /> 
-                                  {rental.logisticsType === 'delivery' ? 'Track Delivery' : 'Navigate to Pickup'}
+                                  {isOwnerDelivery(rental.logisticsType) ? 'Track Delivery' : 'Navigate to Pickup'}
                                 </button>
                               )
                             )}
