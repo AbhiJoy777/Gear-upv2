@@ -39,6 +39,16 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
 
+  const dedupeRentalCards = (items: any[]) => {
+    const seen = new Set<string>();
+    return items.filter((rental) => {
+      const key = `${rental.gearId}-${rental.ownerId}-${rental.renterId}-${rental.status}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const openRentalReport = (rental: any) => {
     const reporterRole = rental.historyRole || (rental.ownerId === user?.uid ? 'owner' : 'borrower');
     setReportContext({
@@ -234,12 +244,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     return 'text-white border-white/20 bg-white/5';
   };
 
-  const liveRentals = rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status));
+  const visibleOwnerRentals = dedupeRentalCards(ownerRentals);
+  const liveRentals = dedupeRentalCards(rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status)));
   const historyRentals = [
-    ...ownerRentals
+    ...visibleOwnerRentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'owner' })),
-    ...rentals
+    ...dedupeRentalCards(rentals)
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'borrower' })),
   ].sort((a, b) => {
@@ -375,9 +386,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             ) : listings.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
                 {listings.map((item, idx) => {
-                  const pendingRental = ownerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
-                  const activeRental = ownerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
-                  const lockedRental = ownerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
+                  const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
+                  const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
+                  const lockedRental = visibleOwnerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
                   
                   return (
                   <motion.div
@@ -462,7 +473,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                          </div>
                        ) : (
                          <div className="flex flex-col gap-3 mt-auto pt-5">
-                            {ownerRentals.filter(r => r.gearId === item.id && ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)).map(r => (
+                            {visibleOwnerRentals.filter(r => r.gearId === item.id && ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)).map(r => (
                               <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
