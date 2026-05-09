@@ -34,7 +34,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
-  const HISTORY_RENTAL_STATUSES = ['RETURNED', 'CANCELLED'];
+  const LIVE_RENTAL_STATUSES = ['REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+  const HISTORY_RENTAL_STATUSES = ['RETURNED', 'DECLINED', 'CANCELLED'];
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
@@ -256,12 +257,12 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const visibleOwnerRentals = dedupeRentalCards(ownerRentals);
-  const liveRentals = dedupeRentalCards(rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status)));
+  const liveRentals = dedupeRentalCards(rentals.filter((rental) => LIVE_RENTAL_STATUSES.includes(rental.status)));
   const historyRentals = [
-    ...visibleOwnerRentals
+    ...ownerRentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'owner' })),
-    ...dedupeRentalCards(rentals)
+    ...rentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'borrower' })),
   ].sort((a, b) => {
@@ -269,7 +270,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
       return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
     };
-    return getTime(b.returnedAt || b.cancelledAt) - getTime(a.returnedAt || a.cancelledAt);
+    return getTime(b.returnedAt || b.cancelledAt || b.createdAt) - getTime(a.returnedAt || a.cancelledAt || a.createdAt);
   });
 
   const renderHistoryCards = (items: any[]) => {
@@ -279,9 +280,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
             <ShieldCheck size={56} className="text-white/20" />
           </div>
-          <h3 className="text-[18px] font-semibold text-white tracking-tight">No History Yet</h3>
+          <h3 className="text-[18px] font-semibold text-white tracking-tight">No rental history yet</h3>
           <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
-            Completed and cancelled rental records will appear here.
+            Returned, declined, and cancelled rental records will appear here.
           </p>
         </div>
       );
@@ -292,6 +293,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
         {items.map((rental, idx) => {
           const lateFee = rental.extraAmountDue || 0;
           const returned = rental.status === 'RETURNED';
+          const declined = rental.status === 'DECLINED';
 
           return (
             <motion.div
@@ -311,9 +313,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                   returned
                     ? 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10'
+                    : declined
+                      ? 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10'
                     : 'text-white/45 border-white/10 bg-white/5'
                 }`}>
-                  {returned ? 'Returned' : 'Cancelled'}
+                  {returned ? 'Returned' : declined ? 'Declined' : 'Cancelled'}
                 </span>
               </div>
 
@@ -323,8 +327,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   <p className="text-white/70 mt-1">{formatHistoryDate(rental.actualStartTime)}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
-                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Return</p>
-                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.returnedAt || rental.cancelledAt)}</p>
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">{declined ? 'Decision' : 'Return'}</p>
+                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.returnedAt || rental.cancelledAt || rental.createdAt)}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
                   <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Total Paid</p>
@@ -761,9 +765,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
                   <ShoppingBag size={56} className="text-white/20" />
                 </div>
-                <h3 className="text-[18px] font-semibold text-white tracking-tight">No Active Leases</h3>
+                <h3 className="text-[18px] font-semibold text-white tracking-tight">No active rentals</h3>
                 <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
-                  You haven&apos;t leased any hardware yet. Explore the marketplace for professional equipment.
+                  Current rental requests and active rentals will appear here.
                 </p>
                 <button onClick={() => setActiveView && setActiveView('marketplace')} className="cursor-pointer flex items-center gap-2.5 px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-semibold rounded-[24px] hover:bg-white/5 hover:text-white active:scale-95 transition-all text-[13px] tracking-wide mx-auto">
                   Explore Market
