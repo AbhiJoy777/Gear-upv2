@@ -52,6 +52,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const discountedBasePrice = duration !== 'Custom' && finalDays > 0 ? getDiscountedPrice(finalDays, itemPrice) : baseTotalPrice;
   const logisticsAdj = item.logisticsAdjustment || 0;
   const finalTotalPrice = discountedBasePrice + logisticsAdj;
+  const pickupLocation = typeof item.location === 'object' ? item.location : {};
+  const locationCity = pickupLocation.city || item.city || (typeof item.location === 'string' ? item.location : '') || 'Hyderabad';
+  const locationArea = pickupLocation.area || 'Area pending';
+  const locationLandmark = pickupLocation.landmark || 'Landmark pending';
+  const locationInstructions = pickupLocation.instructions || '';
 
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate || loading) return;
@@ -96,6 +101,12 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           pricePerDay: item.pricePerDay || 0,
           logisticsType: item.logisticsType || 'pickup',
           logisticsAdjustment: logisticsAdj,
+          pickupLocation: {
+            city: locationCity,
+            area: locationArea,
+            landmark: locationLandmark,
+            instructions: locationInstructions,
+          },
           createdAt: serverTimestamp(),
         });
 
@@ -168,7 +179,16 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                 )}
               </div>
               <h2 className="text-[20px] md:text-[24px] font-bold text-white mb-2 tracking-tight line-clamp-2 md:line-clamp-none">{item.title}</h2>
-              <p className="text-[14px] text-white/50 mb-6">{item.category} • {item.location || 'Local'}</p>
+              <p className="text-[14px] text-white/50 mb-6">{item.category} • {locationCity} • {locationArea}</p>
+
+              <div className="p-4 bg-[#121212] border border-[#222] rounded-[18px] mb-6">
+                <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Location</p>
+                <p className="text-white text-[13px] font-semibold">{locationArea}, {locationCity}</p>
+                <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
+                {locationInstructions && (
+                  <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
+                )}
+              </div>
 
               <div className="space-y-4 pt-6 mt-auto border-t border-[#222]">
                  <h3 className="text-[12px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
@@ -287,6 +307,12 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         </select>
                         <Clock size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                       </div>
+                    </div>
+
+                    <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
+                      <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
+                      <p className="text-white text-[13px] font-semibold">{locationArea}, {locationCity}</p>
+                      <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
                     </div>
 
                     {startDate && duration !== 'Custom' && (

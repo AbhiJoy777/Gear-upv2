@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -38,6 +38,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+
+  const pickupLabel = (rental: any) => {
+    const location = rental.pickupLocation || {};
+    const city = location.city || 'Hyderabad';
+    const area = location.area || '';
+    const landmark = location.landmark || '';
+    return [area, city, landmark].filter(Boolean).join(' • ');
+  };
 
   const dedupeRentalCards = (items: any[]) => {
     const seen = new Set<string>();
@@ -425,6 +433,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           }`}>
                             {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
                           </p>
+                          {pickupLabel(activeRental) && (
+                            <p className="text-[11px] text-white/45 flex items-center gap-1.5">
+                              <MapPin size={12} className="text-[#A855F7]" /> {pickupLabel(activeRental)}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 text-white font-mono text-sm">
                             <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
@@ -477,6 +490,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
+                                  {pickupLabel(r) && (
+                                    <p className="text-[11px] text-white/45 text-center mt-1">{pickupLabel(r)}</p>
+                                  )}
                                 </div>
                                 
                                 {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
@@ -598,6 +614,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 flex items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
+                      {rental.status !== 'REQUESTED' && pickupLabel(rental) && (
+                        <p className="text-white/45 text-[12px] mb-4 flex items-center gap-1.5">
+                          <MapPin size={13} className="text-[#A855F7]" /> {pickupLabel(rental)}
+                        </p>
+                      )}
                       
                       <div className="py-3 border-y border-white/5 mb-6 flex items-center justify-between">
                         <span className="text-[11px] text-white/40 font-bold uppercase tracking-widest">Status</span>

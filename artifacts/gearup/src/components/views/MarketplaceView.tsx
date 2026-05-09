@@ -50,7 +50,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   };
 
   const filteredItems = items.filter((item) => {
-    const itemCity = item.city || 'Hyderabad';
+    const itemCity = item.location?.city || item.city || 'Hyderabad';
     const isAvailable = !item.status || item.status === 'AVAILABLE';
     const cityMatches = itemCity === selectedCity;
     const categoryMatches = selectedCategory === 'All Gear' || item.category === selectedCategory;
@@ -98,7 +98,11 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       ) : filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative">
           <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, idx) => (
+            {filteredItems.map((item, idx) => {
+              const pickupLocation = typeof item.location === 'object' ? item.location : {};
+              const itemCity = pickupLocation.city || item.city || 'Hyderabad';
+              const itemArea = pickupLocation.area || 'Area pending';
+              return (
               <motion.div
                 layout
                 key={item.id}
@@ -138,8 +142,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                     <h3 className="font-semibold text-[15px] text-white group-hover:text-[#2DD4BF] transition-colors tracking-tight line-clamp-1 duration-300">{item.title}</h3>
                   </div>
                 <p className="text-[#707070] text-[12px] mb-4 line-clamp-2 font-medium leading-relaxed flex-1 flex flex-col gap-1.5">
-                  <span>{item.category} <span className="opacity-50 mx-1">•</span> {item.city || 'Hyderabad'}</span>
-
+                  <span>{item.category} <span className="opacity-50 mx-1">•</span> {itemCity} <span className="opacity-50 mx-1">•</span> {itemArea}</span>
 
                   {item.logisticsType && (
                     <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-max px-2 py-1 rounded-[6px] border border-white/[0.05]">
@@ -159,7 +162,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                   </div>
                 </div>
               </motion.div>
-            ))}
+            )})}
           </AnimatePresence>
         </div>
       ) : (

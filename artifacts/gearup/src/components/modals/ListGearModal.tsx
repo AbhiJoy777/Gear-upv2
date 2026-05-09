@@ -171,7 +171,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
   const [logisticsType, setLogisticsType] = useState('Self-Pickup');
   const [city, setCity] = useState(selectedCity || 'Hyderabad');
-
+  const [area, setArea] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [pickupInstructions, setPickupInstructions] = useState('');
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -299,6 +301,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       return !incMonitor || (!!monSize && !!monRefresh && !!monRes);
     }
     if (step === 4) return imgs.length > 0;
+    if (step === 5) return !!city && !!area.trim() && !!landmark.trim();
     return true;
   };
 
@@ -349,6 +352,13 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         specData.model = otherCpu ?? '';
       }
 
+      const location = {
+        city,
+        area: area.trim(),
+        landmark: landmark.trim(),
+        instructions: pickupInstructions.trim(),
+      };
+
       const payload: any = {
         title, category: c, pricePerDay: base,
         tier, imageUrl: imgs[0] || '',
@@ -359,6 +369,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         logisticsType: logisticsType === 'Self-Pickup' ? 'pickup' : 'delivery',
         logisticsAdjustment: logisticsType === 'Self-Pickup' ? -50 : 50,
         city,
+        location,
         updatedAt: serverTimestamp()
 
       };
@@ -367,7 +378,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       } else {
         await addDoc(collection(db, 'listings'), {
           ...payload, status: 'AVAILABLE', ownerId: user.uid,
-          location: city, description: 'Premium Gear',
+          description: 'Premium Gear',
 
           createdAt: serverTimestamp()
         });
@@ -390,6 +401,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setControllerPlatform(''); setControllerModel('');
     setLogisticsType('Self-Pickup');
     setCity(selectedCity || 'Hyderabad');
+    setArea('');
+    setLandmark('');
+    setPickupInstructions('');
 
     setImgs([]); 
   };
@@ -402,7 +416,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setC(editItem.category || '');
     setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
     setLogisticsType(editItem.logisticsType === 'delivery' ? 'Owner Delivery' : 'Self-Pickup');
-    setCity(editItem.city || editItem.location || 'Hyderabad');
+    const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
+    setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
+    setArea(existingLocation.area || '');
+    setLandmark(existingLocation.landmark || '');
+    setPickupInstructions(existingLocation.instructions || '');
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -524,21 +542,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                 <div className="grid grid-cols-1 gap-4 pb-2">
                   {(c === 'Laptops' || c === 'Desktops') ? (
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
-                        <select
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none cursor-pointer"
-                        >
-                          {CITIES.map((cityName) => (
-                            <option key={cityName} value={cityName} className="bg-[#121212] text-white">
-                              {cityName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
                       <div className="grid grid-cols-2 gap-4">
                         <Select label="CPU Platform" val={cpuPlatform} set={setCpuPlatform} opts={CPU_PLATFORMS} />
                         <Select label="CPU Model" val={cpuModel} set={setCpuModel} opts={cpuPlatform === 'Intel' ? INTEL_CPUS : cpuPlatform === 'AMD' ? AMD_CPUS : []} disabled={!cpuPlatform} />
@@ -688,6 +691,54 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                 </div>
                 
                 <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
+                      <select
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none cursor-pointer"
+                      >
+                        {CITIES.map((cityName) => (
+                          <option key={cityName} value={cityName} className="bg-[#121212] text-white">
+                            {cityName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Area / Locality</label>
+                      <input
+                        value={area}
+                        onChange={(e) => setArea(e.target.value)}
+                        placeholder="Banjara Hills"
+                        className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Landmark</label>
+                    <input
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="Near metro gate / main road"
+                      className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Instructions</label>
+                    <textarea
+                      value={pickupInstructions}
+                      onChange={(e) => setPickupInstructions(e.target.value)}
+                      placeholder="Share parking, security, or call-ahead details"
+                      rows={3}
+                      className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
+                    />
+                  </div>
+
                   <button onClick={() => setLogisticsType('Self-Pickup')} className={`w-full flex items-center p-4 rounded-[16px] border transition-all cursor-pointer ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/10 border-[#A855F7]' : 'bg-[#121212] border-white/10 hover:border-white/20'}`}>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/20 text-[#A855F7]' : 'bg-white/5 text-white/50'}`}>
                        <MapPin size={24} />
