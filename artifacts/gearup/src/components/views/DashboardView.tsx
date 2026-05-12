@@ -32,6 +32,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [chatRental, setChatRental] = useState<any>(null);
   const [reportContext, setReportContext] = useState<any>(null);
+  const [recordingReturnProofId, setRecordingReturnProofId] = useState<string | null>(null);
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
@@ -115,7 +116,31 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     }
   };
 
+  const recordReturnProof = async (rental: any) => {
+    if (!user || !rental?.id) return;
+    setRecordingReturnProofId(rental.id);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        returnProofRecorded: true,
+        returnProofRecordedAt: serverTimestamp(),
+        returnProofRecordedBy: user.uid,
+      });
+      showToast('Return proof recorded.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to record return proof.', 'error');
+    } finally {
+      setRecordingReturnProofId(null);
+    }
+  };
+
   const handleReturnGear = async (rental: any) => {
+    if (!rental.returnProofRecorded) {
+      showToast('Record return proof before returning the gear.', 'warning');
+      return;
+    }
+
     const lateDays = getLateDays(rental);
     const extraAmountDue = getExtraAmountDue(rental);
 
@@ -452,6 +477,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
                             </p>
                           )}
+                          {activeRental.returnProofRecorded && (
+                            <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3">
+                              <p className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Return Proof Recorded</p>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-2 text-white font-mono text-sm">
                             <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
@@ -704,9 +734,27 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           )}
 
                           {rental.status === 'RETURN_DUE' && (
+                            rental.returnProofRecorded ? (
+                              <div className="w-full bg-[#2DD4BF]/10 text-[#2DD4BF] font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 border border-[#2DD4BF]/20">
+                                <Check size={14} /> Return Proof Recorded
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); recordReturnProof(rental); }}
+                                disabled={recordingReturnProofId === rental.id}
+                                className="w-full bg-[#A855F7] text-white font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#9333EA] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {recordingReturnProofId === rental.id ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                                {recordingReturnProofId === rental.id ? 'Recording proof...' : 'Record Return Proof'}
+                              </button>
+                            )
+                          )}
+
+                          {rental.status === 'RETURN_DUE' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); handleReturnGear(rental); }}
-                              className="w-full bg-[#2DD4BF] text-black font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#14b8a6] transition-all"
+                              disabled={!rental.returnProofRecorded}
+                              className="w-full bg-[#2DD4BF] text-black font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#14b8a6] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <RotateCcw size={14} /> Return Gear
                             </button>
