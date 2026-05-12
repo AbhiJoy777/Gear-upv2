@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -34,10 +34,22 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
-  const HISTORY_RENTAL_STATUSES = ['RETURNED', 'CANCELLED'];
+  const LIVE_RENTAL_STATUSES = ['REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+  const HISTORY_RENTAL_STATUSES = ['RETURNED', 'DECLINED', 'CANCELLED'];
 
   const canChat = (status: string) =>
     ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+
+  const isOwnerDelivery = (type: string) => type === 'delivery' || type === 'Owner Delivery';
+
+  const locationLabel = (rental: any) => {
+    const location = isOwnerDelivery(rental.logisticsType) ? rental.deliveryLocation || {} : rental.pickupLocation || {};
+    const city = location.city || '';
+    const area = location.area || '';
+    const house = location.houseOrBuilding || '';
+    const landmark = location.landmark || '';
+    return [house, area, city, landmark].filter(Boolean).join(' • ');
+  };
 
   const dedupeRentalCards = (items: any[]) => {
     const seen = new Set<string>();
@@ -245,12 +257,12 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const visibleOwnerRentals = dedupeRentalCards(ownerRentals);
-  const liveRentals = dedupeRentalCards(rentals.filter((rental) => !HISTORY_RENTAL_STATUSES.includes(rental.status)));
+  const liveRentals = dedupeRentalCards(rentals.filter((rental) => LIVE_RENTAL_STATUSES.includes(rental.status)));
   const historyRentals = [
-    ...visibleOwnerRentals
+    ...ownerRentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'owner' })),
-    ...dedupeRentalCards(rentals)
+    ...rentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
       .map((rental) => ({ ...rental, historyRole: 'borrower' })),
   ].sort((a, b) => {
@@ -258,7 +270,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
       const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
       return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
     };
-    return getTime(b.returnedAt || b.cancelledAt) - getTime(a.returnedAt || a.cancelledAt);
+    return getTime(b.returnedAt || b.cancelledAt || b.createdAt) - getTime(a.returnedAt || a.cancelledAt || a.createdAt);
   });
 
   const renderHistoryCards = (items: any[]) => {
@@ -268,9 +280,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
             <ShieldCheck size={56} className="text-white/20" />
           </div>
-          <h3 className="text-[18px] font-semibold text-white tracking-tight">No History Yet</h3>
+          <h3 className="text-[18px] font-semibold text-white tracking-tight">No rental history yet</h3>
           <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
-            Completed and cancelled rental records will appear here.
+            Returned, declined, and cancelled rental records will appear here.
           </p>
         </div>
       );
@@ -281,6 +293,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
         {items.map((rental, idx) => {
           const lateFee = rental.extraAmountDue || 0;
           const returned = rental.status === 'RETURNED';
+          const declined = rental.status === 'DECLINED';
 
           return (
             <motion.div
@@ -300,9 +313,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                   returned
                     ? 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10'
+                    : declined
+                      ? 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10'
                     : 'text-white/45 border-white/10 bg-white/5'
                 }`}>
-                  {returned ? 'Returned' : 'Cancelled'}
+                  {returned ? 'Returned' : declined ? 'Declined' : 'Cancelled'}
                 </span>
               </div>
 
@@ -312,8 +327,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   <p className="text-white/70 mt-1">{formatHistoryDate(rental.actualStartTime)}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
-                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Return</p>
-                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.returnedAt || rental.cancelledAt)}</p>
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">{declined ? 'Decision' : 'Return'}</p>
+                  <p className="text-white/70 mt-1">{formatHistoryDate(rental.returnedAt || rental.cancelledAt || rental.createdAt)}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
                   <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Total Paid</p>
@@ -425,6 +440,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           }`}>
                             {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
                           </p>
+                          {locationLabel(activeRental) && (
+                            <p className="text-[11px] text-white/45 flex items-center gap-1.5">
+                              <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 text-white font-mono text-sm">
                             <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
@@ -477,6 +497,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
+                                  {locationLabel(r) && (
+                                    <p className="text-[11px] text-white/45 text-center mt-1">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
+                                  )}
                                 </div>
                                 
                                 {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
@@ -510,7 +533,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
-                                  <Navigation size={14} /> {item.logisticsType === 'delivery' ? 'Navigate to Delivery' : 'Track Borrower'}
+                                  <Navigation size={14} /> {isOwnerDelivery(item.logisticsType) ? 'Navigate to Delivery' : 'Track Borrower'}
                                 </button>
                                 {canChat(r.status) && (
                                   <button
@@ -598,6 +621,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 flex items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
+                      {rental.status !== 'REQUESTED' && locationLabel(rental) && (
+                        <p className="text-white/45 text-[12px] mb-4 flex items-center gap-1.5">
+                          <MapPin size={13} className="text-[#A855F7]" /> {isOwnerDelivery(rental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(rental)}
+                        </p>
+                      )}
                       
                       <div className="py-3 border-y border-white/5 mb-6 flex items-center justify-between">
                         <span className="text-[11px] text-white/40 font-bold uppercase tracking-widest">Status</span>
@@ -713,7 +741,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   }`}
                                >
                                   <Navigation size={16} /> 
-                                  {rental.logisticsType === 'delivery' ? 'Track Delivery' : 'Navigate to Pickup'}
+                                  {isOwnerDelivery(rental.logisticsType) ? 'Track Delivery' : 'Navigate to Pickup'}
                                 </button>
                               )
                             )}
@@ -737,9 +765,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
                   <ShoppingBag size={56} className="text-white/20" />
                 </div>
-                <h3 className="text-[18px] font-semibold text-white tracking-tight">No Active Leases</h3>
+                <h3 className="text-[18px] font-semibold text-white tracking-tight">No active rentals</h3>
                 <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
-                  You haven&apos;t leased any hardware yet. Explore the marketplace for professional equipment.
+                  Current rental requests and active rentals will appear here.
                 </p>
                 <button onClick={() => setActiveView && setActiveView('marketplace')} className="cursor-pointer flex items-center gap-2.5 px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-semibold rounded-[24px] hover:bg-white/5 hover:text-white active:scale-95 transition-all text-[13px] tracking-wide mx-auto">
                   Explore Market

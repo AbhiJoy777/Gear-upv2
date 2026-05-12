@@ -6,6 +6,7 @@ import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
+const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const DURATIONS = [
   { days: 1, label: '1 Day', labelShort: '1 Day', discountPercent: 0 },
   { days: 3, label: '3 Days', labelShort: '3 Days', discountPercent: 22 },
@@ -15,7 +16,7 @@ const DURATIONS = [
 ];
 
 export default function BookingModal({ item, onClose }: { item: any, onClose: () => void }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [duration, setDuration] = useState<number | 'Custom' | null>(null);
@@ -23,6 +24,13 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const [endDate, setEndDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('Morning (8 AM - 11 AM)');
   const [loading, setLoading] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    houseOrBuilding: '',
+    area: '',
+    city: item.location?.city || item.city || 'Hyderabad',
+    landmark: '',
+    instructions: '',
+  });
 
   // Compute final days based on selection or custom dates
   let finalDays = 0;
@@ -52,9 +60,29 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const discountedBasePrice = duration !== 'Custom' && finalDays > 0 ? getDiscountedPrice(finalDays, itemPrice) : baseTotalPrice;
   const logisticsAdj = item.logisticsAdjustment || 0;
   const finalTotalPrice = discountedBasePrice + logisticsAdj;
+  const pickupLocation = typeof item.location === 'object' ? item.location : {};
+  const locationCity = pickupLocation.city || item.city || (typeof item.location === 'string' ? item.location : '') || 'Hyderabad';
+  const locationHouse = pickupLocation.houseOrBuilding || '';
+  const locationArea = pickupLocation.area || 'Area pending';
+  const locationLandmark = pickupLocation.landmark || 'Landmark pending';
+  const locationInstructions = pickupLocation.instructions || '';
+  const isOwnerDelivery = item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery';
+  const deliveryReady = !isOwnerDelivery || Boolean(deliveryAddress.houseOrBuilding.trim() && deliveryAddress.area.trim() && deliveryAddress.city && deliveryAddress.landmark.trim());
+
+  useEffect(() => {
+    if (!profile || !isOwnerDelivery) return;
+    const profileAddress = profile.address || profile.location || {};
+    setDeliveryAddress({
+      houseOrBuilding: profileAddress.houseOrBuilding || profile.houseOrBuilding || '',
+      area: profileAddress.area || profile.area || '',
+      city: profileAddress.city || profile.city || locationCity,
+      landmark: profileAddress.landmark || profile.landmark || '',
+      instructions: profileAddress.instructions || profile.deliveryInstructions || '',
+    });
+  }, [profile, isOwnerDelivery, locationCity]);
 
   const handleConfirm = async () => {
-    if (!user || finalDays <= 0 || !startDate || loading) return;
+    if (!user || finalDays <= 0 || !startDate || loading || !deliveryReady) return;
     setLoading(true);
     try {
       const existingRentalQuery = query(
@@ -94,8 +122,23 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           status: 'REQUESTED',
           totalPrice: finalTotalPrice,
           pricePerDay: item.pricePerDay || 0,
-          logisticsType: item.logisticsType || 'pickup',
+          logisticsType: isOwnerDelivery ? 'Owner Delivery' : 'Self-Pickup',
           logisticsAdjustment: logisticsAdj,
+          pickupLocation: isOwnerDelivery ? null : {
+            city: locationCity,
+            houseOrBuilding: locationHouse,
+            area: locationArea,
+            landmark: locationLandmark,
+            instructions: locationInstructions,
+            serviceRadiusKm: pickupLocation.serviceRadiusKm || 50,
+          },
+          deliveryLocation: isOwnerDelivery ? {
+            city: deliveryAddress.city,
+            houseOrBuilding: deliveryAddress.houseOrBuilding.trim(),
+            area: deliveryAddress.area.trim(),
+            landmark: deliveryAddress.landmark.trim(),
+            instructions: deliveryAddress.instructions.trim(),
+          } : null,
           createdAt: serverTimestamp(),
         });
 
@@ -168,7 +211,19 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                 )}
               </div>
               <h2 className="text-[20px] md:text-[24px] font-bold text-white mb-2 tracking-tight line-clamp-2 md:line-clamp-none">{item.title}</h2>
-              <p className="text-[14px] text-white/50 mb-6">{item.category} • {item.location || 'Local'}</p>
+              <p className="text-[14px] text-white/50 mb-6">{item.category} • {locationCity} • {locationArea}</p>
+
+              {!isOwnerDelivery && (
+                <div className="p-4 bg-[#121212] border border-[#222] rounded-[18px] mb-6">
+                  <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
+                  {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
+                  <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
+                  <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
+                  {locationInstructions && (
+                    <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-4 pt-6 mt-auto border-t border-[#222]">
                  <h3 className="text-[12px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
@@ -242,7 +297,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         </div>
                         <div className="flex justify-between items-center text-[13px]">
                            <span className="text-white/70 flex items-center gap-1.5">
-                             {item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery' ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
+                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
                            </span>
                            <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
                               {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
@@ -259,7 +314,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                   <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                        <div>
-                         <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">{item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery' ? 'Delivery Date' : 'Pickup Date'}</label>
+                         <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">{isOwnerDelivery ? 'Delivery Date' : 'Pickup Date'}</label>
                          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[16px] p-4 text-[14px] focus:border-[#A855F7] outline-none transition-colors shadow-inner [color-scheme:dark]" />
                        </div>
                        
@@ -289,6 +344,55 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                       </div>
                     </div>
 
+                    {isOwnerDelivery ? (
+                      <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px] space-y-3">
+                        <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider">Delivery Address</p>
+                        <input
+                          value={deliveryAddress.houseOrBuilding}
+                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, houseOrBuilding: e.target.value })}
+                          placeholder="House / building"
+                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <input
+                            value={deliveryAddress.area}
+                            onChange={(e) => setDeliveryAddress({ ...deliveryAddress, area: e.target.value })}
+                            placeholder="Area / locality"
+                            className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                          />
+                          <select
+                            value={deliveryAddress.city}
+                            onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
+                            className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none"
+                          >
+                            {CITIES.map((cityName) => (
+                              <option key={cityName} value={cityName}>{cityName}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <input
+                          value={deliveryAddress.landmark}
+                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, landmark: e.target.value })}
+                          placeholder="Landmark"
+                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                        />
+                        <textarea
+                          value={deliveryAddress.instructions}
+                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, instructions: e.target.value })}
+                          placeholder="Delivery instructions"
+                          rows={2}
+                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
+                        <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
+                        {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
+                        <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
+                        <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
+                      </div>
+                    )}
+
                     {startDate && duration !== 'Custom' && (
                       <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
                         <p className="text-[12px] text-white/60 leading-relaxed">
@@ -307,7 +411,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         </div>
                         <div className="flex justify-between items-center text-[13px]">
                            <span className="text-white/70 flex items-center gap-1.5">
-                             {item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery' ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
+                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
                            </span>
                            <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
                               {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
@@ -337,7 +441,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                ) : (
                  <button 
                    onClick={handleConfirm} 
-                   disabled={finalDays <= 0 || !startDate || loading} 
+                   disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
                    className="px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-[160px]"
                  >
                    {loading ? <span className="animate-pulse">Processing...</span> : 'Confirm Request'}
