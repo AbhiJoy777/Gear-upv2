@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import VerificationRequestModal from '../modals/VerificationRequestModal';
+import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 
 const VERIFICATION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -28,6 +29,7 @@ const ProfileView = memo(() => {
   const { showToast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [verificationOpen, setVerificationOpen] = useState(false);
+  const [phoneVerificationOpen, setPhoneVerificationOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -53,6 +55,7 @@ const ProfileView = memo(() => {
         username: form.name,
         email: form.email,
         phone: form.phone,
+        phoneVerified: form.phone === profile?.phone ? !!profile?.phoneVerified : false,
         role: profile?.role || 'user',
         verificationStatus: profile?.verificationStatus || 'not_started',
       }, { merge: true });
@@ -68,6 +71,7 @@ const ProfileView = memo(() => {
   };
 
   const verificationStatus = profile?.verificationStatus || 'not_started';
+  const phoneVerified = !!profile?.phoneVerified;
   const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
   const verificationAction =
     verificationStatus === 'not_started'
@@ -80,6 +84,7 @@ const ProfileView = memo(() => {
 
   const menuItems = [
     { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
+    { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
@@ -105,6 +110,12 @@ const ProfileView = memo(() => {
             <Phone size={14} />
             {form.phone || 'No phone number added'}
           </p>
+          <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border text-[11px] font-bold uppercase tracking-wider ${
+            phoneVerified ? 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10' : 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10'
+          }`}>
+            <Phone size={13} />
+            {phoneVerified ? 'Phone Verified' : 'Phone Not Verified'}
+          </div>
           <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border text-[11px] font-bold uppercase tracking-wider ${VERIFICATION_STYLES[verificationStatus] || VERIFICATION_STYLES.not_started}`}>
             <Shield size={13} />
             {VERIFICATION_LABELS[verificationStatus] || 'Not started'}
@@ -128,10 +139,14 @@ const ProfileView = memo(() => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             onClick={() => {
+              if (item.type === 'phone') {
+                if (!phoneVerified) setPhoneVerificationOpen(true);
+                return;
+              }
               if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
             className={`bg-[#121212] p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between group transition-all ${
-              item.interactive && canRequestVerification ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+              (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
             }`}
           >
             <div className="flex items-center gap-4">
@@ -142,9 +157,12 @@ const ProfileView = memo(() => {
             </div>
             <div className="flex items-center gap-3">
               <span className={`text-[11px] font-semibold tracking-wider ${
-                item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
+                item.type === 'phone'
+                  ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
+                  : item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
               }`}>{item.status}</span>
-              {item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
+              {item.type === 'phone' && !phoneVerified && <ChevronRight size={16} className="text-white/20" />}
+              {item.type !== 'phone' && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
             </div>
           </motion.div>
         ))}
@@ -251,6 +269,11 @@ const ProfileView = memo(() => {
       <AnimatePresence>
         {verificationOpen && (
           <VerificationRequestModal onClose={() => setVerificationOpen(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {phoneVerificationOpen && (
+          <PhoneVerificationModal onClose={() => setPhoneVerificationOpen(false)} />
         )}
       </AnimatePresence>
     </div>
