@@ -12,6 +12,7 @@ const RECAPTCHA_CONTAINER_ID = 'phone-recaptcha-container';
 declare global {
   interface Window {
     recaptchaVerifier?: RecaptchaVerifier;
+    recaptchaVerifierContainer?: HTMLElement;
   }
 }
 
@@ -46,6 +47,9 @@ const getPhoneAuthErrorMessage = (err: any) => {
   }
 };
 
+const isRemovedRecaptchaError = (err: any) =>
+  String(err?.message || '').toLowerCase().includes('client element has been removed');
+
 export default function PhoneVerificationModal({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -56,16 +60,40 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  const resetVerifier = () => {
+    try {
+      window.recaptchaVerifier?.clear();
+    } catch (err) {
+      console.warn('Failed to clear stale recaptcha verifier:', err);
+    }
+    window.recaptchaVerifier = undefined;
+    window.recaptchaVerifierContainer = undefined;
+  };
+
   const getVerifier = async () => {
-    if (window.recaptchaVerifier) {
+    const container = document.getElementById(RECAPTCHA_CONTAINER_ID);
+    if (!container) {
+      throw new Error('Phone reCAPTCHA container is not mounted.');
+    }
+
+    if (
+      window.recaptchaVerifier &&
+      window.recaptchaVerifierContainer &&
+      document.body.contains(window.recaptchaVerifierContainer)
+    ) {
       console.log('Reusing existing recaptcha verifier');
       return window.recaptchaVerifier;
+    }
+
+    if (window.recaptchaVerifier) {
+      resetVerifier();
     }
 
     console.log('Creating new recaptcha verifier');
     window.recaptchaVerifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
       size: 'invisible',
     });
+    window.recaptchaVerifierContainer = container;
     await window.recaptchaVerifier.render();
     return window.recaptchaVerifier;
   };
@@ -94,8 +122,17 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
     try {
       const e164Phone = `+91${digits}`;
       const provider = new PhoneAuthProvider(auth);
-      const verifier = await getVerifier();
-      const id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      let verifier = await getVerifier();
+      let id: string;
+      try {
+        id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      } catch (err: any) {
+        if (!isRemovedRecaptchaError(err)) throw err;
+        console.warn('Phone OTP retrying after removed reCAPTCHA container:', err);
+        resetVerifier();
+        verifier = await getVerifier();
+        id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      }
       setVerificationId(id);
       setVerificationPhone(e164Phone);
       showToast('OTP sent successfully.', 'success');
