@@ -27,6 +27,10 @@ export default function NotificationInboxModal({ onClose }: { onClose: () => voi
         });
       setNotifications(items);
       setLoading(false);
+    }, (err) => {
+      console.error('Notification listener failed:', err);
+      showToast('Could not load notifications.', 'error');
+      setLoading(false);
     });
     return () => unsubscribe();
   }, [user]);

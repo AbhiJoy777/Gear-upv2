@@ -29,6 +29,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       // Bootstrap user doc — preserve existing user-set fields
+      setProfile(null);
+      setLoading(true);
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);

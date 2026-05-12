@@ -21,6 +21,9 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.error('Chat listener failed:', err);
+      showToast('Could not load chat messages.', 'error');
     });
 
     return () => unsubscribe();
