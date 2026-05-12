@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Camera, Loader2, Video } from 'lucide-react';
-import { arrayUnion, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { arrayUnion, doc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -174,7 +174,7 @@ export default function ProofCapturePanel({
         type: 'simulated-video',
         url: 'simulated-proof',
         uploadedBy: user.uid,
-        uploadedAt: serverTimestamp(),
+        uploadedAt: Timestamp.now(),
         simulated: true,
       };
       await updateDoc(doc(db, 'rentals', rental.id), {
@@ -183,8 +183,12 @@ export default function ProofCapturePanel({
       });
       onUploaded?.([simulatedProof]);
       showToast('Simulated proof saved.', 'success');
-    } catch (err) {
-      console.error('Simulated proof failed:', err);
+    } catch (err: any) {
+      console.error('Simulated proof failed:', {
+        code: err?.code,
+        message: err?.message,
+        error: err,
+      });
       showToast('Could not save simulated proof. Please try again.', 'error');
     } finally {
       setUploading(false);
