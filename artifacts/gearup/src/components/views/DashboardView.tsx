@@ -12,6 +12,7 @@ import ConfirmModal from '../modals/ConfirmModal';
 import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 import { createTransaction } from '@/lib/transactions';
+import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 
 
 type Tab = 'listings' | 'rentals' | 'history';
@@ -404,6 +405,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
                   const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
                   const lockedRental = visibleOwnerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
+                  const timelineRental = lockedRental || activeRental;
                   
                   return (
                   <motion.div
@@ -428,6 +430,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     <div className="p-5 flex-1 flex flex-col">
                       <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{item.title}</h3>
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
+                      {timelineRental && (
+                        <div className="mb-5">
+                          <RentalTimelineSummary rental={timelineRental} />
+                        </div>
+                      )}
                       
                       {activeRental && activeRental.actualStartTime && (
                         <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
@@ -640,6 +647,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 ? 'Return Due'
                                 : rental.status}
                         </span>
+                      </div>
+                      <div className="mb-6">
+                        <RentalTimelineSummary rental={rental} />
                       </div>
                       
                       {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) && rental.actualStartTime && (
