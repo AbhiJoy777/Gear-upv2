@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Camera, Loader2, Video } from 'lucide-react';
 import { arrayUnion, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
 export type ProofItem = {
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'simulated-video';
   url: string;
   uploadedBy: string;
   uploadedAt?: any;
@@ -40,7 +40,7 @@ export function ProofMediaStrip({ media, max = 6 }: { media: ProofItem[]; max?: 
   return (
     <div className="flex gap-2 overflow-x-auto">
       {media.slice(0, max).map((item, idx) => {
-        const simulated = item.simulated || item.url?.startsWith('simulated-proof://');
+        const simulated = item.simulated || item.url === 'simulated-proof' || item.url?.startsWith('simulated-proof://');
         if (simulated) {
           return (
             <div key={`${item.url}-${idx}`} className="w-14 h-14 rounded-[10px] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 shrink-0 flex items-center justify-center text-[9px] text-[#2DD4BF] font-bold text-center px-1">
@@ -115,11 +115,9 @@ export default function ProofCapturePanel({
 }) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingProof[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const existingMedia = useMemo(() => getProofMedia(rental, field), [rental, field]);
 
@@ -165,20 +163,33 @@ export default function ProofCapturePanel({
 
   const saveSimulatedProof = async () => {
     if (!user || !rental?.id) return;
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    const simulatedProof: ProofItem = {
-      type: 'image',
-      url: `simulated-proof://${rental.id}/${Date.now()}`,
-      uploadedBy: user.uid,
-      uploadedAt: serverTimestamp(),
-      simulated: true,
-    };
-    await updateDoc(doc(db, 'rentals', rental.id), {
-      [field]: arrayUnion(simulatedProof),
-      updatedAt: serverTimestamp(),
-    });
-    onUploaded?.([simulatedProof]);
-    showToast('Simulated proof saved.', 'success');
+    setUploading(true);
+    setProgress(0);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      setProgress(50);
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      setProgress(100);
+      const simulatedProof: ProofItem = {
+        type: 'simulated-video',
+        url: 'simulated-proof',
+        uploadedBy: user.uid,
+        uploadedAt: serverTimestamp(),
+        simulated: true,
+      };
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        [field]: arrayUnion(simulatedProof),
+        updatedAt: serverTimestamp(),
+      });
+      onUploaded?.([simulatedProof]);
+      showToast('Simulated proof saved.', 'success');
+    } catch (err) {
+      console.error('Simulated proof failed:', err);
+      showToast('Could not save simulated proof. Please try again.', 'error');
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
   };
 
   const uploadProof = async (items: PendingProof[]) => {
@@ -236,14 +247,6 @@ export default function ProofCapturePanel({
     }
   };
 
-  const handleFiles = async (files: FileList | null) => {
-    const items = await prepareFiles(files);
-    if (inputRef.current) inputRef.current.value = '';
-    if (items.length > 0) {
-      await uploadProof(items);
-    }
-  };
-
   return (
     <div className="rounded-[20px] border border-white/10 bg-[#0A0A0A] p-4 space-y-4">
       <div>
@@ -251,12 +254,10 @@ export default function ProofCapturePanel({
         <p className="text-[12px] text-white/45 mt-1 leading-relaxed">{helper}</p>
       </div>
 
-      <input ref={inputRef} type="file" accept="image/*,video/*" capture={isMobile ? 'environment' : undefined} className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
-
-      {(existingMedia.length > 0 || pending.length > 0) && (
+      {existingMedia.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {existingMedia.slice(0, 6).map((item: ProofItem, idx: number) => (
-            item.simulated || item.url?.startsWith('simulated-proof://') ? (
+            item.simulated || item.url === 'simulated-proof' || item.url?.startsWith('simulated-proof://') ? (
               <div key={`${item.url}-${idx}`} className="aspect-square rounded-[12px] overflow-hidden bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 flex items-center justify-center text-[10px] text-[#2DD4BF] font-bold text-center px-2">
                 Simulated
               </div>
@@ -266,24 +267,16 @@ export default function ProofCapturePanel({
               </a>
             )
           ))}
-          {pending.map((item) => (
-            <div key={item.id} className="aspect-square rounded-[12px] overflow-hidden bg-white/5 border border-[#A855F7]/30 relative">
-              {item.type === 'image' ? <img src={item.previewUrl} alt="Pending proof" className="w-full h-full object-cover" /> : <video src={item.previewUrl} className="w-full h-full object-cover" muted />}
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <Loader2 size={18} className="animate-spin text-white" />
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
       <button
-        onClick={() => inputRef.current?.click()}
+        onClick={saveSimulatedProof}
         disabled={uploading}
         className="w-full py-3 bg-[#A855F7] disabled:opacity-40 text-white font-bold rounded-[14px] text-[12px] flex items-center justify-center gap-2 transition-all"
       >
         {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-        {uploading ? `Saving Proof ${progress}%` : actionLabel}
+        {uploading ? `Recording proof... ${progress}%` : actionLabel}
       </button>
     </div>
   );
