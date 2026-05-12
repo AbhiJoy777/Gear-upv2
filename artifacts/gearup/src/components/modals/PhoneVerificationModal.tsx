@@ -7,10 +7,24 @@ import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
+const RECAPTCHA_CONTAINER_ID = 'phone-verification-recaptcha';
+
+const getInitialIndianMobile = (phone?: string) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  return digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits.slice(-10);
+};
+
 const getPhoneAuthErrorMessage = (err: any) => {
   switch (err?.code) {
     case 'auth/invalid-phone-number':
-      return 'Enter a valid phone number with country code.';
+      return 'Enter a valid 10-digit Indian mobile number.';
+    case 'auth/quota-exceeded':
+      return 'SMS quota exceeded. Please try again later.';
+    case 'auth/captcha-check-failed':
+    case 'auth/missing-app-credential':
+      return 'reCAPTCHA verification failed. Please try again.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please try again later.';
     case 'auth/invalid-verification-code':
@@ -29,9 +43,10 @@ const getPhoneAuthErrorMessage = (err: any) => {
 export default function PhoneVerificationModal({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
-  const [phone, setPhone] = useState(profile?.phone || '');
+  const [mobileNumber, setMobileNumber] = useState(getInitialIndianMobile(profile?.phone));
   const [otp, setOtp] = useState('');
   const [verificationId, setVerificationId] = useState('');
+  const [verificationPhone, setVerificationPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
@@ -43,35 +58,53 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
     };
   }, []);
 
-  const getVerifier = () => {
+  const getVerifier = async () => {
     if (!recaptchaRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(auth, 'phone-recaptcha-container', {
+      recaptchaRef.current = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
         size: 'invisible',
       });
+      await recaptchaRef.current.render();
     }
     return recaptchaRef.current;
   };
 
+  const handleMobileChange = (value: string) => {
+    setMobileNumber(value.replace(/\D/g, '').slice(0, 10));
+    if (verificationId) {
+      setVerificationId('');
+      setVerificationPhone('');
+      setOtp('');
+    }
+  };
+
   const handleSendOtp = async () => {
-    const cleanedPhone = phone.trim();
-    if (!cleanedPhone) {
-      showToast('Enter a phone number first.', 'error');
+    const digits = mobileNumber.replace(/\D/g, '');
+    if (!digits) {
+      showToast('Enter your mobile number first.', 'error');
       return;
     }
-    if (!cleanedPhone.startsWith('+')) {
-      showToast('Use country code format, for example +919876543210.', 'error');
+    if (digits.length !== 10) {
+      showToast('Enter a valid 10-digit Indian mobile number.', 'error');
       return;
     }
 
     setSending(true);
     try {
+      const e164Phone = `+91${digits}`;
       const provider = new PhoneAuthProvider(auth);
-      const id = await provider.verifyPhoneNumber(cleanedPhone, getVerifier());
+      const verifier = await getVerifier();
+      const id = await provider.verifyPhoneNumber(e164Phone, verifier);
       setVerificationId(id);
+      setVerificationPhone(e164Phone);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
-      console.error('Phone OTP send failed:', err);
+      console.error('Phone OTP send failed:', {
+        code: err?.code,
+        message: err?.message,
+        error: err,
+      });
       showToast(getPhoneAuthErrorMessage(err), 'error');
+      setVerificationPhone('');
       recaptchaRef.current?.clear();
       recaptchaRef.current = null;
     } finally {
@@ -80,7 +113,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   };
 
   const handleVerifyOtp = async () => {
-    if (!user || !verificationId || !otp.trim()) {
+    if (!user || !verificationId || !verificationPhone || !otp.trim()) {
       showToast('Enter the OTP to continue.', 'error');
       return;
     }
@@ -90,14 +123,18 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       const credential = PhoneAuthProvider.credential(verificationId, otp.trim());
       await updatePhoneNumber(user, credential);
       await setDoc(doc(db, 'users', user.uid), {
-        phone: phone.trim(),
+        phone: verificationPhone,
         phoneVerified: true,
         phoneVerifiedAt: serverTimestamp(),
       }, { merge: true });
       showToast('Phone verified successfully.', 'success');
       onClose();
     } catch (err: any) {
-      console.error('Phone OTP verification failed:', err);
+      console.error('Phone OTP verification failed:', {
+        code: err?.code,
+        message: err?.message,
+        error: err,
+      });
       showToast(getPhoneAuthErrorMessage(err), 'error');
     } finally {
       setVerifying(false);
@@ -137,12 +174,22 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
             <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">
               Phone Number
             </label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+919876543210"
-              className="w-full bg-[#0A0A0A] border border-white/10 rounded-[16px] px-4 py-3.5 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors placeholder:text-white/25"
-            />
+            <div className="flex items-center bg-[#0A0A0A] border border-white/10 rounded-[16px] overflow-hidden focus-within:border-[#A855F7] transition-colors">
+              <span className="px-4 py-3.5 text-[13px] font-bold text-white border-r border-white/10 bg-white/[0.03]">
+                +91
+              </span>
+              <input
+                value={mobileNumber}
+                onChange={(e) => handleMobileChange(e.target.value)}
+                placeholder="9876543210"
+                inputMode="numeric"
+                maxLength={10}
+                className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-white text-[13px] outline-none placeholder:text-white/25"
+              />
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+              Enter your 10-digit mobile number. India +91 is added automatically.
+            </p>
           </div>
 
           <button
@@ -168,7 +215,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
             </div>
           )}
 
-          <div id="phone-recaptcha-container" />
+          <div id={RECAPTCHA_CONTAINER_ID} />
         </div>
 
         <div className="px-6 py-5 border-t border-white/5 flex justify-end gap-3">
