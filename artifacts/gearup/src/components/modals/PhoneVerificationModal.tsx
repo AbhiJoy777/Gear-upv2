@@ -12,6 +12,7 @@ const RECAPTCHA_CONTAINER_ID = 'phone-recaptcha-container';
 declare global {
   interface Window {
     recaptchaVerifier?: RecaptchaVerifier;
+    recaptchaVerifierContainer?: HTMLElement;
   }
 }
 
@@ -46,6 +47,9 @@ const getPhoneAuthErrorMessage = (err: any) => {
   }
 };
 
+const isRemovedRecaptchaError = (err: any) =>
+  String(err?.message || '').toLowerCase().includes('client element has been removed');
+
 export default function PhoneVerificationModal({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -56,16 +60,40 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  const resetVerifier = () => {
+    try {
+      window.recaptchaVerifier?.clear();
+    } catch (err) {
+      console.warn('Failed to clear stale recaptcha verifier:', err);
+    }
+    window.recaptchaVerifier = undefined;
+    window.recaptchaVerifierContainer = undefined;
+  };
+
   const getVerifier = async () => {
-    if (window.recaptchaVerifier) {
+    const container = document.getElementById(RECAPTCHA_CONTAINER_ID);
+    if (!container) {
+      throw new Error('Phone reCAPTCHA container is not mounted.');
+    }
+
+    if (
+      window.recaptchaVerifier &&
+      window.recaptchaVerifierContainer &&
+      document.body.contains(window.recaptchaVerifierContainer)
+    ) {
       console.log('Reusing existing recaptcha verifier');
       return window.recaptchaVerifier;
+    }
+
+    if (window.recaptchaVerifier) {
+      resetVerifier();
     }
 
     console.log('Creating new recaptcha verifier');
     window.recaptchaVerifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
       size: 'invisible',
     });
+    window.recaptchaVerifierContainer = container;
     await window.recaptchaVerifier.render();
     return window.recaptchaVerifier;
   };
@@ -94,8 +122,17 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
     try {
       const e164Phone = `+91${digits}`;
       const provider = new PhoneAuthProvider(auth);
-      const verifier = await getVerifier();
-      const id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      let verifier = await getVerifier();
+      let id: string;
+      try {
+        id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      } catch (err: any) {
+        if (!isRemovedRecaptchaError(err)) throw err;
+        console.warn('Phone OTP retrying after removed reCAPTCHA container:', err);
+        resetVerifier();
+        verifier = await getVerifier();
+        id = await provider.verifyPhoneNumber(e164Phone, verifier);
+      }
       setVerificationId(id);
       setVerificationPhone(e164Phone);
       showToast('OTP sent successfully.', 'success');
@@ -142,7 +179,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   };
 
   return (
-    <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -155,9 +192,9 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative z-10 w-full max-w-[440px] bg-[#121212] border border-white/10 rounded-[32px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
+        className="relative z-10 w-full max-w-[440px] bg-[#121212] border border-white/10 rounded-[24px] sm:rounded-[32px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
       >
-        <div className="px-6 py-5 flex items-center justify-between border-b border-white/5">
+        <div className="px-5 sm:px-6 py-5 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#A855F7]/10 flex items-center justify-center">
               <Phone size={18} className="text-[#A855F7]" />
@@ -169,7 +206,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-5 sm:p-6 space-y-5">
           <div>
             <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">
               Phone Number
@@ -218,14 +255,14 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
           <div id={RECAPTCHA_CONTAINER_ID} />
         </div>
 
-        <div className="px-6 py-5 border-t border-white/5 flex justify-end gap-3">
-          <button onClick={onClose} className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all">
+        <div className="px-5 sm:px-6 py-5 border-t border-white/5 flex flex-col-reverse sm:flex-row justify-end gap-3">
+          <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all">
             Cancel
           </button>
           <button
             onClick={handleVerifyOtp}
             disabled={!verificationId || !otp.trim() || verifying}
-            className="px-6 py-3 bg-[#2DD4BF] text-black font-bold rounded-[24px] hover:bg-[#14b8a6] transition-all text-[13px] flex items-center gap-2 disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-3 bg-[#2DD4BF] text-black font-bold rounded-[24px] hover:bg-[#14b8a6] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {verifying && <Loader2 size={16} className="animate-spin" />}
             Verify OTP

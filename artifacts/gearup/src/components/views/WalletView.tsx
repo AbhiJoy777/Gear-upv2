@@ -65,27 +65,27 @@ const WalletView = memo(() => {
     .join(' ');
 
   return (
-    <div className="p-6 md:p-12 max-w-5xl mx-auto space-y-12">
+    <div className="p-4 sm:p-6 md:p-12 max-w-5xl mx-auto space-y-8 md:space-y-12">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-[#121212] p-10 rounded-[24px] border-[0.5px] border-white/[0.04] relative overflow-hidden"
+        className="bg-[#121212] p-6 sm:p-10 rounded-[24px] border-[0.5px] border-white/[0.04] relative overflow-hidden"
       >
         <div className="relative z-10">
           <p className="text-[11px] text-[#707070] font-medium tracking-wide mb-2 ml-1">Available Liquidity</p>
-          <h2 className="text-5xl font-bold tracking-tight text-white mb-8">{currency(profile?.walletBalance)}</h2>
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-8 break-words">{currency(profile?.walletBalance)}</h2>
 
-          <div className="flex gap-4">
-            <button className="cursor-pointer px-6 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <button className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide">
               Add Funds
             </button>
-            <button className="cursor-pointer px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-medium rounded-[24px] hover:bg-white/5 hover:text-white transition-all text-[13px] tracking-wide active:scale-95">
+            <button className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-medium rounded-[24px] hover:bg-white/5 hover:text-white transition-all text-[13px] tracking-wide active:scale-95">
               Withdraw
             </button>
           </div>
         </div>
 
-        <Wallet className="absolute -right-12 -bottom-12 w-64 h-64 text-white/5 rotate-12" />
+        <Wallet className="absolute -right-16 -bottom-16 w-48 h-48 sm:w-64 sm:h-64 text-white/5 rotate-12" />
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -108,12 +108,12 @@ const WalletView = memo(() => {
                 {transactions.map((item) => {
                   const isCredit = item.direction === 'credit';
                   return (
-                    <div key={item.id} className="p-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors">
+                    <div key={item.id} className="p-4 flex items-start sm:items-center gap-3 sm:gap-4 hover:bg-white/[0.02] transition-colors">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCredit ? 'bg-[#2DD4BF]/10 text-[#2DD4BF]' : 'bg-[#A855F7]/10 text-[#A855F7]'}`}>
                         {isCredit ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="text-white font-bold text-[13px] truncate">{typeLabel(item.type)}</p>
                           <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-white/35">
                             {statusIcon(item.status)}
@@ -123,7 +123,7 @@ const WalletView = memo(() => {
                         <p className="text-[#707070] text-[12px] truncate">{item.description || 'Wallet transaction'}</p>
                         <p className="text-white/30 text-[11px] mt-1">{formatDate(item.createdAt)}</p>
                       </div>
-                      <div className={`text-right font-black text-[13px] ${isCredit ? 'text-[#2DD4BF]' : 'text-white'}`}>
+                      <div className={`text-right font-black text-[13px] shrink-0 ${isCredit ? 'text-[#2DD4BF]' : 'text-white'}`}>
                         {isCredit ? '+' : '-'}{currency(item.amount)}
                       </div>
                     </div>

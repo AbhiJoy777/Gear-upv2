@@ -104,13 +104,13 @@ const AdminView = memo(() => {
   ];
 
   return (
-    <div className="p-6 md:p-10 space-y-8">
+    <div className="p-4 sm:p-6 md:p-10 space-y-8">
       <div>
         <h2 className="text-[22px] font-black tracking-tight text-white">Admin Dashboard</h2>
         <p className="text-[#707070] text-[13px] mt-1">Verification and marketplace oversight.</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(({ label, value, Icon }, idx) => (
           <motion.div
             key={label}
@@ -139,7 +139,7 @@ const AdminView = memo(() => {
               const relatedRental = rentals.find((item) => item.id === report.rentalId);
               return (
                 <div key={report.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Flag size={14} className="text-red-400" />
                       <p className="text-white font-semibold text-[14px]">{report.reason || 'Report'}</p>
@@ -147,28 +147,28 @@ const AdminView = memo(() => {
                         {report.status || 'open'}
                       </span>
                     </div>
-                    <p className="text-[#707070] text-[12px]">Reporter: {report.reporterEmail || report.reporterId || 'Unknown user'}</p>
-                    <p className="text-white/45 text-[12px] leading-relaxed max-w-3xl">{report.description || 'No description provided.'}</p>
-                    <p className="text-white/30 text-[11px]">
+                    <p className="text-[#707070] text-[12px] break-all">Reporter: {report.reporterEmail || report.reporterId || 'Unknown user'}</p>
+                    <p className="text-white/45 text-[12px] leading-relaxed max-w-3xl break-words">{report.description || 'No description provided.'}</p>
+                    <p className="text-white/30 text-[11px] break-words">
                       {relatedRental?.gearTitle || relatedListing?.title || report.rentalId || report.listingId || 'User behavior report'}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
                       onClick={() => updateReportStatus(report.id, 'reviewing')}
-                      className="px-3 py-2 bg-[#F97316]/10 text-[#F97316] font-bold rounded-[12px] text-[12px] border border-[#F97316]/20 hover:bg-[#F97316]/20 transition-all"
+                      className="w-full sm:w-auto px-3 py-2 bg-[#F97316]/10 text-[#F97316] font-bold rounded-[12px] text-[12px] border border-[#F97316]/20 hover:bg-[#F97316]/20 transition-all"
                     >
                       Reviewing
                     </button>
                     <button
                       onClick={() => updateReportStatus(report.id, 'resolved')}
-                      className="px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] hover:bg-[#14b8a6] transition-all"
+                      className="w-full sm:w-auto px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] hover:bg-[#14b8a6] transition-all"
                     >
                       Resolve
                     </button>
                     <button
                       onClick={() => updateReportStatus(report.id, 'rejected')}
-                      className="px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] border border-red-500/20 hover:bg-red-500/20 transition-all"
+                      className="w-full sm:w-auto px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] border border-red-500/20 hover:bg-red-500/20 transition-all"
                     >
                       Reject
                     </button>
@@ -192,22 +192,22 @@ const AdminView = memo(() => {
               const targetUser = usersList.find((item) => item.id === request.uid) || { id: request.uid };
               return (
                 <div key={request.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <p className="text-white font-semibold text-[14px]">{request.fullName || 'Unnamed applicant'}</p>
-                    <p className="text-[#707070] text-[12px]">{request.userEmail || request.uid}</p>
-                    <p className="text-white/50 text-[12px]">{request.idType}: {request.idNumber}</p>
+                    <p className="text-[#707070] text-[12px] break-all">{request.userEmail || request.uid}</p>
+                    <p className="text-white/50 text-[12px] break-words">{request.idType}: {request.idNumber}</p>
                     {request.note && <p className="text-white/35 text-[12px] italic">{request.note}</p>}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       onClick={() => updateVerification(targetUser, 'verified', request)}
-                      className="px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 hover:bg-[#14b8a6] transition-all"
+                      className="w-full sm:w-auto px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] flex items-center justify-center gap-1.5 hover:bg-[#14b8a6] transition-all"
                     >
                       <Check size={14} /> Approve
                     </button>
                     <button
                       onClick={() => updateVerification(targetUser, 'rejected', request)}
-                      className="px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                      className="w-full sm:w-auto px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] flex items-center justify-center gap-1.5 border border-red-500/20 hover:bg-red-500/20 transition-all"
                     >
                       <X size={14} /> Reject
                     </button>
@@ -226,23 +226,23 @@ const AdminView = memo(() => {
             const status = item.verificationStatus || 'not_started';
             return (
               <div key={item.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-white font-semibold text-[14px]">{item.username || item.fullName || item.name || item.email || 'Unnamed user'}</p>
-                  <p className="text-[#707070] text-[12px] mt-1">{item.email || item.id}</p>
+                  <p className="text-[#707070] text-[12px] mt-1 break-all">{item.email || item.id}</p>
                   <div className={`mt-2 inline-flex px-2.5 py-1 rounded-[24px] border text-[10px] font-bold uppercase tracking-wider ${statusStyles[status] || statusStyles.not_started}`}>
                     {statusLabels[status] || 'Not started'}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={() => updateVerification(item, 'verified')}
-                    className="px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 hover:bg-[#14b8a6] transition-all"
+                    className="w-full sm:w-auto px-3 py-2 bg-[#2DD4BF] text-black font-bold rounded-[12px] text-[12px] flex items-center justify-center gap-1.5 hover:bg-[#14b8a6] transition-all"
                   >
                     <Check size={14} /> Verify
                   </button>
                   <button
                     onClick={() => updateVerification(item, 'rejected')}
-                    className="px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] flex items-center gap-1.5 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                    className="w-full sm:w-auto px-3 py-2 bg-red-500/10 text-red-400 font-bold rounded-[12px] text-[12px] flex items-center justify-center gap-1.5 border border-red-500/20 hover:bg-red-500/20 transition-all"
                   >
                     <X size={14} /> Reject
                   </button>

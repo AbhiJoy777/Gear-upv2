@@ -189,7 +189,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
         <motion.div
            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
            onClick={onClose}
@@ -199,11 +199,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
            initial={{ opacity: 0, scale: 0.95, y: 20 }}
            animate={{ opacity: 1, scale: 1, y: 0 }}
            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-           className="bg-[#121212] w-full max-w-[900px] rounded-[32px] overflow-y-auto md:overflow-hidden border border-[#222] shadow-[0_0_80px_rgba(0,0,0,0.8)] relative z-10 flex flex-col md:flex-row max-h-[95vh] no-scrollbar"
+           className="bg-[#121212] w-full max-w-[900px] rounded-[24px] sm:rounded-[32px] overflow-y-auto md:overflow-hidden border border-[#222] shadow-[0_0_80px_rgba(0,0,0,0.8)] relative z-10 flex flex-col md:flex-row max-h-[92dvh] md:max-h-[95vh] no-scrollbar"
          >
            {/* Left side: Gear Info */}
-           <div className="w-full md:w-3/5 bg-[#080808] border-b md:border-b-0 md:border-r border-[#222] p-6 md:p-8 flex flex-col shrink-0 md:overflow-y-auto no-scrollbar">
-              <div className="h-[200px] md:h-[300px] bg-[#121212] rounded-[24px] border border-[#222] flex items-center justify-center mb-6 overflow-hidden relative">
+           <div className="w-full md:w-3/5 bg-[#080808] border-b md:border-b-0 md:border-r border-[#222] p-4 sm:p-6 md:p-8 flex flex-col shrink-0 md:overflow-y-auto no-scrollbar">
+              <div className="h-[180px] sm:h-[220px] md:h-[300px] bg-[#121212] rounded-[20px] md:rounded-[24px] border border-[#222] flex items-center justify-center mb-5 md:mb-6 overflow-hidden relative">
                 {item.imageUrl && !item.imageUrl.includes('picsum.photos') ? (
                   <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
                 ) : (
@@ -258,7 +258,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
              </div>
              
              {/* Scrolling Content */}
-             <div className="p-6 space-y-6 flex-1 pb-10 md:pb-32 md:overflow-y-auto no-scrollbar">
+             <div className="p-4 sm:p-6 space-y-6 flex-1 pb-8 md:pb-32 md:overflow-y-auto no-scrollbar">
                 {step === 1 ? (
                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -428,13 +428,13 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
              </div>
 
              {/* Sticky Footer */}
-             <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex justify-end gap-3 pb-8 md:pb-4">
-               <button onClick={onClose} className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all">Cancel</button>
+             <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col-reverse sm:flex-row justify-end gap-3 pb-6 md:pb-4">
+               <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all">Cancel</button>
                {step === 1 ? (
                  <button 
                    onClick={() => setStep(2)} 
                    disabled={duration === null} 
-                   className="px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
+                   className="w-full sm:w-auto px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
                  >
                    Next: Choose Dates
                  </button>
@@ -442,7 +442,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                  <button 
                    onClick={handleConfirm} 
                    disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
-                   className="px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-[160px]"
+                   className="w-full sm:w-auto px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-[160px]"
                  >
                    {loading ? <span className="animate-pulse">Processing...</span> : 'Confirm Request'}
                  </button>
