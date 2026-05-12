@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { recordRentalPaymentTransactions } from '@/lib/transactions';
 import { useToast } from '@/context/ToastContext';
-import RentalTimeline from '@/components/common/RentalTimeline';
+import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 
 interface HandshakeModalProps {
   rental: any;
@@ -179,7 +179,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
         </div>
 
         <div className="p-8 space-y-6">
-           <RentalTimeline rental={rental} />
+           <RentalTimelineSummary rental={rental} />
 
            {/* Step Content */}
            <AnimatePresence mode="wait">
