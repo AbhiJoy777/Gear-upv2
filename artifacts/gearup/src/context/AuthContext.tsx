@@ -48,6 +48,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (e) {
         console.error('User doc bootstrap error:', e);
+      } finally {
+        setLoading(false);
       }
     });
 
@@ -55,7 +57,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     const unsubscribeProfile = onSnapshot(doc(db, 'users', user.uid), (snap) => {
       setProfile(snap.data() || null);
       setLoading(false);
