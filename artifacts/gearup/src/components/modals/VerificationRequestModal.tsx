@@ -75,7 +75,7 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[230] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -88,7 +88,7 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative z-10 w-full max-w-[500px] bg-[#121212] border border-white/10 rounded-[32px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
+          className="relative z-10 w-full max-w-[500px] bg-[#121212] border border-white/10 rounded-[24px] sm:rounded-[32px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
         >
           <div className="px-5 md:px-6 py-4 flex items-center justify-between border-b border-white/5">
             <div className="flex items-center gap-3">
@@ -130,14 +130,14 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
 
             </div>
 
-            <div className="px-5 md:px-6 py-4 border-t border-white/5 flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all">
+            <div className="px-5 md:px-6 py-4 border-t border-white/5 flex flex-col-reverse sm:flex-row justify-end gap-3">
+              <button type="button" onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all">
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Send size={16} />
                 {saving ? 'Submitting...' : 'Submit Request'}

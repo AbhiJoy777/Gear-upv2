@@ -62,7 +62,7 @@ export default function NotificationInboxModal({ onClose }: { onClose: () => voi
   };
 
   return (
-    <div className="fixed inset-0 z-[220] flex items-start justify-end p-4 md:p-6">
+    <div className="fixed inset-0 z-[220] flex items-start justify-center sm:justify-end p-3 sm:p-4 md:p-6">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -73,7 +73,7 @@ export default function NotificationInboxModal({ onClose }: { onClose: () => voi
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: -8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative z-10 w-full max-w-[420px] mt-14 md:mt-16 bg-[#121212] border border-white/10 rounded-[28px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
+        className="relative z-10 w-full max-w-[420px] mt-12 md:mt-16 bg-[#121212] border border-white/10 rounded-[24px] sm:rounded-[28px] shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
       >
         <div className="px-5 py-4 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export default function NotificationInboxModal({ onClose }: { onClose: () => voi
           </button>
         </div>
 
-        <div className="max-h-[62vh] overflow-y-auto p-3">
+        <div className="max-h-[68dvh] sm:max-h-[62vh] overflow-y-auto p-3">
           {loading ? (
             <div className="h-48 flex items-center justify-center">
               <Loader2 className="w-6 h-6 text-[#A855F7] animate-spin" />
@@ -106,13 +106,13 @@ export default function NotificationInboxModal({ onClose }: { onClose: () => voi
               {notifications.map((item) => (
                 <div key={item.id} className={`rounded-[18px] border p-4 ${item.read ? 'bg-white/[0.02] border-white/[0.04]' : 'bg-[#A855F7]/10 border-[#A855F7]/20'}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-white font-bold text-[13px]">{item.title || 'GearUp update'}</p>
                       <p className="text-white/45 text-[12px] mt-1 leading-relaxed">{item.message || 'You have a new notification.'}</p>
                     </div>
                     <span className="text-[10px] text-white/30 whitespace-nowrap">{formatDate(item.createdAt)}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
                     <span className="text-[10px] text-white/30 uppercase tracking-wider">{item.type || 'update'}</span>
                     {!item.read && (
                       <button

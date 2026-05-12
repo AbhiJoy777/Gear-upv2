@@ -89,24 +89,24 @@ const ProfileView = memo(() => {
   ];
 
   return (
-    <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 md:p-12 max-w-4xl mx-auto space-y-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-6"
+        className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6"
       >
-        <div className="w-20 h-20 rounded-[24px] bg-[#121212] flex items-center justify-center border-[0.5px] border-white/[0.04]">
+        <div className="w-20 h-20 rounded-[24px] bg-[#121212] flex items-center justify-center border-[0.5px] border-white/[0.04] shrink-0">
           <User size={40} className="text-[#A855F7]" />
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h2 className="text-[18px] font-bold tracking-tight text-white mb-1">
             {form.name || 'User'}
           </h2>
-          <p className="text-[#707070] font-medium text-[13px]">
+          <p className="text-[#707070] font-medium text-[13px] break-all">
             {form.email || 'No email added'}
           </p>
-          <p className="text-[#707070] font-medium text-[13px] mt-1 flex items-center gap-2">
+          <p className="text-[#707070] font-medium text-[13px] mt-1 flex items-center gap-2 break-all">
             <Phone size={14} />
             {form.phone || 'No phone number added'}
           </p>
@@ -124,7 +124,7 @@ const ProfileView = memo(() => {
 
         <button
           onClick={() => setEditOpen(true)}
-          className="cursor-pointer px-5 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] tracking-wide flex items-center gap-2 active:scale-95"
+          className="cursor-pointer w-full sm:w-auto px-5 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] tracking-wide flex items-center justify-center gap-2 active:scale-95"
         >
           <Pencil size={16} />
           Edit Profile
@@ -145,17 +145,17 @@ const ProfileView = memo(() => {
               }
               if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
-            className={`bg-[#121212] p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between group transition-all ${
+            className={`bg-[#121212] p-4 sm:p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between gap-3 group transition-all ${
               (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
             }`}
           >
-            <div className="flex items-center gap-4">
-              <div className="p-2.5 bg-black/40 rounded-lg text-white/50 group-hover:text-[#A855F7] transition-colors">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="p-2.5 bg-black/40 rounded-lg text-white/50 group-hover:text-[#A855F7] transition-colors shrink-0">
                 <item.icon size={18} />
               </div>
-              <span className="font-medium text-white tracking-tight text-[13px]">{item.label}</span>
+              <span className="font-medium text-white tracking-tight text-[13px] truncate">{item.label}</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <span className={`text-[11px] font-semibold tracking-wider ${
                 item.type === 'phone'
                   ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
@@ -245,17 +245,17 @@ const ProfileView = memo(() => {
                 </div>
               </div>
 
-              <div className="px-6 py-5 border-t border-white/5 flex justify-end gap-3">
+              <div className="px-6 py-5 border-t border-white/5 flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <button
                   onClick={() => setEditOpen(false)}
-                  className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all"
+                  className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center gap-2 disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[24px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Save size={16} />
                   {saving ? 'Saving...' : 'Save Changes'}

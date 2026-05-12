@@ -277,11 +277,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     if (items.length === 0) {
       return (
         <div className="space-y-6">
-          <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
+          <div className="p-8 sm:p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
             <ShieldCheck size={56} className="text-white/20" />
           </div>
           <h3 className="text-[18px] font-semibold text-white tracking-tight">No rental history yet</h3>
-          <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
+          <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-4 sm:px-8 leading-relaxed">
             Returned, declined, and cancelled rental records will appear here.
           </p>
         </div>
@@ -304,13 +304,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               className="bg-[#101010] border-[0.5px] border-white/[0.04] rounded-[24px] p-5 flex flex-col gap-4 opacity-90"
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold text-[15px] text-white/90 tracking-tight line-clamp-1">{rental.gearTitle || 'Rental'}</h3>
                   <p className="text-[#707070] text-[12px] mt-1">
                     {rental.historyRole === 'owner' ? 'You listed this' : 'You borrowed this'}
                   </p>
                 </div>
-                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                   returned
                     ? 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10'
                     : declined
@@ -340,13 +340,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-white/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
                 <span className="text-[11px] text-white/35">
                   Proof-of-life: <span className="text-white/60">{rental.proofOfLifeUrl ? 'Recorded' : 'Not recorded'}</span>
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openRentalReport(rental); }}
-                  className="bg-red-500/10 text-red-400 font-bold px-3 py-2 rounded-[12px] text-[11px] flex items-center justify-center gap-1.5 transition-all border border-red-500/20 hover:bg-red-500/20"
+                  className="w-full sm:w-auto bg-red-500/10 text-red-400 font-bold px-3 py-2 rounded-[12px] text-[11px] flex items-center justify-center gap-1.5 transition-all border border-red-500/20 hover:bg-red-500/20"
                 >
                   <Flag size={13} /> Report Issue
                 </button>
@@ -359,8 +359,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   return (
-    <div className="p-6 md:p-10 space-y-4">
-      <div className="flex gap-8 border-b border-white/5 pb-0">
+    <div className="p-4 sm:p-6 md:p-10 space-y-4">
+      <div className="flex gap-6 md:gap-8 overflow-x-auto scrollbar-hide border-b border-white/5 pb-0">
         {[
           { key: 'listings', label: 'My Listings' },
           { key: 'rentals', label: 'My Rentals' },
@@ -369,7 +369,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as Tab)}
-            className="cursor-pointer relative pb-4 group"
+            className="cursor-pointer relative pb-4 group shrink-0"
           >
             <span className={`text-sm font-semibold tracking-wide transition-colors ${
               activeTab === tab.key ? 'text-white' : 'text-[#707070] group-hover:text-white'
@@ -441,11 +441,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
                           </p>
                           {locationLabel(activeRental) && (
-                            <p className="text-[11px] text-white/45 flex items-center gap-1.5">
+                          <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
                               <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
                             </p>
                           )}
-                          <div className="flex items-center gap-2 text-white font-mono text-sm">
+                          <div className="flex flex-wrap items-center gap-2 text-white font-mono text-sm">
                             <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
                               {(() => {
@@ -498,7 +498,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                   {locationLabel(r) && (
-                                    <p className="text-[11px] text-white/45 text-center mt-1">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
+                                    <p className="text-[11px] text-white/45 text-center mt-1 break-words">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
                                   )}
                                 </div>
                                 
@@ -587,11 +587,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
+                <div className="p-8 sm:p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
                   <Box size={56} className="text-white/20" />
                 </div>
                 <h3 className="text-[18px] font-semibold text-white tracking-tight">Vault Empty</h3>
-                <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
+                <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-4 sm:px-8 leading-relaxed">
                   Your professional catalog is quiet. Be the first to drop high-end gear in the market.
                 </p>
                 <button onClick={() => window.dispatchEvent(new CustomEvent('open-list-modal'))} className="cursor-pointer flex items-center gap-2.5 px-6 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide mx-auto">
@@ -618,16 +618,16 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     </div>
                     <div className="p-5 flex-1 flex flex-col">
                       <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{rental.gearTitle}</h3>
-                      <p className="text-[#707070] text-[12px] mt-1 mb-4 flex items-center gap-1.5 font-medium tracking-wide">
+                      <p className="text-[#707070] text-[12px] mt-1 mb-4 flex flex-wrap items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
                       {rental.status !== 'REQUESTED' && locationLabel(rental) && (
-                        <p className="text-white/45 text-[12px] mb-4 flex items-center gap-1.5">
+                        <p className="text-white/45 text-[12px] mb-4 flex items-start gap-1.5 leading-relaxed">
                           <MapPin size={13} className="text-[#A855F7]" /> {isOwnerDelivery(rental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(rental)}
                         </p>
                       )}
                       
-                      <div className="py-3 border-y border-white/5 mb-6 flex items-center justify-between">
+                      <div className="py-3 border-y border-white/5 mb-6 flex flex-wrap items-center justify-between gap-2">
                         <span className="text-[11px] text-white/40 font-bold uppercase tracking-widest">Status</span>
                         <span className={`text-[12px] font-bold ${
                           rental.status === 'ACCEPTED' ? 'text-[#F97316]' : rental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'
@@ -653,7 +653,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           }`}>
                             {rental.status === 'RETURN_DUE' ? 'Return Phase' : 'Time Remaining'}
                           </p>
-                          <div className="flex items-center gap-2 text-white font-mono text-lg">
+                          <div className="flex flex-wrap items-center gap-2 text-white font-mono text-base sm:text-lg">
                             <Box size={16} className={rental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#A855F7]'} />
                             <span>
                               {(() => {
@@ -748,9 +748,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                          </div>
                       )}
 
-                      <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
+                      <div className="flex flex-wrap items-center justify-between gap-3 mt-auto pt-4 border-t border-white/10">
                          <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{rental.totalPrice}</span>
-                         <div className="flex items-center gap-1.5">
+                         <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">{rental.durationDays} Days</span>
                             <div className="w-1 h-1 bg-white/10 rounded-full" />
                             <span className="text-[12px] text-white/50 tracking-wide font-medium">Total Price</span>
@@ -762,11 +762,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
+                <div className="p-8 sm:p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
                   <ShoppingBag size={56} className="text-white/20" />
                 </div>
                 <h3 className="text-[18px] font-semibold text-white tracking-tight">No active rentals</h3>
-                <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-8 leading-relaxed">
+                <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-4 sm:px-8 leading-relaxed">
                   Current rental requests and active rentals will appear here.
                 </p>
                 <button onClick={() => setActiveView && setActiveView('marketplace')} className="cursor-pointer flex items-center gap-2.5 px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-semibold rounded-[24px] hover:bg-white/5 hover:text-white active:scale-95 transition-all text-[13px] tracking-wide mx-auto">

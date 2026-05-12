@@ -59,13 +59,13 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
 
   return (
-    <div className="p-6 md:p-10 space-y-10">
+    <div className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10">
       <div className="mb-2">
-        <h2 className="text-7xl md:text-8xl font-black mb-12 tracking-tighter">
+        <h2 className="text-4xl sm:text-6xl md:text-8xl font-black mb-8 md:mb-12 tracking-tighter">
           <span className="text-white">Explore the </span>
           <span className="text-[#2DD4BF] italic">Armory.</span>
         </h2>
-        <div className="flex flex-wrap gap-8 overflow-x-auto pb-0 scrollbar-hide border-b border-white/5 relative">
+        <div className="flex gap-6 md:gap-8 overflow-x-auto pb-0 scrollbar-hide border-b border-white/5 relative">
           {['All Gear', ...CATEGORIES].map((cat, idx) => (
             <button 
               key={cat}
@@ -145,13 +145,13 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                   <span>{item.category} <span className="opacity-50 mx-1">•</span> {itemCity} <span className="opacity-50 mx-1">•</span> {itemArea}</span>
 
                   {item.logisticsType && (
-                    <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-max px-2 py-1 rounded-[6px] border border-white/[0.05]">
+                    <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-fit max-w-full px-2 py-1 rounded-[6px] border border-white/[0.05]">
                       {item.logisticsType === 'Owner Delivery' || item.logisticsType === 'delivery' ? <Truck size={12} className="text-[#A855F7]" /> : <MapPin size={12} className="text-[#A855F7]" />}
                       {item.logisticsType === 'Owner Delivery' || item.logisticsType === 'delivery' ? 'Home Delivery' : 'Self-Pickup'}
                     </span>
                   )}
                 </p>
-                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-auto pt-4 border-t border-white/10">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
@@ -166,12 +166,12 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           </AnimatePresence>
         </div>
       ) : (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-[50vh]">
-          <div className="p-10 bg-[#121212] rounded-[24px] mb-8 border-[0.5px] border-white/[0.04] shadow-2xl relative overflow-hidden">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="w-full max-w-md p-6 sm:p-10 bg-[#121212] rounded-[24px] mb-8 border-[0.5px] border-white/[0.04] shadow-2xl relative overflow-hidden">
              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
              <Camera size={48} className="text-[#A855F7]/40 mb-6 mx-auto" />
              <h3 className="text-[20px] font-bold text-white mb-2 tracking-tight text-center">Vault is Empty</h3>
-             <p className="text-[#707070] text-[13px] text-center max-w-sm mb-8 font-medium leading-relaxed">
+             <p className="text-[#707070] text-[13px] text-center max-w-sm mb-8 font-medium leading-relaxed mx-auto">
                 No {selectedCategory !== 'All Gear' ? selectedCategory : 'Gear'} listed in {selectedCity} yet. Be the first explorer to list high-end gear.
 
              </p>
