@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Camera, Loader2, Trash2, UploadCloud, Video } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Camera, Loader2, Video } from 'lucide-react';
 import { arrayUnion, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -11,6 +11,7 @@ export type ProofItem = {
   url: string;
   uploadedBy: string;
   uploadedAt?: any;
+  simulated?: boolean;
 };
 
 export type ProofMediaField = 'handoverProofMedia' | 'returnProofMedia' | 'proofMedia';
@@ -38,17 +39,27 @@ export function ProofMediaStrip({ media, max = 6 }: { media: ProofItem[]; max?: 
 
   return (
     <div className="flex gap-2 overflow-x-auto">
-      {media.slice(0, max).map((item, idx) => (
-        <a
-          key={`${item.url}-${idx}`}
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-white/40"
-        >
-          {item.type === 'image' ? <img src={item.url} alt="Proof" className="w-full h-full object-cover" /> : <Video size={18} className="text-white/40" />}
-        </a>
-      ))}
+      {media.slice(0, max).map((item, idx) => {
+        const simulated = item.simulated || item.url?.startsWith('simulated-proof://');
+        if (simulated) {
+          return (
+            <div key={`${item.url}-${idx}`} className="w-14 h-14 rounded-[10px] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 shrink-0 flex items-center justify-center text-[9px] text-[#2DD4BF] font-bold text-center px-1">
+              Simulated
+            </div>
+          );
+        }
+        return (
+          <a
+            key={`${item.url}-${idx}`}
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-white/40"
+          >
+            {item.type === 'image' ? <img src={item.url} alt="Proof" className="w-full h-full object-cover" /> : <Video size={18} className="text-white/40" />}
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -92,24 +103,28 @@ export default function ProofCapturePanel({
   label = 'Proof Media',
   helper = 'Capture at least one clear gear photo before continuing.',
   field = 'proofMedia',
+  actionLabel = 'Record Proof of Life',
   onUploaded,
 }: {
   rental: any;
   label?: string;
   helper?: string;
   field?: ProofMediaField;
+  actionLabel?: string;
   onUploaded?: (items: ProofItem[]) => void;
 }) {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingProof[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const existingMedia = useMemo(() => getProofMedia(rental, field), [rental, field]);
 
-  const addFiles = async (files: FileList | null) => {
-    if (!files) return;
+  const prepareFiles = async (files: FileList | null) => {
+    if (!files) return [];
     const next: PendingProof[] = [];
     for (const file of Array.from(files)) {
       const type = file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : null;
@@ -145,25 +160,36 @@ export default function ProofCapturePanel({
         previewUrl: URL.createObjectURL(file),
       });
     }
-    setPending((items) => [...items, ...next].slice(0, 4));
+    return next.slice(0, 1);
   };
 
-  const removePending = (id: string) => {
-    setPending((items) => {
-      const target = items.find((item) => item.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return items.filter((item) => item.id !== id);
+  const saveSimulatedProof = async () => {
+    if (!user || !rental?.id) return;
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    const simulatedProof: ProofItem = {
+      type: 'image',
+      url: `simulated-proof://${rental.id}/${Date.now()}`,
+      uploadedBy: user.uid,
+      uploadedAt: serverTimestamp(),
+      simulated: true,
+    };
+    await updateDoc(doc(db, 'rentals', rental.id), {
+      [field]: arrayUnion(simulatedProof),
+      updatedAt: serverTimestamp(),
     });
+    onUploaded?.([simulatedProof]);
+    showToast('Simulated proof saved.', 'success');
   };
 
-  const uploadPending = async () => {
-    if (!user || !rental?.id || pending.length === 0) return;
+  const uploadProof = async (items: PendingProof[]) => {
+    if (!user || !rental?.id || items.length === 0) return;
     setUploading(true);
     setProgress(0);
+    setPending(items);
     try {
       const uploaded: ProofItem[] = [];
-      for (let index = 0; index < pending.length; index += 1) {
-        const item = pending[index];
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
         const uploadFile = item.type === 'image' ? await compressImage(item.file) : item.file;
         const ext = item.type === 'image' ? 'jpg' : (item.file.name.split('.').pop() || 'webm');
         const proofRef = ref(storage, `rental-proofs/${rental.id}/${Date.now()}-${index}.${ext}`);
@@ -172,7 +198,7 @@ export default function ProofCapturePanel({
         await new Promise<void>((resolve, reject) => {
           task.on('state_changed', (snapshot) => {
             const itemProgress = snapshot.bytesTransferred / snapshot.totalBytes;
-            setProgress(Math.round(((index + itemProgress) / pending.length) * 100));
+            setProgress(Math.round(((index + itemProgress) / items.length) * 100));
           }, reject, () => resolve());
         });
 
@@ -189,7 +215,6 @@ export default function ProofCapturePanel({
         [field]: arrayUnion(...uploaded),
         updatedAt: serverTimestamp(),
       });
-      pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
       setPending([]);
       onUploaded?.(uploaded);
       showToast('Proof media uploaded.', 'success');
@@ -197,17 +222,25 @@ export default function ProofCapturePanel({
       console.error('Proof upload failed:', err);
       const message = String(err?.message || '').toLowerCase();
       const storageNotReady = err?.code === 'storage/bucket-not-found' || err?.code === 'storage/unknown' || message.includes('storage has not been set up');
-      showToast(
-        storageNotReady
-          ? 'Media upload requires Firebase Storage to be enabled.'
-          : err?.code === 'storage/unauthorized'
-            ? 'Permission denied while uploading proof.'
-            : 'Proof upload failed. Please try again.',
-        'error'
-      );
+      if (storageNotReady) {
+        showToast('Media upload requires Firebase Storage to be enabled. Saving simulated proof for dev mode.', 'warning');
+        await saveSimulatedProof();
+      } else {
+        showToast(err?.code === 'storage/unauthorized' ? 'Permission denied while uploading proof.' : 'Proof upload failed. Please try again.', 'error');
+      }
     } finally {
+      items.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      setPending([]);
       setUploading(false);
       setProgress(0);
+    }
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    const items = await prepareFiles(files);
+    if (inputRef.current) inputRef.current.value = '';
+    if (items.length > 0) {
+      await uploadProof(items);
     }
   };
 
@@ -218,42 +251,39 @@ export default function ProofCapturePanel({
         <p className="text-[12px] text-white/45 mt-1 leading-relaxed">{helper}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="cursor-pointer bg-[#121212] border border-white/10 hover:border-[#A855F7]/40 rounded-[14px] py-3 text-[12px] text-white font-bold flex items-center justify-center gap-2 transition-all">
-          <Camera size={15} /> Camera
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void addFiles(e.target.files)} />
-        </label>
-        <label className="cursor-pointer bg-[#121212] border border-white/10 hover:border-[#A855F7]/40 rounded-[14px] py-3 text-[12px] text-white font-bold flex items-center justify-center gap-2 transition-all">
-          <Video size={15} /> Video
-          <input type="file" accept="video/*" capture="environment" className="hidden" onChange={(e) => void addFiles(e.target.files)} />
-        </label>
-      </div>
+      <input ref={inputRef} type="file" accept="image/*,video/*" capture={isMobile ? 'environment' : undefined} className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
 
       {(existingMedia.length > 0 || pending.length > 0) && (
         <div className="grid grid-cols-3 gap-2">
           {existingMedia.slice(0, 6).map((item: ProofItem, idx: number) => (
-            <a key={`${item.url}-${idx}`} href={item.url} target="_blank" rel="noreferrer" className="aspect-square rounded-[12px] overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center">
-              {item.type === 'image' ? <img src={item.url} alt="Proof" className="w-full h-full object-cover" /> : <Video size={20} className="text-white/50" />}
-            </a>
+            item.simulated || item.url?.startsWith('simulated-proof://') ? (
+              <div key={`${item.url}-${idx}`} className="aspect-square rounded-[12px] overflow-hidden bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 flex items-center justify-center text-[10px] text-[#2DD4BF] font-bold text-center px-2">
+                Simulated
+              </div>
+            ) : (
+              <a key={`${item.url}-${idx}`} href={item.url} target="_blank" rel="noreferrer" className="aspect-square rounded-[12px] overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center">
+                {item.type === 'image' ? <img src={item.url} alt="Proof" className="w-full h-full object-cover" /> : <Video size={20} className="text-white/50" />}
+              </a>
+            )
           ))}
           {pending.map((item) => (
             <div key={item.id} className="aspect-square rounded-[12px] overflow-hidden bg-white/5 border border-[#A855F7]/30 relative">
               {item.type === 'image' ? <img src={item.previewUrl} alt="Pending proof" className="w-full h-full object-cover" /> : <video src={item.previewUrl} className="w-full h-full object-cover" muted />}
-              <button onClick={() => removePending(item.id)} className="absolute top-1 right-1 p-1 bg-black/70 rounded-full text-white">
-                <Trash2 size={12} />
-              </button>
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <Loader2 size={18} className="animate-spin text-white" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
       <button
-        onClick={uploadPending}
-        disabled={uploading || pending.length === 0}
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
         className="w-full py-3 bg-[#A855F7] disabled:opacity-40 text-white font-bold rounded-[14px] text-[12px] flex items-center justify-center gap-2 transition-all"
       >
-        {uploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-        {uploading ? `Uploading ${progress}%` : pending.length > 0 ? 'Upload Proof' : 'Add Proof First'}
+        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+        {uploading ? `Saving Proof ${progress}%` : actionLabel}
       </button>
     </div>
   );

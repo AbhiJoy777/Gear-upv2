@@ -103,17 +103,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     return lateDays * (getDailyRent(rental) + 100);
   };
 
-  const hasProofImage = (media: any[]) => media.some((item) => item.type === 'image');
-
-  const combinedProofMedia = (rental: any) => {
-    const seen = new Set<string>();
-    return [...getProofMedia(rental, 'handoverProofMedia'), ...(Array.isArray(rental?.returnProofMedia) ? rental.returnProofMedia : [])]
-      .filter((item) => {
-        if (!item?.url || seen.has(item.url)) return false;
-        seen.add(item.url);
-        return true;
-      });
-  };
+  const hasProofMedia = (media: any[]) => media.length > 0;
 
   const moveToReturnDue = async (rental: any) => {
     if (!rental?.id || rental.status !== 'ACTIVE_RENTAL') return;
@@ -131,7 +121,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const handleReturnGear = async (rental: any) => {
     const returnProofMedia = Array.isArray(rental.returnProofMedia) ? rental.returnProofMedia : [];
-    if (!hasProofImage(returnProofMedia)) {
+    if (!hasProofMedia(returnProofMedia)) {
       showToast('Upload return proof before marking the gear returned.', 'warning');
       return;
     }
@@ -315,7 +305,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           const lateFee = rental.extraAmountDue || 0;
           const returned = rental.status === 'RETURNED';
           const declined = rental.status === 'DECLINED';
-          const proofMedia = combinedProofMedia(rental);
 
           return (
             <motion.div
@@ -361,13 +350,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   <p className="text-white/70 mt-1">Rs {lateFee}</p>
                 </div>
               </div>
-
-              {proofMedia.length > 0 && (
-                <div className="border-t border-white/5 pt-3">
-                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold mb-2">Proof Media</p>
-                  <ProofMediaStrip media={proofMedia} max={4} />
-                </div>
-              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
                 <span className="text-[11px] text-white/35">
@@ -654,7 +636,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
                 {liveRentals.map((rental, idx) => {
                   const handoverProofMedia = getProofMedia(rental, 'handoverProofMedia');
-                  const ownerProofAvailable = hasProofImage(handoverProofMedia);
+                  const ownerProofAvailable = hasProofMedia(handoverProofMedia);
                   return (
                   <motion.div
                     key={rental.id}
@@ -758,6 +740,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               label="Return Proof"
                               helper="Capture return condition before marking the gear returned."
                               field="returnProofMedia"
+                              actionLabel="Record Return Proof"
                             />
                           )}
 
