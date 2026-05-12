@@ -152,6 +152,21 @@ const AdminView = memo(() => {
                     <p className="text-white/30 text-[11px] break-words">
                       {relatedRental?.gearTitle || relatedListing?.title || report.rentalId || report.listingId || 'User behavior report'}
                     </p>
+                    {Array.isArray(relatedRental?.proofMedia) && relatedRental.proofMedia.length > 0 && (
+                      <div className="flex gap-2 pt-2 overflow-x-auto">
+                        {relatedRental.proofMedia.slice(0, 5).map((media: any, idx: number) => (
+                          <a
+                            key={`${media.url}-${idx}`}
+                            href={media.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-12 h-12 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[9px] text-white/40"
+                          >
+                            {media.type === 'image' ? <img src={media.url} alt="Proof" className="w-full h-full object-cover" /> : 'Video'}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button

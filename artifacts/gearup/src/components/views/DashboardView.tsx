@@ -13,6 +13,7 @@ import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 import { createTransaction } from '@/lib/transactions';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+import ProofCapturePanel from '@/components/common/ProofCapturePanel';
 
 
 type Tab = 'listings' | 'rentals' | 'history';
@@ -107,6 +108,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'RETURN_DUE',
+        returnRequestedAt: serverTimestamp(),
         returnDueAt: serverTimestamp(),
       });
     } catch (err) {
@@ -340,6 +342,25 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                   <p className="text-white/70 mt-1">Rs {lateFee}</p>
                 </div>
               </div>
+
+              {Array.isArray(rental.proofMedia) && rental.proofMedia.length > 0 && (
+                <div className="border-t border-white/5 pt-3">
+                  <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold mb-2">Proof Media</p>
+                  <div className="flex gap-2 overflow-x-auto">
+                    {rental.proofMedia.slice(0, 4).map((media: any, mediaIdx: number) => (
+                      <a
+                        key={`${media.url}-${mediaIdx}`}
+                        href={media.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center"
+                      >
+                        {media.type === 'image' ? <img src={media.url} alt="Proof" className="w-full h-full object-cover" /> : <Camera size={18} className="text-white/40" />}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
                 <span className="text-[11px] text-white/35">
@@ -701,6 +722,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             >
                               <AlertTriangle size={13} /> Expire for testing
                             </button>
+                          )}
+
+                          {rental.status === 'RETURN_DUE' && (
+                            <ProofCapturePanel
+                              rental={rental}
+                              label="Return Proof"
+                              helper="Capture return condition before marking the gear returned."
+                            />
                           )}
 
                           {rental.status === 'RETURN_DUE' && (

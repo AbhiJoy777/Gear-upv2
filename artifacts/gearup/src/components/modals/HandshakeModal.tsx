@@ -10,6 +10,7 @@ import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { recordRentalPaymentTransactions } from '@/lib/transactions';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+import ProofCapturePanel from '@/components/common/ProofCapturePanel';
 
 interface HandshakeModalProps {
   rental: any;
@@ -27,8 +28,12 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [countdown, setCountdown] = useState(15);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [proofMedia, setProofMedia] = useState<any[]>(Array.isArray(rental.proofMedia) ? rental.proofMedia : []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  const proofRental = { ...rental, proofMedia };
+  const hasProofImage = proofMedia.some((item) => item.type === 'image');
   
   useEffect(() => {
     if (initialStep) {
@@ -63,11 +68,16 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeSimulation = async () => {
+    if (!hasProofImage) {
+      showToast('Upload at least one proof image before continuing.', 'warning');
+      return;
+    }
     setLoading(true);
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'PROOF_RECORDED',
-        proofOfLifeUrl: 'https://example.com/simulated-video.mp4'
+        proofOfLifeUrl: proofMedia.find((item) => item.type === 'image')?.url || '',
+        proofRecordedAt: serverTimestamp(),
       });
       onClose(); // Automatically close as requested
     } catch (err) {
@@ -97,9 +107,14 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeHandover = async () => {
+    if (!hasProofImage) {
+      throw new Error('PROOF_REQUIRED');
+    }
     await updateDoc(doc(db, 'rentals', rental.id), {
       status: 'ACTIVE_RENTAL',
       actualStartTime: serverTimestamp(),
+      activeAt: serverTimestamp(),
+      paymentCompletedAt: serverTimestamp(),
       returnDueAt: null
     });
 
@@ -135,7 +150,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              onClose();
            } catch (err) {
              console.error(err);
-             showToast('Could not complete handover. Please try again.', 'error');
+             showToast((err as Error)?.message === 'PROOF_REQUIRED' ? 'Upload at least one proof image before handover.' : 'Could not complete handover. Please try again.', 'error');
            } finally {
              setLoading(false);
            }
@@ -213,9 +228,16 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     )}
                   </div>
 
+                  <ProofCapturePanel
+                    rental={proofRental}
+                    label="Proof of Life"
+                    helper="Capture and upload at least one clear gear image before recording proof."
+                    onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                  />
+
                   <button 
                     onClick={startRecording}
-                    disabled={recording || loading}
+                    disabled={recording || loading || !hasProofImage}
                     className="w-full py-4 bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold rounded-[16px] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20} /> {recording ? 'Processing...' : 'Record Proof of Life'}</>}
@@ -261,6 +283,13 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                   </div>
 
                   <div className="space-y-3">
+                     <ProofCapturePanel
+                       rental={proofRental}
+                       label="Handover Proof"
+                       helper="Add optional handover proof before selecting return logistics."
+                       onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                     />
+
                      <button 
                        onClick={() => handleSelectLogistics('drop_off')}
                        className="w-full p-6 bg-[#121212] border border-[#222] hover:border-[#A855F7] rounded-[24px] text-left transition-all group cursor-pointer"
@@ -287,6 +316,13 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     <h3 className="text-[20px] font-bold text-white tracking-tight">Final Handover</h3>
                     <p className="text-[13px] text-white/50">Have the borrower scan this to confirm.</p>
                   </div>
+
+                  <ProofCapturePanel
+                    rental={proofRental}
+                    label="Confirm Handover Proof"
+                    helper="Proof stays attached to this rental for history and dispute review."
+                    onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                  />
 
                   <div className="bg-white p-6 rounded-[32px] w-fit mx-auto shadow-[0_0_40px_rgba(168,85,247,0.3)]">
                      <QRCodeSVG value={`handover-${rental.id}`} size={200} level="H" />
@@ -318,9 +354,17 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                   </div>
 
                   <div className="space-y-3">
+                    <ProofCapturePanel
+                      rental={proofRental}
+                      label="Payment Handover Proof"
+                      helper="Upload one proof image before completing handover."
+                      onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                    />
+
                     <button 
                       onClick={() => setScanning(true)}
-                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer"
+                      disabled={!hasProofImage}
+                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <QrCode size={20} />
                       Open Scanner
@@ -334,12 +378,13 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                            onClose();
                         } catch (err) {
                            console.error(err);
-                           showToast('Could not complete handover. Please try again.', 'error');
+                           showToast((err as Error)?.message === 'PROOF_REQUIRED' ? 'Upload at least one proof image before handover.' : 'Could not complete handover. Please try again.', 'error');
                         } finally {
                            setLoading(false);
                         }
                       }}
-                      className="w-full py-4 bg-[#A855F7]/10 border border-[#A855F7]/30 text-[#A855F7] font-bold rounded-[16px] hover:bg-[#A855F7]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={!hasProofImage}
+                      className="w-full py-4 bg-[#A855F7]/10 border border-[#A855F7]/30 text-[#A855F7] font-bold rounded-[16px] hover:bg-[#A855F7]/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ShieldCheck size={20} />
                       Simulate Success

@@ -124,6 +124,25 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
               className="w-full bg-[#0A0A0A] border border-white/10 rounded-[14px] px-4 py-3 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors resize-none"
             />
           </div>
+
+          {Array.isArray(rental?.proofMedia) && rental.proofMedia.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-white/50 uppercase tracking-wider mb-2">Rental Proof</p>
+              <div className="flex gap-2 overflow-x-auto">
+                {rental.proofMedia.slice(0, 5).map((media: any, idx: number) => (
+                  <a
+                    key={`${media.url}-${idx}`}
+                    href={media.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-white/40"
+                  >
+                    {media.type === 'image' ? <img src={media.url} alt="Proof" className="w-full h-full object-cover" /> : 'Video'}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="px-5 md:px-6 py-4 border-t border-white/5 flex justify-end gap-3">
