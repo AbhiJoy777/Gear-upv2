@@ -41,10 +41,14 @@ export function RentalTimelineSummary({ rental }: { rental: any }) {
 }
 
 export default function RentalTimeline({ rental, compact = false }: { rental: any; compact?: boolean }) {
+  if (compact) {
+    return <RentalTimelineSummary rental={rental} />;
+  }
+
   const currentIndex = getRentalTimelineIndex(rental?.status);
 
   return (
-    <div className={`w-full rounded-[16px] border border-white/[0.06] bg-black/20 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className="w-full rounded-[16px] border border-white/[0.06] bg-black/20 p-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {RENTAL_TIMELINE_STAGES.map((stage, index) => {
           const completed = index < currentIndex;
