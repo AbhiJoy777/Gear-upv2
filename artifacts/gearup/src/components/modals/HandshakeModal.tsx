@@ -10,7 +10,7 @@ import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { recordRentalPaymentTransactions } from '@/lib/transactions';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
-import ProofCapturePanel from '@/components/common/ProofCapturePanel';
+import ProofCapturePanel, { ProofMediaStrip, getProofMedia } from '@/components/common/ProofCapturePanel';
 
 interface HandshakeModalProps {
   rental: any;
@@ -28,12 +28,12 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [countdown, setCountdown] = useState(15);
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [proofMedia, setProofMedia] = useState<any[]>(Array.isArray(rental.proofMedia) ? rental.proofMedia : []);
+  const [handoverProofMedia, setHandoverProofMedia] = useState<any[]>(getProofMedia(rental, 'handoverProofMedia'));
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
-  const proofRental = { ...rental, proofMedia };
-  const hasProofImage = proofMedia.some((item) => item.type === 'image');
+  const proofRental = { ...rental, handoverProofMedia };
+  const hasHandoverProofImage = handoverProofMedia.some((item) => item.type === 'image');
   
   useEffect(() => {
     if (initialStep) {
@@ -68,7 +68,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeSimulation = async () => {
-    if (!hasProofImage) {
+    if (!hasHandoverProofImage) {
       showToast('Upload at least one proof image before continuing.', 'warning');
       return;
     }
@@ -76,7 +76,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'PROOF_RECORDED',
-        proofOfLifeUrl: proofMedia.find((item) => item.type === 'image')?.url || '',
+        proofOfLifeUrl: handoverProofMedia.find((item) => item.type === 'image')?.url || '',
         proofRecordedAt: serverTimestamp(),
       });
       onClose(); // Automatically close as requested
@@ -107,7 +107,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeHandover = async () => {
-    if (!hasProofImage) {
+    if (!hasHandoverProofImage) {
       throw new Error('PROOF_REQUIRED');
     }
     await updateDoc(doc(db, 'rentals', rental.id), {
@@ -231,13 +231,14 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                   <ProofCapturePanel
                     rental={proofRental}
                     label="Proof of Life"
-                    helper="Capture and upload at least one clear gear image before recording proof."
-                    onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                    helper="Capture the gear powering on, visible condition, and accessories before handover."
+                    field="handoverProofMedia"
+                    onUploaded={(items) => setHandoverProofMedia((current) => [...current, ...items])}
                   />
 
                   <button 
                     onClick={startRecording}
-                    disabled={recording || loading || !hasProofImage}
+                    disabled={recording || loading || !hasHandoverProofImage}
                     className="w-full py-4 bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold rounded-[16px] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 className="animate-spin" /> : <><ShieldCheck size={20} /> {recording ? 'Processing...' : 'Record Proof of Life'}</>}
@@ -286,8 +287,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                      <ProofCapturePanel
                        rental={proofRental}
                        label="Handover Proof"
-                       helper="Add optional handover proof before selecting return logistics."
-                       onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                       helper="Owner proof stays visible to the borrower before pickup or payment."
+                       field="handoverProofMedia"
+                       onUploaded={(items) => setHandoverProofMedia((current) => [...current, ...items])}
                      />
 
                      <button 
@@ -321,7 +323,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     rental={proofRental}
                     label="Confirm Handover Proof"
                     helper="Proof stays attached to this rental for history and dispute review."
-                    onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
+                    field="handoverProofMedia"
+                    onUploaded={(items) => setHandoverProofMedia((current) => [...current, ...items])}
                   />
 
                   <div className="bg-white p-6 rounded-[32px] w-fit mx-auto shadow-[0_0_40px_rgba(168,85,247,0.3)]">
@@ -354,16 +357,21 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                   </div>
 
                   <div className="space-y-3">
-                    <ProofCapturePanel
-                      rental={proofRental}
-                      label="Payment Handover Proof"
-                      helper="Upload one proof image before completing handover."
-                      onUploaded={(items) => setProofMedia((current) => [...current, ...items])}
-                    />
+                    <div className="rounded-[20px] border border-white/10 bg-[#0A0A0A] p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider">Owner Proof</p>
+                        {hasHandoverProofImage && <span className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Available</span>}
+                      </div>
+                      {hasHandoverProofImage ? (
+                        <ProofMediaStrip media={handoverProofMedia} />
+                      ) : (
+                        <p className="text-[12px] text-white/45 leading-relaxed">Owner proof is required before payment and final handover.</p>
+                      )}
+                    </div>
 
                     <button 
                       onClick={() => setScanning(true)}
-                      disabled={!hasProofImage}
+                      disabled={!hasHandoverProofImage}
                       className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <QrCode size={20} />
@@ -383,7 +391,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                            setLoading(false);
                         }
                       }}
-                      disabled={!hasProofImage}
+                      disabled={!hasHandoverProofImage}
                       className="w-full py-4 bg-[#A855F7]/10 border border-[#A855F7]/30 text-[#A855F7] font-bold rounded-[16px] hover:bg-[#A855F7]/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ShieldCheck size={20} />

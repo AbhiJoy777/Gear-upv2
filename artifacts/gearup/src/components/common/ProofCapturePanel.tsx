@@ -6,12 +6,14 @@ import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
-type ProofItem = {
+export type ProofItem = {
   type: 'image' | 'video';
   url: string;
   uploadedBy: string;
   uploadedAt?: any;
 };
+
+export type ProofMediaField = 'handoverProofMedia' | 'returnProofMedia' | 'proofMedia';
 
 type PendingProof = {
   id: string;
@@ -23,6 +25,33 @@ type PendingProof = {
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 30 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 20;
+
+export const getProofMedia = (rental: any, field: ProofMediaField = 'proofMedia') => {
+  const primary = Array.isArray(rental?.[field]) ? rental[field] : [];
+  if (primary.length > 0) return primary;
+  if (field === 'handoverProofMedia' && Array.isArray(rental?.proofMedia)) return rental.proofMedia;
+  return [];
+};
+
+export function ProofMediaStrip({ media, max = 6 }: { media: ProofItem[]; max?: number }) {
+  if (!media.length) return null;
+
+  return (
+    <div className="flex gap-2 overflow-x-auto">
+      {media.slice(0, max).map((item, idx) => (
+        <a
+          key={`${item.url}-${idx}`}
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-white/40"
+        >
+          {item.type === 'image' ? <img src={item.url} alt="Proof" className="w-full h-full object-cover" /> : <Video size={18} className="text-white/40" />}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 const compressImage = async (file: File) => {
   if (!file.type.startsWith('image/')) return file;
@@ -62,11 +91,13 @@ export default function ProofCapturePanel({
   rental,
   label = 'Proof Media',
   helper = 'Capture at least one clear gear photo before continuing.',
+  field = 'proofMedia',
   onUploaded,
 }: {
   rental: any;
   label?: string;
   helper?: string;
+  field?: ProofMediaField;
   onUploaded?: (items: ProofItem[]) => void;
 }) {
   const { user } = useAuth();
@@ -75,7 +106,7 @@ export default function ProofCapturePanel({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const existingMedia = useMemo(() => Array.isArray(rental?.proofMedia) ? rental.proofMedia : [], [rental?.proofMedia]);
+  const existingMedia = useMemo(() => getProofMedia(rental, field), [rental, field]);
 
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -155,7 +186,7 @@ export default function ProofCapturePanel({
       }
 
       await updateDoc(doc(db, 'rentals', rental.id), {
-        proofMedia: arrayUnion(...uploaded),
+        [field]: arrayUnion(...uploaded),
         updatedAt: serverTimestamp(),
       });
       pending.forEach((item) => URL.revokeObjectURL(item.previewUrl));
@@ -164,7 +195,16 @@ export default function ProofCapturePanel({
       showToast('Proof media uploaded.', 'success');
     } catch (err: any) {
       console.error('Proof upload failed:', err);
-      showToast(err?.code === 'storage/unauthorized' ? 'Permission denied while uploading proof.' : 'Proof upload failed. Please try again.', 'error');
+      const message = String(err?.message || '').toLowerCase();
+      const storageNotReady = err?.code === 'storage/bucket-not-found' || err?.code === 'storage/unknown' || message.includes('storage has not been set up');
+      showToast(
+        storageNotReady
+          ? 'Media upload requires Firebase Storage to be enabled.'
+          : err?.code === 'storage/unauthorized'
+            ? 'Permission denied while uploading proof.'
+            : 'Proof upload failed. Please try again.',
+        'error'
+      );
     } finally {
       setUploading(false);
       setProgress(0);

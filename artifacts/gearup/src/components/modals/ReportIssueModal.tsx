@@ -5,6 +5,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { ProofMediaStrip, getProofMedia } from '@/components/common/ProofCapturePanel';
 
 const REPORT_REASONS: Record<'borrower' | 'owner', string[]> = {
   borrower: ['Wrong item', 'Unsafe behavior', 'Other'],
@@ -32,6 +33,12 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
 
   const rental = context.rental;
   const listing = context.listing;
+  const proofMedia = rental
+    ? [
+        ...getProofMedia(rental, 'handoverProofMedia'),
+        ...(Array.isArray(rental.returnProofMedia) ? rental.returnProofMedia : []),
+      ].filter((item, idx, items) => item?.url && items.findIndex((other) => other.url === item.url) === idx)
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,22 +132,10 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
             />
           </div>
 
-          {Array.isArray(rental?.proofMedia) && rental.proofMedia.length > 0 && (
+          {proofMedia.length > 0 && (
             <div>
               <p className="text-[11px] font-bold text-white/50 uppercase tracking-wider mb-2">Rental Proof</p>
-              <div className="flex gap-2 overflow-x-auto">
-                {rental.proofMedia.slice(0, 5).map((media: any, idx: number) => (
-                  <a
-                    key={`${media.url}-${idx}`}
-                    href={media.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-14 h-14 rounded-[10px] bg-white/5 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center text-[10px] text-white/40"
-                  >
-                    {media.type === 'image' ? <img src={media.url} alt="Proof" className="w-full h-full object-cover" /> : 'Video'}
-                  </a>
-                ))}
-              </div>
+              <ProofMediaStrip media={proofMedia} max={5} />
             </div>
           )}
         </div>
