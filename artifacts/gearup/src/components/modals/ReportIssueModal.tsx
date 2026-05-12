@@ -5,7 +5,6 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { ProofMediaStrip, getProofMedia } from '@/components/common/ProofCapturePanel';
 
 const REPORT_REASONS: Record<'borrower' | 'owner', string[]> = {
   borrower: ['Wrong item', 'Unsafe behavior', 'Other'],
@@ -33,12 +32,6 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
 
   const rental = context.rental;
   const listing = context.listing;
-  const proofMedia = rental
-    ? [
-        ...getProofMedia(rental, 'handoverProofMedia'),
-        ...(Array.isArray(rental.returnProofMedia) ? rental.returnProofMedia : []),
-      ].filter((item, idx, items) => item?.url && items.findIndex((other) => other.url === item.url) === idx)
-    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,13 +124,6 @@ export default function ReportIssueModal({ context, onClose }: ReportIssueModalP
               className="w-full bg-[#0A0A0A] border border-white/10 rounded-[14px] px-4 py-3 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors resize-none"
             />
           </div>
-
-          {proofMedia.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold text-white/50 uppercase tracking-wider mb-2">Rental Proof</p>
-              <ProofMediaStrip media={proofMedia} max={5} />
-            </div>
-          )}
         </div>
 
         <div className="px-5 md:px-6 py-4 border-t border-white/5 flex justify-end gap-3">

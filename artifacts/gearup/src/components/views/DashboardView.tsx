@@ -13,7 +13,6 @@ import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 import { createTransaction } from '@/lib/transactions';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
-import ProofCapturePanel, { ProofMediaStrip, getProofMedia } from '@/components/common/ProofCapturePanel';
 
 
 type Tab = 'listings' | 'rentals' | 'history';
@@ -103,14 +102,11 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     return lateDays * (getDailyRent(rental) + 100);
   };
 
-  const hasProofMedia = (media: any[]) => media.length > 0;
-
   const moveToReturnDue = async (rental: any) => {
     if (!rental?.id || rental.status !== 'ACTIVE_RENTAL') return;
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'RETURN_DUE',
-        returnRequestedAt: serverTimestamp(),
         returnDueAt: serverTimestamp(),
       });
     } catch (err) {
@@ -120,12 +116,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const handleReturnGear = async (rental: any) => {
-    const returnProofMedia = Array.isArray(rental.returnProofMedia) ? rental.returnProofMedia : [];
-    if (!hasProofMedia(returnProofMedia)) {
-      showToast('Upload return proof before marking the gear returned.', 'warning');
-      return;
-    }
-
     const lateDays = getLateDays(rental);
     const extraAmountDue = getExtraAmountDue(rental);
 
@@ -462,12 +452,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
                             </p>
                           )}
-                          {Array.isArray(activeRental.returnProofMedia) && activeRental.returnProofMedia.length > 0 && (
-                            <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3 space-y-2">
-                              <p className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Return Proof Available</p>
-                              <ProofMediaStrip media={activeRental.returnProofMedia} max={4} />
-                            </div>
-                          )}
                           <div className="flex flex-wrap items-center gap-2 text-white font-mono text-sm">
                             <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
                             <span>
@@ -524,12 +508,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                     <p className="text-[11px] text-white/45 text-center mt-1 break-words">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
                                   )}
                                 </div>
-                                {getProofMedia(r, 'handoverProofMedia').length > 0 && (
-                                  <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3 space-y-2">
-                                    <p className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Owner Proof Available</p>
-                                    <ProofMediaStrip media={getProofMedia(r, 'handoverProofMedia')} max={4} />
-                                  </div>
-                                )}
                                 
                                 {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
                                   <button
@@ -634,10 +612,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
             ) : liveRentals.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
-                {liveRentals.map((rental, idx) => {
-                  const handoverProofMedia = getProofMedia(rental, 'handoverProofMedia');
-                  const ownerProofAvailable = hasProofMedia(handoverProofMedia);
-                  return (
+                {liveRentals.map((rental, idx) => (
                   <motion.div
                     key={rental.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -676,12 +651,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <div className="mb-6">
                         <RentalTimelineSummary rental={rental} />
                       </div>
-                      {ownerProofAvailable && (
-                        <div className="mb-6 rounded-[14px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3 space-y-2">
-                          <p className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Owner Proof Available</p>
-                          <ProofMediaStrip media={handoverProofMedia} max={4} />
-                        </div>
-                      )}
                       
                       {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) && rental.actualStartTime && (
                         <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
@@ -735,16 +704,6 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           )}
 
                           {rental.status === 'RETURN_DUE' && (
-                            <ProofCapturePanel
-                              rental={rental}
-                              label="Return Proof"
-                              helper="Capture return condition before marking the gear returned."
-                              field="returnProofMedia"
-                              actionLabel="Record Return Proof"
-                            />
-                          )}
-
-                          {rental.status === 'RETURN_DUE' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); handleReturnGear(rental); }}
                               className="w-full bg-[#2DD4BF] text-black font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#14b8a6] transition-all"
@@ -777,10 +736,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               rental.status === 'PAYMENT_PENDING' ? (
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
-                                  disabled={!ownerProofAvailable}
-                                  className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10"
                                >
-                                  <QrCode size={16} /> {ownerProofAvailable ? 'Scan & Pay' : 'Owner Proof Needed'}
+                                  <QrCode size={16} /> Scan & Pay
                                </button>
                             ) : (
                                <button 
@@ -810,7 +768,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       </div>
                     </div>
                   </motion.div>
-                )})}
+                ))}
               </div>
             ) : (
               <div className="space-y-6">

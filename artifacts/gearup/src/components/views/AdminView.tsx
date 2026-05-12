@@ -5,7 +5,6 @@ import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from 'firebas
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { ProofMediaStrip, getProofMedia } from '@/components/common/ProofCapturePanel';
 
 const statusLabels: Record<string, string> = {
   not_started: 'Not started',
@@ -138,12 +137,6 @@ const AdminView = memo(() => {
             activeReports.map((report) => {
               const relatedListing = listings.find((item) => item.id === report.listingId);
               const relatedRental = rentals.find((item) => item.id === report.rentalId);
-              const proofMedia = relatedRental
-                ? [
-                    ...getProofMedia(relatedRental, 'handoverProofMedia'),
-                    ...(Array.isArray(relatedRental.returnProofMedia) ? relatedRental.returnProofMedia : []),
-                  ].filter((item, idx, items) => item?.url && items.findIndex((other) => other.url === item.url) === idx)
-                : [];
               return (
                 <div key={report.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                   <div className="space-y-1 min-w-0">
@@ -159,11 +152,6 @@ const AdminView = memo(() => {
                     <p className="text-white/30 text-[11px] break-words">
                       {relatedRental?.gearTitle || relatedListing?.title || report.rentalId || report.listingId || 'User behavior report'}
                     </p>
-                    {proofMedia.length > 0 && (
-                      <div className="pt-2">
-                        <ProofMediaStrip media={proofMedia} max={5} />
-                      </div>
-                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
