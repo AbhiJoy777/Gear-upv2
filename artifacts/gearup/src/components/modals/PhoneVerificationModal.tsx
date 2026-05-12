@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Phone, ShieldCheck, Loader2 } from 'lucide-react';
 import { PhoneAuthProvider, RecaptchaVerifier, updatePhoneNumber } from 'firebase/auth';
@@ -7,7 +7,13 @@ import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
-const RECAPTCHA_CONTAINER_ID = 'phone-verification-recaptcha';
+const RECAPTCHA_CONTAINER_ID = 'phone-recaptcha-container';
+
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+  }
+}
 
 const getInitialIndianMobile = (phone?: string) => {
   const digits = (phone || '').replace(/\D/g, '');
@@ -49,23 +55,19 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [verificationPhone, setVerificationPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-
-  useEffect(() => {
-    return () => {
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    };
-  }, []);
 
   const getVerifier = async () => {
-    if (!recaptchaRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
-        size: 'invisible',
-      });
-      await recaptchaRef.current.render();
+    if (window.recaptchaVerifier) {
+      console.log('Reusing existing recaptcha verifier');
+      return window.recaptchaVerifier;
     }
-    return recaptchaRef.current;
+
+    console.log('Creating new recaptcha verifier');
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
+      size: 'invisible',
+    });
+    await window.recaptchaVerifier.render();
+    return window.recaptchaVerifier;
   };
 
   const handleMobileChange = (value: string) => {
@@ -105,8 +107,6 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       });
       showToast(getPhoneAuthErrorMessage(err), 'error');
       setVerificationPhone('');
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
     } finally {
       setSending(false);
     }
