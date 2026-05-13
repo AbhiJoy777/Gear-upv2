@@ -425,7 +425,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             loadingListings ? (
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
             ) : listings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start w-full text-left">
                 {listings.map((item, idx) => {
                   const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
                   const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
@@ -438,7 +438,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full select-none"
+                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full h-fit select-none"
                   >
                     <div className="h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
                       {item.tier && (

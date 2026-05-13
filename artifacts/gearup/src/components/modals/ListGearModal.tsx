@@ -284,7 +284,39 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     base = 1200;
   }
 
-  const dailyRentAmount = Number(dailyRentPrice || base);
+  const gpuPricingTable = [
+    { match: '5080', price: 1500 },
+    { match: '5090', price: 1800 },
+    { match: '4090', price: 1600 },
+    { match: '4080', price: 1300 },
+    { match: '4070', price: 1000 },
+    { match: '4060', price: 700 },
+    { match: '3060', price: 600 },
+    { match: '3050', price: 400 },
+  ];
+  const tierPricing = {
+    Laptops: { Low: 500, Mid: 900, High: 1800 },
+    Desktops: { Low: 700, Mid: 1200, High: 2200 },
+    Monitors: { Low: 250, Mid: 500, High: 900 },
+    Controllers: { Low: 150, Mid: 250, High: 400 },
+    Consoles: { Low: 400, Mid: 600, High: 800 },
+  } as const;
+  const normalizedGpuModel = gpuModel.toLowerCase();
+  const gpuSuggestion = gpuPricingTable.find(({ match }) => normalizedGpuModel.includes(match))?.price;
+  const consoleSuggestion = otherCpu.includes('PS5') || otherCpu.includes('PlayStation 5')
+    ? 600
+    : otherCpu.includes('Xbox Series X')
+      ? 550
+      : otherCpu.includes('Nintendo Switch')
+        ? 400
+        : undefined;
+  const categoryTierPrices = tierPricing[c as keyof typeof tierPricing];
+  const suggestedDailyRate = c === 'GPUs'
+    ? (gpuSuggestion || base)
+    : c === 'Consoles'
+      ? (consoleSuggestion || categoryTierPrices?.[tier as keyof typeof categoryTierPrices] || base)
+      : categoryTierPrices?.[tier as keyof typeof categoryTierPrices] || base;
+  const dailyRentAmount = Number(dailyRentPrice || suggestedDailyRate);
 
   const isValid = () => {
     if (step === 1) return !!c;
@@ -483,8 +515,8 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
   useEffect(() => {
     if (!isOpen || editItem || step !== 6 || dailyRentPrice) return;
-    setDailyRentPrice(String(base));
-  }, [base, dailyRentPrice, editItem, isOpen, step]);
+    setDailyRentPrice(String(suggestedDailyRate));
+  }, [dailyRentPrice, editItem, isOpen, step, suggestedDailyRate]);
 
   useEffect(() => {
     if (isOpen) {
@@ -796,25 +828,27 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="text-center space-y-1 mb-8">
                    <h3 className="text-white font-bold text-[22px]">Set Daily Rent</h3>
-                   <p className="text-white/50 text-[13px]">Choose the daily price renters will see.</p>
+                   <p className="text-white/50 text-[13px]">GearUp suggests a market rate from your gear details.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
                    <div className="bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-[24px] p-6 text-center relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
-                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Daily Rental Price</p>
-                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{dailyRentAmount || base}</h4>
+                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Suggested Daily Rate</p>
+                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-2">₹{suggestedDailyRate}</h4>
+                      <p className="text-[11px] text-white/45 mb-4">{c || 'Gear'} • {tier} tier recommendation</p>
                       <div className="text-left border-t border-[#A855F7]/20 pt-4 mb-4">
                         <div>
-                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Daily rent</label>
+                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Adjust daily rent</label>
                           <input
                             type="number"
                             min="1"
                             value={dailyRentPrice}
                             onChange={(e) => setDailyRentPrice(e.target.value)}
-                            placeholder={String(base)}
+                            placeholder={String(suggestedDailyRate)}
                             className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                           />
+                          <p className="text-[11px] text-white/40 mt-2">Prefilled from GearUp's placeholder market pricing. You can nudge it if needed.</p>
                         </div>
                       </div>
                       <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-2">
