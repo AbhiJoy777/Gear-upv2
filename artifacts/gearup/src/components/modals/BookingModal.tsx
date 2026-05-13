@@ -304,14 +304,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                               ₹{discountedBasePrice}
                            </span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                           <span className="text-white/70 flex items-center gap-1.5">
-                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
-                           </span>
-                           <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
-                              {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
-                           </span>
-                        </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
                           <span className="text-[14px] font-bold text-white/70">Estimated Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{rentalTotal}</span>
@@ -424,14 +416,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                            <span className="text-white/70">Rental total</span>
                            <span className="font-medium text-white flex items-center gap-2">
                               ₹{baseTotalPrice}
-                           </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                           <span className="text-white/70 flex items-center gap-1.5">
-                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
-                           </span>
-                           <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
-                              {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
                            </span>
                         </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">

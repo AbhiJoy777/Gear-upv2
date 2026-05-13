@@ -175,7 +175,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
-  const [dailyRentPrice, setDailyRentPrice] = useState('');
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -316,8 +315,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     : c === 'Consoles'
       ? (consoleSuggestion || categoryTierPrices?.[tier as keyof typeof categoryTierPrices] || base)
       : categoryTierPrices?.[tier as keyof typeof categoryTierPrices] || base;
-  const dailyRentAmount = Number(dailyRentPrice || suggestedDailyRate);
-
   const isValid = () => {
     if (step === 1) return !!c;
     if (step === 2) {
@@ -338,7 +335,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
-    if (step === 6) return dailyRentAmount > 0;
     return true;
   };
 
@@ -399,7 +395,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       };
 
       const payload: any = {
-        title, category: c, pricePerDay: dailyRentAmount,
+        title, category: c, pricePerDay: suggestedDailyRate,
         tier, imageUrl: imgs[0] || '',
         images: imgs,
         specs: specData,
@@ -444,7 +440,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea('');
     setLandmark('');
     setPickupInstructions('');
-    setDailyRentPrice('');
 
     setImgs([]); 
   };
@@ -463,7 +458,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea(existingLocation.area || '');
     setLandmark(existingLocation.landmark || '');
     setPickupInstructions(existingLocation.instructions || '');
-    setDailyRentPrice(String(editItem.pricePerDay || ''));
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -514,11 +508,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   }, [gpuPlatform]);
 
   useEffect(() => {
-    if (!isOpen || editItem || step !== 6 || dailyRentPrice) return;
-    setDailyRentPrice(String(suggestedDailyRate));
-  }, [dailyRentPrice, editItem, isOpen, step, suggestedDailyRate]);
-
-  useEffect(() => {
     if (isOpen) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
@@ -558,7 +547,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             <button onClick={close} className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-all">
               <X size={20} />
             </button>
-            <div className="absolute bottom-0 left-0 h-[2px] bg-[#A855F7] transition-all duration-300 z-10" style={{ width: `${(step / (c === 'Desktops' ? 6 : 5)) * 100}%` }} />
+            <div className="absolute bottom-0 left-0 h-[2px] bg-[#A855F7] transition-all duration-300 z-10" style={{ width: `${(step / 5) * 100}%` }} />
           </div>
 
           {/* Body */}
@@ -671,7 +660,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 relative">
                 <div className="text-center space-y-1 mb-6">
                    <h3 className="text-white font-bold text-[18px]">Bundle Peripherals</h3>
-                   <p className="text-white/50 text-[13px]">Adding peripherals increases your gear's daily value.</p>
+                   <p className="text-white/50 text-[13px]">Add anything the borrower gets with the setup.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4 pb-2">
@@ -807,7 +796,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <span className={`text-[15px] font-bold ${logisticsType === 'Self-Pickup' ? 'text-[#A855F7]' : 'text-white'}`}>Self-Pickup</span>
                       <span className="text-[13px] text-white/50">Borrower travels to your hub</span>
                     </div>
-                    <span className="text-[15px] font-bold text-white">-₹50</span>
                   </button>
 
                   <button onClick={() => setLogisticsType('Owner Delivery')} className={`w-full flex items-center p-4 rounded-[16px] border transition-all cursor-pointer ${logisticsType === 'Owner Delivery' ? 'bg-[#A855F7]/10 border-[#A855F7]' : 'bg-[#121212] border-white/10 hover:border-white/20'}`}>
@@ -818,65 +806,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <span className={`text-[15px] font-bold ${logisticsType === 'Owner Delivery' ? 'text-[#A855F7]' : 'text-white'}`}>Owner Delivery</span>
                       <span className="text-[13px] text-white/50">You drop off the gear</span>
                     </div>
-                    <span className="text-[15px] font-bold text-white">+₹50</span>
                   </button>
-                </div>
-              </div>
-            )}
-
-            {step === 6 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="text-center space-y-1 mb-8">
-                   <h3 className="text-white font-bold text-[22px]">Set Daily Rent</h3>
-                   <p className="text-white/50 text-[13px]">GearUp suggests a market rate from your gear details.</p>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                   <div className="bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-[24px] p-6 text-center relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
-                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Suggested Daily Rate</p>
-                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-2">₹{suggestedDailyRate}</h4>
-                      <p className="text-[11px] text-white/45 mb-4">{c || 'Gear'} • {tier} tier recommendation</p>
-                      <div className="text-left border-t border-[#A855F7]/20 pt-4 mb-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Adjust daily rent</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={dailyRentPrice}
-                            onChange={(e) => setDailyRentPrice(e.target.value)}
-                            placeholder={String(suggestedDailyRate)}
-                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                          />
-                          <p className="text-[11px] text-white/40 mt-2">Prefilled from GearUp's placeholder market pricing. You can nudge it if needed.</p>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-2">
-                         <span className="text-white/70 font-medium">{logisticsType === 'Self-Pickup' ? 'Self-Pickup Adjustment' : 'Owner Delivery Adjustment'}</span>
-                         <span className={logisticsType === 'Self-Pickup' ? 'text-[#2DD4BF] font-medium' : 'text-[#A855F7] font-medium'}>
-                            {logisticsType === 'Self-Pickup' ? '-₹50' : '+₹50'}
-                         </span>
-                      </div>
-                      <div className="flex justify-between items-center text-[13px] mb-4">
-                         <span className="text-white/70 font-medium">Platform Fee (5%)</span>
-                         <span className="text-white/70">-₹{Math.round((dailyRentAmount || base) * 0.05)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[14px] pt-4 border-t border-[#A855F7]/20">
-                         <span className="text-[#2DD4BF] font-bold">You Earn (Per Day)</span>
-                         <span className="text-[#2DD4BF] font-black">₹{Math.round((dailyRentAmount || base) * 0.95)}</span>
-                      </div>
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4">
-                     <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
-                        <p className="text-[11px] text-[#A855F7] font-bold tracking-wider uppercase mb-1">3-Day (25% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round((dailyRentAmount || base) * 3 * 0.75)}</p>
-                     </div>
-                     <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
-                        <p className="text-[11px] text-[#2DD4BF] font-bold tracking-wider uppercase mb-1">30-Day (50% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round((dailyRentAmount || base) * 30 * 0.5)}</p>
-                     </div>
-                   </div>
                 </div>
               </div>
             )}
@@ -887,9 +817,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             <button onClick={prevStep} className="px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all cursor-pointer">
               {step === 1 ? 'Cancel' : 'Back'}
             </button>
-            {step < 6 ? (
+            {step < 5 ? (
               <button onClick={nextStep} disabled={!isValid()} className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-[13px] rounded-[24px] disabled:opacity-50 transition-all active:scale-95 cursor-pointer">
-                {step === 5 ? 'Set Price' : 'Next Step'}
+                Next Step
               </button>
             ) : (
               <button onClick={submit} disabled={!isValid() || load} className="px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 cursor-pointer">
