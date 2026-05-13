@@ -96,7 +96,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           <Loader2 className="w-10 h-10 text-[#A855F7] animate-spin" />
         </div>
       ) : filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 relative">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start relative">
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, idx) => {
               const pickupLocation = typeof item.location === 'object' ? item.location : {};
@@ -110,7 +110,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
-                className="cursor-pointer bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden group hover:border-white/20 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all flex flex-col duration-300 shadow-lg relative"
+                className="cursor-pointer bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden group hover:border-white/20 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all flex flex-col duration-300 shadow-lg relative h-fit"
               >
                 <div className="h-48 bg-[#121212] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
                   {/* Abstract Background Elements */}
