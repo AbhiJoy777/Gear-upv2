@@ -29,7 +29,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [loading, setLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const paymentAmount = Number(rental.totalDue || rental.totalPrice || 0);
+  const paymentAmount = Number(rental.totalPrice || 0);
   
   useEffect(() => {
     if (initialStep) {
@@ -354,8 +354,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
         {/* Footer Info */}
         <div className="p-6 bg-[#0A0A0A] border-t border-[#222] flex items-center justify-between">
            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Escrow Protection</span>
-              <span className="text-[#2DD4BF] text-[13px] font-bold">₹{paymentAmount} Secured</span>
+              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Payment Simulation</span>
+              <span className="text-[#2DD4BF] text-[13px] font-bold">₹{paymentAmount} Rental Total</span>
            </div>
            <div className="flex items-center gap-1.5 text-white/30 text-[12px] font-medium">
              <AlertCircle size={14} />

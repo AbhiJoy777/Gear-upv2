@@ -40,7 +40,7 @@ export const createTransaction = async ({
 };
 
 export const recordRentalPaymentTransactions = async (rental: any) => {
-  const amount = Number(rental.totalDue || rental.totalPrice || 0);
+  const amount = Number(rental.totalPrice || 0);
   const platformFee = Number(rental.platformFee || 0);
   const lateFee = Number(rental.extraAmountDue || 0);
   const gearTitle = rental.gearTitle || 'Gear rental';

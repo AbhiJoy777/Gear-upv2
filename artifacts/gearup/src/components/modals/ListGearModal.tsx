@@ -176,8 +176,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [landmark, setLandmark] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
   const [dailyRentPrice, setDailyRentPrice] = useState('');
-  const [refundableDeposit, setRefundableDeposit] = useState('');
-  const [estimatedItemValue, setEstimatedItemValue] = useState('');
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -287,9 +285,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   }
 
   const dailyRentAmount = Number(dailyRentPrice || base);
-  const depositAmount = Number(refundableDeposit || 0);
-  const itemValueAmount = Number(estimatedItemValue || 0);
-  const depositWarning = itemValueAmount > 0 && depositAmount > 0 && depositAmount < itemValueAmount * 0.3;
 
   const isValid = () => {
     if (step === 1) return !!c;
@@ -311,7 +306,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
-    if (step === 6) return dailyRentAmount > 0 && depositAmount > 0;
+    if (step === 6) return dailyRentAmount > 0;
     return true;
   };
 
@@ -373,8 +368,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
       const payload: any = {
         title, category: c, pricePerDay: dailyRentAmount,
-        depositAmount,
-        itemValue: itemValueAmount || null,
         tier, imageUrl: imgs[0] || '',
         images: imgs,
         specs: specData,
@@ -420,8 +413,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setLandmark('');
     setPickupInstructions('');
     setDailyRentPrice('');
-    setRefundableDeposit('');
-    setEstimatedItemValue('');
 
     setImgs([]); 
   };
@@ -441,8 +432,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setLandmark(existingLocation.landmark || '');
     setPickupInstructions(existingLocation.instructions || '');
     setDailyRentPrice(String(editItem.pricePerDay || ''));
-    setRefundableDeposit(String(editItem.depositAmount || ''));
-    setEstimatedItemValue(String(editItem.itemValue || ''));
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -563,7 +552,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 relative">
                 <div className="text-center space-y-1 mb-6">
                    <h3 className="text-white font-bold text-[18px]">Select Specifications</h3>
-                   <p className="text-white/50 text-[13px]">We use this to auto-tier and value your gear.</p>
+                   <p className="text-white/50 text-[13px]">Add the details renters need before booking.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4 pb-2">
@@ -806,18 +795,16 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             {step === 6 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="text-center space-y-1 mb-8">
-                   <h3 className="text-white font-bold text-[22px]">Valuation Ready</h3>
-                   <p className={`text-[13px] font-bold tracking-wider uppercase ${tier === 'High' ? 'text-[#2DD4BF]' : tier === 'Mid' ? 'text-[#A855F7]' : 'text-white/70'}`}>
-                     {tier} TIER ASSET
-                   </p>
+                   <h3 className="text-white font-bold text-[22px]">Set Daily Rent</h3>
+                   <p className="text-white/50 text-[13px]">Choose the daily price renters will see.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
                    <div className="bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-[24px] p-6 text-center relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
-                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Base Daily Rate</p>
+                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Daily Rental Price</p>
                       <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{dailyRentAmount || base}</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left border-t border-[#A855F7]/20 pt-4 mb-4">
+                      <div className="text-left border-t border-[#A855F7]/20 pt-4 mb-4">
                         <div>
                           <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Daily rent</label>
                           <input
@@ -829,34 +816,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                             className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Refundable deposit</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={refundableDeposit}
-                            onChange={(e) => setRefundableDeposit(e.target.value)}
-                            placeholder="Required"
-                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Item value</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={estimatedItemValue}
-                            onChange={(e) => setEstimatedItemValue(e.target.value)}
-                            placeholder="Recommended"
-                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                          />
-                        </div>
                       </div>
-                      {depositWarning && (
-                        <p className="text-[11px] text-[#F97316] bg-[#F97316]/10 border border-[#F97316]/20 rounded-[12px] p-3 mb-4 text-left">
-                          Deposit is below 30% of estimated item value. Consider increasing it for better protection.
-                        </p>
-                      )}
                       <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-2">
                          <span className="text-white/70 font-medium">{logisticsType === 'Self-Pickup' ? 'Self-Pickup Adjustment' : 'Owner Delivery Adjustment'}</span>
                          <span className={logisticsType === 'Self-Pickup' ? 'text-[#2DD4BF] font-medium' : 'text-[#A855F7] font-medium'}>
@@ -895,7 +855,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             </button>
             {step < 6 ? (
               <button onClick={nextStep} disabled={!isValid()} className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-[13px] rounded-[24px] disabled:opacity-50 transition-all active:scale-95 cursor-pointer">
-                {step === 5 ? 'View Valuation' : 'Next Step'}
+                {step === 5 ? 'Set Price' : 'Next Step'}
               </button>
             ) : (
               <button onClick={submit} disabled={!isValid() || load} className="px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 cursor-pointer">

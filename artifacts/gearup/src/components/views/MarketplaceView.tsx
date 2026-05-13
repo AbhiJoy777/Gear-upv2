@@ -155,7 +155,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                     <div className="flex flex-col">
                       <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
-                      <span className="text-[11px] text-white/45 mt-1">Deposit ₹{item.depositAmount || 0}</span>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
                       {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}

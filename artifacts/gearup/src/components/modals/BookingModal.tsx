@@ -60,9 +60,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const discountedBasePrice = duration !== 'Custom' && finalDays > 0 ? getDiscountedPrice(finalDays, itemPrice) : baseTotalPrice;
   const logisticsAdj = item.logisticsAdjustment || 0;
   const rentalTotal = Math.max(0, discountedBasePrice + logisticsAdj);
-  const depositAmount = Number(item.depositAmount || 0);
-  const itemValue = Number(item.itemValue || 0);
-  const totalDue = rentalTotal + depositAmount;
   const pickupLocation = typeof item.location === 'object' ? item.location : {};
   const locationCity = pickupLocation.city || item.city || (typeof item.location === 'string' ? item.location : '') || 'Hyderabad';
   const locationHouse = pickupLocation.houseOrBuilding || '';
@@ -125,10 +122,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           status: 'REQUESTED',
           totalPrice: rentalTotal,
           pricePerDay: item.pricePerDay || 0,
-          depositAmount,
-          itemValue: itemValue || null,
           rentalTotal,
-          totalDue,
           logisticsType: isOwnerDelivery ? 'Owner Delivery' : 'Self-Pickup',
           logisticsAdjustment: logisticsAdj,
           pickupLocation: isOwnerDelivery ? null : {
@@ -322,14 +316,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                           <span className="text-[14px] font-bold text-white/70">Estimated Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{rentalTotal}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                          <span className="text-white/70">Refundable deposit</span>
-                          <span className="font-medium text-white">₹{depositAmount}</span>
-                        </div>
-                        <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
-                          <span className="text-[14px] font-bold text-white/70">Total due now</span>
-                          <span className="text-[28px] font-black text-white tracking-tight">₹{totalDue}</span>
-                        </div>
                       </div>
                     )}
                   </motion.div>
@@ -451,14 +437,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
                           <span className="text-[14px] font-bold text-white/70">Estimated Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{rentalTotal}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                          <span className="text-white/70">Refundable deposit</span>
-                          <span className="font-medium text-white">₹{depositAmount}</span>
-                        </div>
-                        <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
-                          <span className="text-[14px] font-bold text-white/70">Total due now</span>
-                          <span className="text-[28px] font-black text-white tracking-tight">₹{totalDue}</span>
                         </div>
                       </div>
                     )}
