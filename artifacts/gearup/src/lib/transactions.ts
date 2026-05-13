@@ -3,7 +3,7 @@ import { db } from './firebase';
 
 type TransactionStatus = 'pending' | 'completed' | 'failed';
 type TransactionDirection = 'credit' | 'debit';
-type TransactionType = 'rental_payment' | 'late_fee' | 'platform_fee' | 'refund' | 'payout';
+type TransactionType = 'rental_payment' | 'late_fee' | 'platform_fee' | 'refund' | 'payout' | 'payout_pending';
 
 type TransactionInput = {
   userId: string;
@@ -96,4 +96,42 @@ export const recordRentalPaymentTransactions = async (rental: any) => {
   }
 
   await Promise.all(writes);
+};
+
+export const recordRazorpayPaymentTransactions = async (
+  rental: any,
+  payment: { amount: number; platformFee: number; ownerAmount: number; paymentId: string }
+) => {
+  const gearTitle = rental.gearTitle || 'Gear rental';
+
+  await Promise.all([
+    createTransaction({
+      userId: rental.renterId,
+      rentalId: rental.id,
+      listingId: rental.gearId,
+      type: 'rental_payment',
+      amount: payment.amount,
+      direction: 'debit',
+      description: `Razorpay payment for ${gearTitle}`,
+    }),
+    createTransaction({
+      userId: rental.ownerId,
+      rentalId: rental.id,
+      listingId: rental.gearId,
+      type: 'payout_pending',
+      amount: payment.ownerAmount,
+      direction: 'credit',
+      status: 'pending',
+      description: `Owner payout pending for ${gearTitle}`,
+    }),
+    createTransaction({
+      userId: rental.renterId,
+      rentalId: rental.id,
+      listingId: rental.gearId,
+      type: 'platform_fee',
+      amount: payment.platformFee,
+      direction: 'debit',
+      description: `Platform fee for ${gearTitle}`,
+    }),
+  ]);
 };

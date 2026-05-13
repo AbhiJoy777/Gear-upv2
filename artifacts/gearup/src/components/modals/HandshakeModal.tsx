@@ -2,14 +2,36 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, MapPin, QrCode, ShieldCheck, Map as MapIcon, Loader2, Navigation, CheckCircle2, AlertCircle } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { X, Camera, MapPin, ShieldCheck, Map as MapIcon, Loader2, Navigation, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
-import { recordRentalPaymentTransactions } from '@/lib/transactions';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { recordRazorpayPaymentTransactions } from '@/lib/transactions';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+
+type RazorpayInstance = {
+  open: () => void;
+  on: (event: 'payment.failed', callback: (response: any) => void) => void;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  handler: (response: { razorpay_payment_id: string }) => void | Promise<void>;
+  prefill?: { email?: string };
+  notes?: Record<string, string>;
+  theme?: { color: string };
+  modal?: { ondismiss?: () => void };
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
 
 interface HandshakeModalProps {
   rental: any;
@@ -22,13 +44,17 @@ type HandshakeStep = 'proof_of_life' | 'tracking' | 'logistics' | 'qr_handover' 
 
 export default function HandshakeModal({ rental, onClose, userRole, initialStep }: HandshakeModalProps) {
   const { showToast } = useToast();
+  const paymentCompletedRef = useRef(false);
   const [step, setStep] = useState<HandshakeStep>(initialStep || 'tracking');
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(15);
-  const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const pricePerDay = Number(rental.pricePerDay || (rental.totalPrice && rental.durationDays ? rental.totalPrice / rental.durationDays : 0));
+  const rentalDays = Number(rental.durationDays || 1);
+  const rentalTotal = Math.round(pricePerDay * rentalDays) || Number(rental.totalPrice || 0);
+  const platformFee = Math.round(rentalTotal * 0.05);
+  const ownerAmount = Math.max(0, rentalTotal - platformFee);
   
   useEffect(() => {
     if (initialStep) {
@@ -96,58 +122,144 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     }
   };
 
-  const completeHandover = async () => {
+  const loadRazorpayScript = () => new Promise<boolean>((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true), { once: true });
+      existingScript.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
+  const markPaymentFailed = async (reason: string) => {
+    try {
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        paymentStatus: 'failed',
+        payment: {
+          provider: 'razorpay',
+          paymentId: null,
+          amount: rentalTotal,
+          platformFee,
+          ownerAmount,
+          status: 'failed',
+          failedAt: serverTimestamp(),
+          failureReason: reason,
+        },
+      });
+    } catch (err) {
+      console.error('Could not save payment failure state:', err);
+    }
+  };
+
+  const completePaidHandover = async (paymentId: string) => {
     await updateDoc(doc(db, 'rentals', rental.id), {
       status: 'ACTIVE_RENTAL',
       actualStartTime: serverTimestamp(),
-      returnDueAt: null
+      returnDueAt: null,
+      paymentId,
+      paymentStatus: 'paid',
+      paidAt: serverTimestamp(),
+      platformFee,
+      ownerAmount,
+      totalPrice: rentalTotal,
+      payment: {
+        provider: 'razorpay',
+        paymentId,
+        amount: rentalTotal,
+        platformFee,
+        ownerAmount,
+        status: 'paid',
+        paidAt: serverTimestamp(),
+      },
     });
 
     await updateDoc(doc(db, 'listings', rental.gearId), {
       status: 'IN_USE'
     });
 
-    await updateDoc(doc(db, 'users', rental.ownerId), {
-      walletBalance: increment(rental.totalPrice)
+    await recordRazorpayPaymentTransactions(rental, {
+      amount: rentalTotal,
+      platformFee,
+      ownerAmount,
+      paymentId,
     });
-
-    await updateDoc(doc(db, 'users', rental.renterId), {
-      walletBalance: increment(-rental.totalPrice)
-    });
-
-    await recordRentalPaymentTransactions(rental);
   };
 
-  // QR Scanning
-  useEffect(() => {
-    let scanner: Html5QrcodeScanner | null = null;
-    if (step === 'payment_scan' && scanning) {
-       scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
-       scanner.render(async (decodedText) => {
-         if (decodedText === `handover-${rental.id}`) {
-           if (scanner) {
-             scanner.clear().catch(console.error);
-           }
-           setScanning(false);
-           setLoading(true);
-           try {
-             await completeHandover();
-             onClose();
-           } catch (err) {
-             console.error(err);
-             showToast('Could not complete handover. Please try again.', 'error');
-           } finally {
-             setLoading(false);
-           }
-         }
-       }, (err) => {});
+  const handleRazorpayPayment = async () => {
+    if (!razorpayKey) {
+      showToast('Payment gateway not configured.', 'error');
+      return;
     }
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
+
+    setLoading(true);
+    const loaded = await loadRazorpayScript();
+    if (!loaded || !window.Razorpay) {
+      setLoading(false);
+      showToast('Could not load payment gateway. Please try again.', 'error');
+      return;
+    }
+
+    const options: RazorpayOptions = {
+      key: razorpayKey,
+      amount: rentalTotal * 100,
+      currency: 'INR',
+      name: 'GearUp',
+      description: `${rental.gearTitle || 'Gear rental'} (${rentalDays} day${rentalDays === 1 ? '' : 's'})`,
+      prefill: { email: rental.renterEmail },
+      notes: {
+        rentalId: rental.id,
+        listingId: rental.gearId,
+        ownerId: rental.ownerId,
+      },
+      theme: { color: '#A855F7' },
+      handler: async (response) => {
+        try {
+          paymentCompletedRef.current = true;
+          await completePaidHandover(response.razorpay_payment_id);
+          showToast('Payment successful. Rental is now active.', 'success');
+          onClose();
+        } catch (err: any) {
+          console.error('Razorpay payment save failed:', {
+            code: err?.code,
+            message: err?.message,
+            error: err,
+          });
+          showToast('Payment succeeded, but we could not update the rental. Please contact support.', 'error');
+        } finally {
+          setLoading(false);
+        }
+      },
+      modal: {
+        ondismiss: async () => {
+          if (paymentCompletedRef.current) return;
+          await markPaymentFailed('checkout_dismissed');
+          setLoading(false);
+          showToast('Payment was cancelled. Rental is still pending.', 'error');
+        },
+      },
     };
-  }, [step, scanning, rental.id, onClose]);
+
+    const checkout = new window.Razorpay(options);
+    checkout.on('payment.failed', async (response: any) => {
+      console.error('Razorpay payment failed:', response);
+      await markPaymentFailed(response?.error?.description || 'payment_failed');
+      setLoading(false);
+      showToast('Payment failed. Please try again.', 'error');
+    });
+    checkout.open();
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -285,16 +397,16 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                <motion.div key="qr" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 text-center">
                   <div className="space-y-2">
                     <h3 className="text-[20px] font-bold text-white tracking-tight">Final Handover</h3>
-                    <p className="text-[13px] text-white/50">Have the borrower scan this to confirm.</p>
+                    <p className="text-[13px] text-white/50">Ask the borrower to complete the protected payment from their rental card.</p>
                   </div>
 
-                  <div className="bg-white p-6 rounded-[32px] w-fit mx-auto shadow-[0_0_40px_rgba(168,85,247,0.3)]">
-                     <QRCodeSVG value={`handover-${rental.id}`} size={200} level="H" />
+                  <div className="bg-[#0A0A0A] p-8 rounded-[32px] w-fit mx-auto border border-[#222] shadow-[0_0_40px_rgba(168,85,247,0.15)]">
+                     <CreditCard size={72} className="text-[#A855F7]" />
                   </div>
 
                   <div className="flex items-center justify-center gap-3 text-[#2DD4BF] animate-pulse">
                     <CheckCircle2 size={18} />
-                    <span className="text-[14px] font-bold uppercase tracking-widest">Awaiting Scan</span>
+                    <span className="text-[14px] font-bold uppercase tracking-widest">Awaiting Payment</span>
                   </div>
                </motion.div>
              )}
@@ -302,49 +414,40 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              {step === 'payment_scan' && (
                <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
                   <div className="text-center space-y-2">
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">Scan & Pay</h3>
-                    <p className="text-[13px] text-white/50">Scan the owner&apos;s QR to authorize payment.</p>
+                    <h3 className="text-[20px] font-bold text-white tracking-tight">Payment Protected</h3>
+                    <p className="text-[13px] text-white/50">Pay with Razorpay test mode to activate the rental.</p>
                   </div>
 
-                  <div className="aspect-square bg-black rounded-[24px] overflow-hidden relative border border-[#222]">
-                     {scanning ? (
-                        <div id="reader" className="w-full h-full" />
-                     ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/20">
-                           <QrCode size={64} />
-                           {loading && <Loader2 className="animate-spin" />}
-                        </div>
-                     )}
+                  <div className="bg-[#0A0A0A] rounded-[24px] border border-[#222] p-5 space-y-4">
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-white/55">Rental total</span>
+                      <span className="text-white font-bold">₹{rentalTotal}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-white/55">Platform fee</span>
+                      <span className="text-[#A855F7] font-bold">₹{platformFee}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-white/55">Owner payout pending</span>
+                      <span className="text-[#2DD4BF] font-bold">₹{ownerAmount}</span>
+                    </div>
+                    <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-[11px] uppercase tracking-widest text-white/35 font-bold">Payable now</span>
+                      <span className="text-[28px] text-white font-black tracking-tight">₹{rentalTotal}</span>
+                    </div>
+                    <p className="text-[11px] text-white/35 leading-relaxed">
+                      {razorpayKey ? 'Razorpay checkout opens in test mode when test keys are configured.' : 'Payment gateway not configured.'}
+                    </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <button 
-                      onClick={() => setScanning(true)}
-                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer"
+                  <button
+                      onClick={handleRazorpayPayment}
+                      disabled={loading || !razorpayKey}
+                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <QrCode size={20} />
-                      Open Scanner
+                      {loading ? <Loader2 size={20} className="animate-spin" /> : <CreditCard size={20} />}
+                      {razorpayKey ? 'Pay Securely' : 'Payment Gateway Not Configured'}
                     </button>
-                    
-                    <button 
-                      onClick={async () => {
-                        setLoading(true);
-                        try {
-                           await completeHandover();
-                           onClose();
-                        } catch (err) {
-                           console.error(err);
-                           showToast('Could not complete handover. Please try again.', 'error');
-                        } finally {
-                           setLoading(false);
-                        }
-                      }}
-                      className="w-full py-4 bg-[#A855F7]/10 border border-[#A855F7]/30 text-[#A855F7] font-bold rounded-[16px] hover:bg-[#A855F7]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <ShieldCheck size={20} />
-                      Simulate Success
-                    </button>
-                  </div>
                </motion.div>
              )}
            </AnimatePresence>
@@ -353,8 +456,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
         {/* Footer Info */}
         <div className="p-6 bg-[#0A0A0A] border-t border-[#222] flex items-center justify-between">
            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Escrow Protection</span>
-              <span className="text-[#2DD4BF] text-[13px] font-bold">₹{rental.totalPrice} Secured</span>
+              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Payment Protected</span>
+              <span className="text-[#2DD4BF] text-[13px] font-bold">₹{rentalTotal} Rental Total</span>
            </div>
            <div className="flex items-center gap-1.5 text-white/30 text-[12px] font-medium">
              <AlertCircle size={14} />
