@@ -175,6 +175,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
+  const [dailyRentPrice, setDailyRentPrice] = useState('');
+  const [refundableDeposit, setRefundableDeposit] = useState('');
+  const [estimatedItemValue, setEstimatedItemValue] = useState('');
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -283,6 +286,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     base = 1200;
   }
 
+  const dailyRentAmount = Number(dailyRentPrice || base);
+  const depositAmount = Number(refundableDeposit || 0);
+  const itemValueAmount = Number(estimatedItemValue || 0);
+  const depositWarning = itemValueAmount > 0 && depositAmount > 0 && depositAmount < itemValueAmount * 0.3;
+
   const isValid = () => {
     if (step === 1) return !!c;
     if (step === 2) {
@@ -303,6 +311,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
+    if (step === 6) return dailyRentAmount > 0 && depositAmount > 0;
     return true;
   };
 
@@ -363,7 +372,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       };
 
       const payload: any = {
-        title, category: c, pricePerDay: base,
+        title, category: c, pricePerDay: dailyRentAmount,
+        depositAmount,
+        itemValue: itemValueAmount || null,
         tier, imageUrl: imgs[0] || '',
         images: imgs,
         specs: specData,
@@ -408,6 +419,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea('');
     setLandmark('');
     setPickupInstructions('');
+    setDailyRentPrice('');
+    setRefundableDeposit('');
+    setEstimatedItemValue('');
 
     setImgs([]); 
   };
@@ -426,6 +440,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea(existingLocation.area || '');
     setLandmark(existingLocation.landmark || '');
     setPickupInstructions(existingLocation.instructions || '');
+    setDailyRentPrice(String(editItem.pricePerDay || ''));
+    setRefundableDeposit(String(editItem.depositAmount || ''));
+    setEstimatedItemValue(String(editItem.itemValue || ''));
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -474,6 +491,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       setVram('');
     }
   }, [gpuPlatform]);
+
+  useEffect(() => {
+    if (!isOpen || editItem || step !== 6 || dailyRentPrice) return;
+    setDailyRentPrice(String(base));
+  }, [base, dailyRentPrice, editItem, isOpen, step]);
 
   useEffect(() => {
     if (isOpen) {
@@ -794,7 +816,47 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <div className="bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-[24px] p-6 text-center relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
                       <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Base Daily Rate</p>
-                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{base}</h4>
+                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{dailyRentAmount || base}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left border-t border-[#A855F7]/20 pt-4 mb-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Daily rent</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={dailyRentPrice}
+                            onChange={(e) => setDailyRentPrice(e.target.value)}
+                            placeholder={String(base)}
+                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Refundable deposit</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={refundableDeposit}
+                            onChange={(e) => setRefundableDeposit(e.target.value)}
+                            placeholder="Required"
+                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">Item value</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={estimatedItemValue}
+                            onChange={(e) => setEstimatedItemValue(e.target.value)}
+                            placeholder="Recommended"
+                            className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                          />
+                        </div>
+                      </div>
+                      {depositWarning && (
+                        <p className="text-[11px] text-[#F97316] bg-[#F97316]/10 border border-[#F97316]/20 rounded-[12px] p-3 mb-4 text-left">
+                          Deposit is below 30% of estimated item value. Consider increasing it for better protection.
+                        </p>
+                      )}
                       <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-2">
                          <span className="text-white/70 font-medium">{logisticsType === 'Self-Pickup' ? 'Self-Pickup Adjustment' : 'Owner Delivery Adjustment'}</span>
                          <span className={logisticsType === 'Self-Pickup' ? 'text-[#2DD4BF] font-medium' : 'text-[#A855F7] font-medium'}>
@@ -803,22 +865,22 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       </div>
                       <div className="flex justify-between items-center text-[13px] mb-4">
                          <span className="text-white/70 font-medium">Platform Fee (5%)</span>
-                         <span className="text-white/70">-₹{base * 0.05}</span>
+                         <span className="text-white/70">-₹{Math.round((dailyRentAmount || base) * 0.05)}</span>
                       </div>
                       <div className="flex justify-between items-center text-[14px] pt-4 border-t border-[#A855F7]/20">
                          <span className="text-[#2DD4BF] font-bold">You Earn (Per Day)</span>
-                         <span className="text-[#2DD4BF] font-black">₹{base * 0.95}</span>
+                         <span className="text-[#2DD4BF] font-black">₹{Math.round((dailyRentAmount || base) * 0.95)}</span>
                       </div>
                    </div>
 
                    <div className="grid grid-cols-2 gap-4">
                      <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
                         <p className="text-[11px] text-[#A855F7] font-bold tracking-wider uppercase mb-1">3-Day (25% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(base * 3 * 0.75)}</p>
+                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round((dailyRentAmount || base) * 3 * 0.75)}</p>
                      </div>
                      <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
                         <p className="text-[11px] text-[#2DD4BF] font-bold tracking-wider uppercase mb-1">30-Day (50% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(base * 30 * 0.5)}</p>
+                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round((dailyRentAmount || base) * 30 * 0.5)}</p>
                      </div>
                    </div>
                 </div>

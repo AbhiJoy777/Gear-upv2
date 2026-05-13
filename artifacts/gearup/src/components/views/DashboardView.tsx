@@ -358,13 +358,20 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
                   <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Total Paid</p>
-                  <p className="text-white/70 mt-1">Rs {rental.totalPrice || 0}</p>
+                  <p className="text-white/70 mt-1">Rs {rental.totalDue || rental.totalPrice || 0}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] rounded-[14px] p-3">
                   <p className="text-white/30 uppercase tracking-wider text-[10px] font-bold">Late Fee</p>
                   <p className="text-white/70 mt-1">Rs {lateFee}</p>
                 </div>
               </div>
+
+              {returned && rental.depositAmount > 0 && (
+                <div className="bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 rounded-[14px] p-3">
+                  <p className="text-[#2DD4BF] uppercase tracking-wider text-[10px] font-bold">Deposit eligible for refund</p>
+                  <p className="text-white/70 mt-1 text-[12px]">Rs {rental.depositAmount}</p>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
                 <span className="text-[11px] text-white/35">
@@ -517,7 +524,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       {pendingRental ? (
                          <div className="mt-auto pt-4 space-y-3">
                            <p className="text-[12px] text-white/70">
-                             Requested for <strong className="text-white">{pendingRental.durationDays} Days</strong> (₹{pendingRental.totalPrice})
+                             Requested for <strong className="text-white">{pendingRental.durationDays} Days</strong> (₹{pendingRental.totalDue || pendingRental.totalPrice})
                            </p>
                            <div className="flex gap-2">
                               <button onClick={(e) => handleAccept(e, pendingRental.id, item.id)} className="flex-1 bg-[#2DD4BF] text-black font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-[#14b8a6] transition-all">
@@ -807,7 +814,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       )}
 
                       <div className="flex flex-wrap items-center justify-between gap-3 mt-auto pt-4 border-t border-white/10">
-                         <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{rental.totalPrice}</span>
+                         <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{rental.totalDue || rental.totalPrice}</span>
                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">{rental.durationDays} Days</span>
                             <div className="w-1 h-1 bg-white/10 rounded-full" />
