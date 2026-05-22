@@ -24,6 +24,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(false);
   const paymentSecured = rental.payment?.status === 'paid' || rental.paymentStatus === 'paid';
+  const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || window.__GEARUP_CONFIG__?.razorpayKey;
+
+  console.log('Razorpay key:', razorpayKey);
   
   useEffect(() => {
     if (initialStep) {
@@ -307,6 +310,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     <CheckCircle2 size={48} className="text-[#2DD4BF] mx-auto mb-3" />
                     <p className="text-white font-bold text-[15px]">Payment already secured.</p>
                     <p className="text-white/45 text-[12px] mt-1">Confirm the physical handover to start the rental.</p>
+                    <p className="text-white/40 text-[11px] mt-3">
+                      Razorpay key: <span className={razorpayKey ? 'text-[#2DD4BF]' : 'text-red-400'}>{razorpayKey ? 'Loaded' : 'Missing'}</span>
+                    </p>
                   </div>
 
                   <div className="space-y-3">

@@ -20,8 +20,7 @@ declare global {
   interface Window {
     Razorpay?: new (options: RazorpayOptions) => { open: () => void };
     __GEARUP_CONFIG__?: {
-      RAZORPAY_KEY_ID?: string;
-      VITE_RAZORPAY_KEY_ID?: string;
+      razorpayKey?: string;
     };
   }
 }
@@ -53,8 +52,7 @@ type RazorpaySuccessResponse = {
 
 const getRazorpayKey = () =>
   import.meta.env.VITE_RAZORPAY_KEY_ID
-  || window.__GEARUP_CONFIG__?.VITE_RAZORPAY_KEY_ID
-  || window.__GEARUP_CONFIG__?.RAZORPAY_KEY_ID
+  || window.__GEARUP_CONFIG__?.razorpayKey
   || '';
 
 const loadRazorpayScript = () => new Promise<void>((resolve, reject) => {
@@ -162,6 +160,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate || loading || !deliveryReady) return;
     const razorpayKey = getRazorpayKey();
+    console.log('Razorpay key:', razorpayKey);
     if (!razorpayKey) {
       showToast('Payment gateway not configured', 'error');
       return;
@@ -606,9 +605,12 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
              {/* Sticky Footer */}
              <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col-reverse sm:flex-row justify-end gap-3 pb-6 md:pb-4">
                {step === 2 && (
-                 <p className="w-full sm:mr-auto sm:max-w-[210px] text-[11px] text-[#2DD4BF] leading-relaxed">
-                   Platform protected payment. Owner must respond within 12 hours.
-                 </p>
+                 <div className="w-full sm:mr-auto sm:max-w-[210px] text-[11px] leading-relaxed">
+                   <p className="text-[#2DD4BF]">Platform protected payment. Owner must respond within 12 hours.</p>
+                   <p className="text-white/40 mt-1">
+                     Razorpay key: <span className={getRazorpayKey() ? 'text-[#2DD4BF]' : 'text-red-400'}>{getRazorpayKey() ? 'Loaded' : 'Missing'}</span>
+                   </p>
+                 </div>
                )}
                <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all">Cancel</button>
                {step === 1 ? (
