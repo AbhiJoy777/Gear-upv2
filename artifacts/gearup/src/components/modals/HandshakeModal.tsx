@@ -28,9 +28,17 @@ type RazorpayOptions = {
   modal?: { ondismiss?: () => void };
 };
 
+type RuntimePaymentConfig = {
+  VITE_RAZORPAY_KEY_ID?: string;
+  RAZORPAY_KEY_ID?: string;
+};
+
 declare global {
   interface Window {
     Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+    __GEARUP_CONFIG__?: RuntimePaymentConfig;
+    __RUNTIME_CONFIG__?: RuntimePaymentConfig;
+    runtimeConfig?: RuntimePaymentConfig;
   }
 }
 
@@ -50,11 +58,19 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(false);
-  const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-  const hasRazorpayKey = Boolean(import.meta.env.VITE_RAZORPAY_KEY_ID);
+  const viteRazorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const runtimeRazorpayKey =
+    window.__GEARUP_CONFIG__?.VITE_RAZORPAY_KEY_ID ||
+    window.__RUNTIME_CONFIG__?.VITE_RAZORPAY_KEY_ID ||
+    window.runtimeConfig?.VITE_RAZORPAY_KEY_ID ||
+    window.__GEARUP_CONFIG__?.RAZORPAY_KEY_ID ||
+    window.__RUNTIME_CONFIG__?.RAZORPAY_KEY_ID ||
+    window.runtimeConfig?.RAZORPAY_KEY_ID;
+  const razorpayKey = viteRazorpayKey || runtimeRazorpayKey || '';
+  const hasRazorpayKey = Boolean(razorpayKey);
   console.log(
     "Razorpay key loaded:",
-    !!import.meta.env.VITE_RAZORPAY_KEY_ID
+    !!razorpayKey
   );
   const pricePerDay = Number(rental.pricePerDay || (rental.totalPrice && rental.durationDays ? rental.totalPrice / rental.durationDays : 0));
   const rentalDays = Number(rental.durationDays || 1);
