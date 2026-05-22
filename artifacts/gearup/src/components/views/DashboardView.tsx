@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, QrCode, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -34,13 +34,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [reportContext, setReportContext] = useState<any>(null);
   const [recordingReturnProofId, setRecordingReturnProofId] = useState<string | null>(null);
 
-  const LOCKED_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
-  const CANCELLABLE_RENTAL_STATUSES = ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
-  const LIVE_RENTAL_STATUSES = ['REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+  const LOCKED_RENTAL_STATUSES = ['PAID_REQUESTED', 'REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
+  const CANCELLABLE_RENTAL_STATUSES = ['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'];
+  const LIVE_RENTAL_STATUSES = ['PAID_REQUESTED', 'REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'];
   const HISTORY_RENTAL_STATUSES = ['RETURNED', 'DECLINED', 'CANCELLED'];
 
   const canChat = (status: string) =>
-    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+    ['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
 
   const isOwnerDelivery = (type: string) => type === 'delivery' || type === 'Owner Delivery';
 
@@ -76,6 +76,16 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
     if (!date || Number.isNaN(date.getTime())) return 'Not recorded';
     return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const hasOwnerResponseDeadlinePassed = (rental: any) => {
+    const deadline = rental?.ownerResponseDeadlineAt?.toDate
+      ? rental.ownerResponseDeadlineAt.toDate()
+      : rental?.ownerResponseDeadlineAt
+        ? new Date(rental.ownerResponseDeadlineAt)
+        : null;
+
+    return Boolean(deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now());
   };
 
   const getRentalEndDate = (rental: any) => {
@@ -253,7 +263,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const handleAccept = async (e: React.MouseEvent, rentalId: string, gearId: string) => {
     e.stopPropagation();
     try {
-      await updateDoc(doc(db, 'rentals', rentalId), { status: 'ACCEPTED' });
+      await updateDoc(doc(db, 'rentals', rentalId), {
+        status: 'ACCEPTED',
+        acceptedAt: serverTimestamp(),
+      });
       // Don't mark as RENTED yet, wait for handshake
     } catch (err) {
       console.error(err);
@@ -266,11 +279,29 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     setInitialHandshakeStep(step);
   };
 
-  const handleDecline = async (e: React.MouseEvent, rentalId: string, gearId: string) => {
+  const handleDecline = async (e: React.MouseEvent, rental: any, gearId: string) => {
     e.stopPropagation();
     try {
-      await updateDoc(doc(db, 'rentals', rentalId), { status: 'DECLINED' });
-      await updateDoc(doc(db, 'listings', gearId), { status: 'AVAILABLE' });
+      await updateDoc(doc(db, 'rentals', rental.id), {
+        status: 'DECLINED',
+        declinedAt: serverTimestamp(),
+        refundStatus: 'refund_required',
+        'payment.refundStatus': 'refund_required',
+      });
+      await updateDoc(doc(db, 'listings', gearId), {
+        status: 'AVAILABLE',
+        reservedBy: null,
+        reservedRentalId: null,
+        updatedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: rental.renterId,
+        title: 'Booking Declined',
+        message: `${rental.gearTitle || 'Your booking'} was declined. Refund is pending manual processing.`,
+        type: 'refund',
+        read: false,
+        createdAt: serverTimestamp(),
+      });
     } catch (err) {
       console.error(err);
     }
@@ -368,7 +399,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
                 <span className="text-[11px] text-white/35">
-                  Proof-of-life: <span className="text-white/60">{rental.proofOfLifeUrl ? 'Recorded' : 'Not recorded'}</span>
+                  {declined && rental.refundStatus === 'refund_required'
+                    ? 'Refund pending'
+                    : <>Proof-of-life: <span className="text-white/60">{rental.proofOfLifeUrl ? 'Recorded' : 'Not recorded'}</span></>}
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openRentalReport(rental); }}
@@ -427,7 +460,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             ) : listings.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
                 {listings.map((item, idx) => {
-                  const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && r.status === 'REQUESTED');
+                  const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['PAID_REQUESTED', 'REQUESTED'].includes(r.status));
                   const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
                   const lockedRental = visibleOwnerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
                   const timelineRental = lockedRental || activeRental;
@@ -519,11 +552,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                            <p className="text-[12px] text-white/70">
                              Requested for <strong className="text-white">{pendingRental.durationDays} Days</strong> (₹{pendingRental.totalPrice})
                            </p>
+                           <p className="text-[11px] text-[#2DD4BF] leading-relaxed">
+                             {hasOwnerResponseDeadlinePassed(pendingRental) ? 'Refund request available.' : 'Payment secured. Owner must respond within 12 hours.'}
+                           </p>
                            <div className="flex gap-2">
                               <button onClick={(e) => handleAccept(e, pendingRental.id, item.id)} className="flex-1 bg-[#2DD4BF] text-black font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-[#14b8a6] transition-all">
                                 <Check size={14} /> Accept
                               </button>
-                              <button onClick={(e) => handleDecline(e, pendingRental.id, item.id)} className="flex-1 bg-white/5 text-white/70 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all border border-white/10">
+                              <button onClick={(e) => handleDecline(e, pendingRental, item.id)} className="flex-1 bg-white/5 text-white/70 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all border border-white/10">
                                 <X size={14} /> Decline
                               </button>
                            </div>
@@ -586,7 +622,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   onClick={async (e) => { 
                                     e.stopPropagation(); 
                                     try {
-                                      await updateDoc(doc(db, 'rentals', r.id), { status: 'LOGISTICS_PENDING' });
+                                      await updateDoc(doc(db, 'rentals', r.id), {
+                                        status: 'LOGISTICS_PENDING',
+                                        logisticsPendingAt: serverTimestamp(),
+                                      });
                                       openHandshake(r, 'owner', 'logistics'); 
                                     } catch (err) { console.error(err); }
                                   }}
@@ -671,6 +710,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                         }`}>
                           {rental.status === 'ACCEPTED'
                             ? 'Owner Securing Gear...'
+                            : rental.status === 'PAID_REQUESTED'
+                              ? hasOwnerResponseDeadlinePassed(rental) ? 'Refund Request Available' : 'Paid - Awaiting Owner'
                             : rental.status === 'PROOF_RECORDED'
                               ? 'Ready for Handover'
                               : rental.status === 'RETURN_DUE'
@@ -786,7 +827,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
                                   className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10"
                                >
-                                  <QrCode size={16} /> Scan & Pay
+                                  <ShieldCheck size={16} /> Confirm Handover
                                </button>
                             ) : (
                                <button 
