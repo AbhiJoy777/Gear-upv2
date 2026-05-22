@@ -1,20 +1,10 @@
 import { createHmac } from 'node:crypto';
 
-type VercelRequest = {
-  method?: string;
-  body?: any;
-};
-
-type VercelResponse = {
-  status: (code: number) => VercelResponse;
-  json: (body: any) => void;
-};
-
-const jsonError = (res: VercelResponse, status: number, message: string) => {
+const jsonError = (res, status, message) => {
   res.status(status).json({ error: message });
 };
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default function handler(req, res) {
   if (req.method !== 'POST') {
     jsonError(res, 405, 'Method not allowed');
     return;
