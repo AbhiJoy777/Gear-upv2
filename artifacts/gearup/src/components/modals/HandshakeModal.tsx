@@ -51,6 +51,11 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(false);
   const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const hasRazorpayKey = Boolean(import.meta.env.VITE_RAZORPAY_KEY_ID);
+  console.log(
+    "Razorpay key loaded:",
+    !!import.meta.env.VITE_RAZORPAY_KEY_ID
+  );
   const pricePerDay = Number(rental.pricePerDay || (rental.totalPrice && rental.durationDays ? rental.totalPrice / rental.durationDays : 0));
   const rentalDays = Number(rental.durationDays || 1);
   const rentalTotal = Math.round(pricePerDay * rentalDays) || Number(rental.totalPrice || 0);
@@ -217,7 +222,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
 
   const handleRazorpayPayment = async () => {
     if (!razorpayKey) {
-      showToast('Payment gateway not configured.', 'error');
+      showToast('Missing VITE_RAZORPAY_KEY_ID.', 'error');
       return;
     }
 
@@ -508,17 +513,17 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                       <span className="text-[28px] text-white font-black tracking-tight">₹{rentalTotal}</span>
                     </div>
                     <p className="text-[11px] text-white/35 leading-relaxed">
-                      {razorpayKey ? 'Razorpay checkout opens in test mode when test keys are configured.' : 'Payment gateway not configured.'}
+                      Razorpay checkout opens in test mode when test keys are configured.
                     </p>
                   </div>
 
                   <button
                     onClick={handleRazorpayPayment}
-                    disabled={loading || !razorpayKey}
+                    disabled={loading || !hasRazorpayKey}
                     className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? <Loader2 size={20} className="animate-spin" /> : <CreditCard size={20} />}
-                    {razorpayKey ? 'Pay Securely' : 'Payment Gateway Not Configured'}
+                    Pay Securely
                   </button>
                </motion.div>
              )}
