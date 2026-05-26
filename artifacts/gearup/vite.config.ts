@@ -60,7 +60,7 @@ const registerRazorpayApi = (middlewares: any) => {
         body: JSON.stringify({
           amount: Math.round(amount * 100),
           currency: "INR",
-          receipt: body.receipt || `gearup-${Date.now()}`,
+          receipt: `gu_${Date.now().toString().slice(-10)}`,
         }),
       });
 

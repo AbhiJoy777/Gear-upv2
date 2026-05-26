@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   const amount = Number(req.body?.amount || 0);
-  const receipt = String(req.body?.receipt || `gearup-${Date.now()}`);
+  const receipt = `gu_${Date.now().toString().slice(-10)}`;
 
   if (!Number.isFinite(amount) || amount <= 0) {
     jsonError(res, 400, 'Invalid payment amount');
