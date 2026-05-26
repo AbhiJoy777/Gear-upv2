@@ -3,7 +3,7 @@ import { db } from './firebase';
 
 type TransactionStatus = 'pending' | 'completed' | 'failed';
 type TransactionDirection = 'credit' | 'debit';
-type TransactionType = 'rental_payment' | 'late_fee' | 'platform_fee' | 'refund' | 'payout';
+type TransactionType = 'rental_payment' | 'late_fee' | 'platform_fee' | 'refund' | 'payout' | 'payout_pending';
 
 type TransactionInput = {
   userId: string;
@@ -91,6 +91,51 @@ export const recordRentalPaymentTransactions = async (rental: any) => {
         direction: 'debit',
         status: 'pending',
         description: `Late fee due for ${gearTitle}`,
+      })
+    );
+  }
+
+  await Promise.all(writes);
+};
+
+export const recordPrepaidRentalTransactions = async (rental: any) => {
+  const amount = Number(rental.totalPrice || rental.payment?.amount || 0);
+  const platformFee = Number(rental.platformFee || rental.payment?.platformFee || 0);
+  const ownerAmount = Number(rental.ownerAmount || rental.payment?.ownerAmount || Math.max(0, amount - platformFee));
+  const gearTitle = rental.gearTitle || 'Gear rental';
+
+  const writes = [
+    createTransaction({
+      userId: rental.renterId,
+      rentalId: rental.id,
+      listingId: rental.gearId,
+      type: 'rental_payment',
+      amount,
+      direction: 'debit',
+      description: `Prepaid rental payment for ${gearTitle}`,
+    }),
+    createTransaction({
+      userId: rental.ownerId,
+      rentalId: rental.id,
+      listingId: rental.gearId,
+      type: 'payout_pending',
+      amount: ownerAmount,
+      direction: 'credit',
+      status: 'pending',
+      description: `Pending owner payout for ${gearTitle}`,
+    }),
+  ];
+
+  if (platformFee > 0) {
+    writes.push(
+      createTransaction({
+        userId: rental.renterId,
+        rentalId: rental.id,
+        listingId: rental.gearId,
+        type: 'platform_fee',
+        amount: platformFee,
+        direction: 'debit',
+        description: `Platform fee for ${gearTitle}`,
       })
     );
   }

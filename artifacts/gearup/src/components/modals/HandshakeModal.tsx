@@ -1,13 +1,10 @@
 
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, MapPin, QrCode, ShieldCheck, Map as MapIcon, Loader2, Navigation, CheckCircle2, AlertCircle } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { X, Camera, MapPin, ShieldCheck, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
-import { recordRentalPaymentTransactions } from '@/lib/transactions';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 
@@ -25,10 +22,11 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [step, setStep] = useState<HandshakeStep>(initialStep || 'tracking');
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState(15);
-  const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const paymentSecured = rental.payment?.status === 'paid' || rental.paymentStatus === 'paid';
+  const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || window.__GEARUP_CONFIG__?.razorpayKey;
+
+  console.log('Razorpay key:', razorpayKey);
   
   useEffect(() => {
     if (initialStep) {
@@ -67,7 +65,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'PROOF_RECORDED',
-        proofOfLifeUrl: 'https://example.com/simulated-video.mp4'
+        proofOfLifeUrl: 'https://example.com/simulated-video.mp4',
+        proofRecordedAt: serverTimestamp(),
       });
       onClose(); // Automatically close as requested
     } catch (err) {
@@ -84,9 +83,26 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     setLoading(true);
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
-        status: 'PAYMENT_PENDING',
-        returnLogistics: type
+        status: paymentSecured ? 'ACTIVE_RENTAL' : 'PAYMENT_PENDING',
+        returnLogistics: type,
+        logisticsPendingAt: serverTimestamp(),
+        ...(paymentSecured ? {
+          actualStartTime: serverTimestamp(),
+          activeAt: serverTimestamp(),
+          paymentCompletedAt: serverTimestamp(),
+          returnDueAt: null,
+        } : {}),
       });
+      if (paymentSecured) {
+        await updateDoc(doc(db, 'listings', rental.gearId), {
+          status: 'IN_USE',
+          updatedAt: serverTimestamp(),
+        });
+        showToast('Payment already secured. Rental is now active.', 'success');
+        onClose();
+        return;
+      }
+
       setStep(userRole === 'owner' ? 'qr_handover' : 'payment_scan');
     } catch (err) {
       console.error(err);
@@ -97,57 +113,23 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeHandover = async () => {
+    if (!paymentSecured) {
+      throw new Error('PAYMENT_NOT_SECURED');
+    }
+
     await updateDoc(doc(db, 'rentals', rental.id), {
       status: 'ACTIVE_RENTAL',
       actualStartTime: serverTimestamp(),
+      activeAt: serverTimestamp(),
+      paymentCompletedAt: serverTimestamp(),
       returnDueAt: null
     });
 
     await updateDoc(doc(db, 'listings', rental.gearId), {
-      status: 'IN_USE'
+      status: 'IN_USE',
+      updatedAt: serverTimestamp(),
     });
-
-    await updateDoc(doc(db, 'users', rental.ownerId), {
-      walletBalance: increment(rental.totalPrice)
-    });
-
-    await updateDoc(doc(db, 'users', rental.renterId), {
-      walletBalance: increment(-rental.totalPrice)
-    });
-
-    await recordRentalPaymentTransactions(rental);
   };
-
-  // QR Scanning
-  useEffect(() => {
-    let scanner: Html5QrcodeScanner | null = null;
-    if (step === 'payment_scan' && scanning) {
-       scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
-       scanner.render(async (decodedText) => {
-         if (decodedText === `handover-${rental.id}`) {
-           if (scanner) {
-             scanner.clear().catch(console.error);
-           }
-           setScanning(false);
-           setLoading(true);
-           try {
-             await completeHandover();
-             onClose();
-           } catch (err) {
-             console.error(err);
-             showToast('Could not complete handover. Please try again.', 'error');
-           } finally {
-             setLoading(false);
-           }
-         }
-       }, (err) => {});
-    }
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(console.error);
-      }
-    };
-  }, [step, scanning, rental.id, onClose]);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -285,64 +267,74 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                <motion.div key="qr" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 text-center">
                   <div className="space-y-2">
                     <h3 className="text-[20px] font-bold text-white tracking-tight">Final Handover</h3>
-                    <p className="text-[13px] text-white/50">Have the borrower scan this to confirm.</p>
+                    <p className="text-[13px] text-white/50">Payment is already secured in GearUp.</p>
                   </div>
 
-                  <div className="bg-white p-6 rounded-[32px] w-fit mx-auto shadow-[0_0_40px_rgba(168,85,247,0.3)]">
-                     <QRCodeSVG value={`handover-${rental.id}`} size={200} level="H" />
+                  <div className="bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 p-6 rounded-[32px] w-full mx-auto">
+                     <CheckCircle2 size={48} className="text-[#2DD4BF] mx-auto mb-3" />
+                     <p className="text-white font-bold text-[15px]">Payment already secured.</p>
+                     <p className="text-white/45 text-[12px] mt-1">Complete the physical handover when both sides are ready.</p>
                   </div>
 
-                  <div className="flex items-center justify-center gap-3 text-[#2DD4BF] animate-pulse">
-                    <CheckCircle2 size={18} />
-                    <span className="text-[14px] font-bold uppercase tracking-widest">Awaiting Scan</span>
-                  </div>
+                  <button
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        await completeHandover();
+                        showToast('Handover confirmed. Rental is now active.', 'success');
+                        onClose();
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading}
+                    className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={20} />}
+                    Confirm Handover
+                  </button>
                </motion.div>
              )}
 
              {step === 'payment_scan' && (
                <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
                   <div className="text-center space-y-2">
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">Scan & Pay</h3>
-                    <p className="text-[13px] text-white/50">Scan the owner&apos;s QR to authorize payment.</p>
+                    <h3 className="text-[20px] font-bold text-white tracking-tight">Payment Protected</h3>
+                    <p className="text-[13px] text-white/50">GearUp has already secured this payment.</p>
                   </div>
 
-                  <div className="aspect-square bg-black rounded-[24px] overflow-hidden relative border border-[#222]">
-                     {scanning ? (
-                        <div id="reader" className="w-full h-full" />
-                     ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white/20">
-                           <QrCode size={64} />
-                           {loading && <Loader2 className="animate-spin" />}
-                        </div>
-                     )}
+                  <div className="bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 rounded-[24px] p-6 text-center">
+                    <CheckCircle2 size={48} className="text-[#2DD4BF] mx-auto mb-3" />
+                    <p className="text-white font-bold text-[15px]">Payment already secured.</p>
+                    <p className="text-white/45 text-[12px] mt-1">Confirm the physical handover to start the rental.</p>
+                    <p className="text-white/40 text-[11px] mt-3">
+                      Razorpay key: <span className={razorpayKey ? 'text-[#2DD4BF]' : 'text-red-400'}>{razorpayKey ? 'Loaded' : 'Missing'}</span>
+                    </p>
                   </div>
 
                   <div className="space-y-3">
                     <button 
-                      onClick={() => setScanning(true)}
-                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer"
-                    >
-                      <QrCode size={20} />
-                      Open Scanner
-                    </button>
-                    
-                    <button 
                       onClick={async () => {
                         setLoading(true);
                         try {
-                           await completeHandover();
-                           onClose();
+                          await completeHandover();
+                          showToast('Handover confirmed. Rental is now active.', 'success');
+                          onClose();
                         } catch (err) {
-                           console.error(err);
-                           showToast('Could not complete handover. Please try again.', 'error');
+                          console.error(err);
+                          showToast('Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
                         } finally {
-                           setLoading(false);
+                          setLoading(false);
                         }
                       }}
-                      className="w-full py-4 bg-[#A855F7]/10 border border-[#A855F7]/30 text-[#A855F7] font-bold rounded-[16px] hover:bg-[#A855F7]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={loading}
+                      className="w-full py-4 bg-[#2DD4BF] hover:bg-[#5EEAD4] text-black font-bold rounded-[16px] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(45,212,191,0.2)] cursor-pointer"
                     >
-                      <ShieldCheck size={20} />
-                      Simulate Success
+                      {loading ? <Loader2 className="animate-spin" /> : <ShieldCheck size={20} />}
+                      Confirm Handover
                     </button>
                   </div>
                </motion.div>
@@ -353,7 +345,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
         {/* Footer Info */}
         <div className="p-6 bg-[#0A0A0A] border-t border-[#222] flex items-center justify-between">
            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Escrow Protection</span>
+              <span className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Payment Protected</span>
               <span className="text-[#2DD4BF] text-[13px] font-bold">₹{rental.totalPrice} Secured</span>
            </div>
            <div className="flex items-center gap-1.5 text-white/30 text-[12px] font-medium">

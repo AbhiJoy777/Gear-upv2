@@ -27,6 +27,7 @@ export const RENTAL_TIMELINE_STAGES: RentalTimelineStage[] = [
 
 const STATUS_STAGE_MAP: Record<string, RentalTimelineStageKey> = {
   REQUESTED: 'request_sent',
+  PAID_REQUESTED: 'request_sent',
   ACCEPTED: 'accepted',
   PROOF_RECORDED: 'proof_recorded',
   LOGISTICS_PENDING: 'logistics_pending',

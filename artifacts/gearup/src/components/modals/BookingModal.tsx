@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { recordPrepaidRentalTransactions } from '@/lib/transactions';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const DURATIONS = [
@@ -14,6 +15,81 @@ const DURATIONS = [
   { days: 30, label: '1 Month', labelShort: '1 Month', discountPercent: 33 },
   { days: 'Custom', label: 'Custom', labelShort: 'Custom', discountPercent: 0 }
 ];
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
+    __GEARUP_CONFIG__?: {
+      razorpayKey?: string;
+    };
+  }
+}
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: {
+    email?: string | null;
+  };
+  theme?: {
+    color: string;
+  };
+  handler: (response: RazorpaySuccessResponse) => void;
+  modal?: {
+    ondismiss?: () => void;
+  };
+};
+
+type RazorpaySuccessResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+const getRazorpayKey = () =>
+  import.meta.env.VITE_RAZORPAY_KEY_ID
+  || window.__GEARUP_CONFIG__?.razorpayKey
+  || '';
+
+const loadRazorpayScript = () => new Promise<void>((resolve, reject) => {
+  if (window.Razorpay) {
+    resolve();
+    return;
+  }
+
+  const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => resolve(), { once: true });
+    existingScript.addEventListener('error', () => reject(new Error('RAZORPAY_SCRIPT_FAILED')), { once: true });
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.async = true;
+  script.onload = () => resolve();
+  script.onerror = () => reject(new Error('RAZORPAY_SCRIPT_FAILED'));
+  document.body.appendChild(script);
+});
+
+const postJson = async (url: string, body: Record<string, unknown>) => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || 'PAYMENT_GATEWAY_ERROR');
+  }
+
+  return payload;
+};
 
 export default function BookingModal({ item, onClose }: { item: any, onClose: () => void }) {
   const { user, profile } = useAuth();
@@ -83,6 +159,13 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate || loading || !deliveryReady) return;
+    const razorpayKey = getRazorpayKey();
+    console.log('Razorpay key:', razorpayKey);
+    if (!razorpayKey) {
+      showToast('Payment gateway not configured', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const existingRentalQuery = query(
@@ -93,23 +176,74 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
       const duplicateRequest = existingRentalSnapshot.docs.some((doc) => {
         const rental = doc.data();
         return rental.gearId === item.id
-          && ['REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status);
+          && ['PAID_REQUESTED', 'REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status);
       });
       if (duplicateRequest) {
         showToast('You already requested this gear.', 'error');
         return;
       }
 
+      await loadRazorpayScript();
+
+      const rentalTotal = Math.max(0, finalTotalPrice);
+      const platformFee = Math.round(rentalTotal * 0.05);
+      const ownerAmount = Math.max(0, rentalTotal - platformFee);
+      const order = await postJson('/api/razorpay/create-order', {
+        amount: rentalTotal,
+        receipt: `gearup-${item.id}-${Date.now()}`,
+      });
+
+      const paymentResponse = await new Promise<RazorpaySuccessResponse>((resolve, reject) => {
+        if (!window.Razorpay) {
+          reject(new Error('RAZORPAY_NOT_LOADED'));
+          return;
+        }
+
+        const checkout = new window.Razorpay({
+          key: razorpayKey,
+          amount: order.amount,
+          currency: order.currency || 'INR',
+          name: 'GearUp',
+          description: `${item.title} rental request`,
+          order_id: order.orderId,
+          prefill: {
+            email: user.email,
+          },
+          theme: {
+            color: '#A855F7',
+          },
+          handler: (response) => resolve(response),
+          modal: {
+            ondismiss: () => reject(new Error('PAYMENT_CANCELLED')),
+          },
+        });
+
+        checkout.open();
+      });
+
+      const verification = await postJson('/api/razorpay/verify-payment', {
+        orderId: paymentResponse.razorpay_order_id,
+        paymentId: paymentResponse.razorpay_payment_id,
+        signature: paymentResponse.razorpay_signature,
+      });
+
+      if (!verification.verified) {
+        throw new Error('PAYMENT_VERIFICATION_FAILED');
+      }
+
+      let prepaidRental: any = null;
+
       await runTransaction(db, async (transaction) => {
         const listingRef = doc(db, 'listings', item.id);
         const listingSnap = await transaction.get(listingRef);
 
         if (!listingSnap.exists() || listingSnap.data().status !== 'AVAILABLE') {
-          throw new Error('GEAR_UNAVAILABLE');
+          throw new Error('GEAR_UNAVAILABLE_AFTER_PAYMENT');
         }
 
         const rentalRef = doc(collection(db, 'rentals'));
-        transaction.set(rentalRef, {
+        const ownerResponseDeadlineAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
+        const rentalData = {
           gearId: item.id,
           gearTitle: item.title,
           renterId: user.uid,
@@ -119,9 +253,14 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           startDate: new Date(startDate),
           durationDays: finalDays,
           timeSlot: timeSlot,
-          status: 'REQUESTED',
-          totalPrice: finalTotalPrice,
+          status: 'PAID_REQUESTED',
+          totalPrice: rentalTotal,
           pricePerDay: item.pricePerDay || 0,
+          platformFee,
+          ownerAmount,
+          paymentStatus: 'paid',
+          refundStatus: 'none',
+          ownerResponseDeadlineAt,
           logisticsType: isOwnerDelivery ? 'Owner Delivery' : 'Self-Pickup',
           logisticsAdjustment: logisticsAdj,
           pickupLocation: isOwnerDelivery ? null : {
@@ -139,8 +278,22 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
             landmark: deliveryAddress.landmark.trim(),
             instructions: deliveryAddress.instructions.trim(),
           } : null,
+          payment: {
+            provider: 'razorpay',
+            orderId: paymentResponse.razorpay_order_id,
+            paymentId: paymentResponse.razorpay_payment_id,
+            signature: paymentResponse.razorpay_signature,
+            amount: rentalTotal,
+            platformFee,
+            ownerAmount,
+            status: 'paid',
+            refundStatus: 'none',
+            paidAt: serverTimestamp(),
+          },
           createdAt: serverTimestamp(),
-        });
+        };
+
+        transaction.set(rentalRef, rentalData);
 
         transaction.update(listingRef, {
           status: 'RESERVED',
@@ -151,23 +304,45 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
         transaction.set(doc(collection(db, 'notifications')), {
           userId: item.ownerId,
-          title: 'New Booking Request',
-          message: `${user.email} requested to book ${item.title} for ${finalDays} days.`,
+          title: 'Paid Booking Request',
+          message: `${user.email} paid and requested ${item.title} for ${finalDays} days. Please respond within 12 hours.`,
           type: 'request',
           read: false,
           createdAt: serverTimestamp(),
         });
+
+        prepaidRental = { id: rentalRef.id, ...rentalData };
       });
+
+      if (prepaidRental) {
+        await recordPrepaidRentalTransactions(prepaidRental);
+      }
       
-      showToast('Booking request sent! The owner will review it shortly.', 'success');
+      showToast('Payment secured. Booking request sent to the owner.', 'success');
       onClose();
     } catch (err) {
+      if ((err as Error)?.message === 'PAYMENT_CANCELLED') {
+        showToast('Payment cancelled. Booking request was not created.', 'error');
+        return;
+      }
       if ((err as Error)?.message === 'GEAR_UNAVAILABLE') {
         showToast('This gear is no longer available.', 'error');
         return;
       }
-      console.error('Booking error: ', err);
-      showToast('Failed to submit booking. Please try again.', 'error');
+      if ((err as Error)?.message === 'GEAR_UNAVAILABLE_AFTER_PAYMENT') {
+        showToast('This gear is no longer available. Please contact support if payment was captured.', 'error');
+        return;
+      }
+      if ((err as Error)?.message === 'RAZORPAY_SCRIPT_FAILED' || (err as Error)?.message === 'RAZORPAY_NOT_LOADED') {
+        showToast('Payment gateway could not load. Please try again.', 'error');
+        return;
+      }
+      if ((err as Error)?.message === 'Payment gateway not configured') {
+        showToast('Payment gateway not configured', 'error');
+        return;
+      }
+      console.error('Prepaid booking error: ', err);
+      showToast('Payment could not be completed. Booking request was not created.', 'error');
     } finally {
       setLoading(false);
     }
@@ -304,7 +479,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                            </span>
                         </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
-                          <span className="text-[14px] font-bold text-white/70">Estimated Total</span>
+                          <span className="text-[14px] font-bold text-white/70">Rental Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{Math.max(0, finalTotalPrice)}</span>
                         </div>
                       </div>
@@ -418,7 +593,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                            </span>
                         </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
-                          <span className="text-[14px] font-bold text-white/70">Estimated Total</span>
+                          <span className="text-[14px] font-bold text-white/70">Rental Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{Math.max(0, finalTotalPrice)}</span>
                         </div>
                       </div>
@@ -429,6 +604,14 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
              {/* Sticky Footer */}
              <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col-reverse sm:flex-row justify-end gap-3 pb-6 md:pb-4">
+               {step === 2 && (
+                 <div className="w-full sm:mr-auto sm:max-w-[210px] text-[11px] leading-relaxed">
+                   <p className="text-[#2DD4BF]">Platform protected payment. Owner must respond within 12 hours.</p>
+                   <p className="text-white/40 mt-1">
+                     Razorpay key: <span className={getRazorpayKey() ? 'text-[#2DD4BF]' : 'text-red-400'}>{getRazorpayKey() ? 'Loaded' : 'Missing'}</span>
+                   </p>
+                 </div>
+               )}
                <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all">Cancel</button>
                {step === 1 ? (
                  <button 
@@ -444,7 +627,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                    disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
                    className="w-full sm:w-auto px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-[160px]"
                  >
-                   {loading ? <span className="animate-pulse">Processing...</span> : 'Confirm Request'}
+                   {loading ? <span className="animate-pulse">Processing...</span> : 'Pay & Request Booking'}
                  </button>
                )}
              </div>
