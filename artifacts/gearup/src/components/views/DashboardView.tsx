@@ -511,7 +511,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           {locationLabel(activeRental) && (
                             <div className="space-y-2">
                               <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
-                                <MapPin size={12} className="text-[#A855F7]" /> Pickup: {locationLabel(activeRental)}
+                                <MapPin size={12} className="text-[#A855F7]" /> Return to: {locationLabel(activeRental)}
                               </p>
                               {rentalLocation(activeRental).lat && rentalLocation(activeRental).lng && (
                                 <a href={mapsUrl(rentalLocation(activeRental).lat, rentalLocation(activeRental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
@@ -640,10 +640,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                     e.stopPropagation(); 
                                     try {
                                       await updateDoc(doc(db, 'rentals', r.id), {
-                                        status: 'LOGISTICS_PENDING',
-                                        logisticsPendingAt: serverTimestamp(),
+                                        returnMethod: 'BORROWER_DROPOFF',
+                                        updatedAt: serverTimestamp(),
                                       });
-                                      openHandshake(r, 'owner', 'logistics'); 
+                                      openHandshake(r, 'owner', 'qr_handover');
                                     } catch (err) { console.error(err); }
                                   }}
                                   disabled={r.status === 'ACCEPTED'}
@@ -717,7 +717,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       {rental.status !== 'REQUESTED' && locationLabel(rental) && (
                         <div className="mb-4 space-y-2">
                           <p className="text-white/45 text-[12px] flex items-start gap-1.5 leading-relaxed">
-                            <MapPin size={13} className="text-[#A855F7]" /> Pickup: {locationLabel(rental)}
+                            <MapPin size={13} className="text-[#A855F7]" /> {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) ? 'Return to' : 'Pickup'}: {locationLabel(rental)}
                           </p>
                           {rentalLocation(rental).lat && rentalLocation(rental).lng && (
                             <a href={mapsUrl(rentalLocation(rental).lat, rentalLocation(rental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">

@@ -240,6 +240,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           refundStatus: 'none',
           ownerResponseDeadlineAt,
           logisticsType: 'Self-Pickup',
+          returnMethod: 'BORROWER_DROPOFF',
           pickupLocation: {
             city: locationCity,
             houseOrBuilding: locationHouse,
