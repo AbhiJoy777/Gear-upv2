@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, MapPin, Truck, Navigation } from 'lucide-react';
+import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, Navigation } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
@@ -170,7 +170,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [otherCpu, setOtherCpu] = useState('');
   const [numControllers, setNumControllers] = useState('');
 
-  const [logisticsType, setLogisticsType] = useState('Self-Pickup');
   const [houseOrBuilding, setHouseOrBuilding] = useState('');
   const [city, setCity] = useState(selectedCity || 'Hyderabad');
   const [area, setArea] = useState('');
@@ -413,8 +412,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         specs: specData,
         score: totalScore,
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
-        logisticsType,
-        logisticsAdjustment: logisticsType === 'Self-Pickup' ? -50 : 50,
+        logisticsType: 'Self-Pickup',
         city,
         location,
         updatedAt: serverTimestamp()
@@ -446,7 +444,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setGpuPlatform(''); setGpuModel(''); setVram(''); setOtherCpu(''); setNumControllers('');
     setMonSize(''); setMonRefresh(''); setMonRes('');
     setControllerPlatform(''); setControllerModel('');
-    setLogisticsType('Self-Pickup');
     setHouseOrBuilding('');
     setCity(selectedCity || 'Hyderabad');
     setArea('');
@@ -466,7 +463,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     const specs = editItem.specs || {};
     setC(editItem.category || '');
     setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
-    setLogisticsType(editItem.logisticsType === 'delivery' || editItem.logisticsType === 'Owner Delivery' ? 'Owner Delivery' : 'Self-Pickup');
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
     setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
     setHouseOrBuilding(existingLocation.houseOrBuilding || '');
@@ -569,7 +565,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
           </div>
 
           {/* Body */}
-          <div className="px-5 md:px-8 py-6 md:py-8 flex-1 min-h-0 md:min-h-[460px] flex flex-col justify-start relative z-[70] overflow-y-auto md:overflow-visible overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="px-5 md:px-8 py-6 md:py-8 flex-1 min-h-0 md:min-h-[460px] flex flex-col justify-start relative z-[70] overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="text-center space-y-1 mb-4">
@@ -741,8 +737,8 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             {step === 5 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="text-center space-y-1 mb-6">
-                   <h3 className="text-white font-bold text-[18px]">Logistics & Transport</h3>
-                   <p className="text-white/50 text-[13px]">How will the gear reach the borrower?</p>
+                   <h3 className="text-white font-bold text-[18px]">Pickup Address</h3>
+                   <p className="text-white/50 text-[13px]">Choose where the borrower will pick up your gear.</p>
                 </div>
                 
                 <div className="space-y-4">
@@ -841,27 +837,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                     </p>
                   )}
 
-                  <button onClick={() => setLogisticsType('Self-Pickup')} className={`w-full flex items-center p-4 rounded-[16px] border transition-all cursor-pointer ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/10 border-[#A855F7]' : 'bg-[#121212] border-white/10 hover:border-white/20'}`}>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/20 text-[#A855F7]' : 'bg-white/5 text-white/50'}`}>
-                       <MapPin size={24} />
-                    </div>
-                    <div className="flex flex-col text-left flex-1">
-                      <span className={`text-[15px] font-bold ${logisticsType === 'Self-Pickup' ? 'text-[#A855F7]' : 'text-white'}`}>Self-Pickup</span>
-                      <span className="text-[13px] text-white/50">Borrower travels to your hub</span>
-                    </div>
-                    <span className="text-[15px] font-bold text-white">-₹50</span>
-                  </button>
-
-                  <button onClick={() => setLogisticsType('Owner Delivery')} className={`w-full flex items-center p-4 rounded-[16px] border transition-all cursor-pointer ${logisticsType === 'Owner Delivery' ? 'bg-[#A855F7]/10 border-[#A855F7]' : 'bg-[#121212] border-white/10 hover:border-white/20'}`}>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${logisticsType === 'Owner Delivery' ? 'bg-[#A855F7]/20 text-[#A855F7]' : 'bg-white/5 text-white/50'}`}>
-                       <Truck size={24} />
-                    </div>
-                    <div className="flex flex-col text-left flex-1">
-                      <span className={`text-[15px] font-bold ${logisticsType === 'Owner Delivery' ? 'text-[#A855F7]' : 'text-white'}`}>Owner Delivery</span>
-                      <span className="text-[13px] text-white/50">You drop off the gear</span>
-                    </div>
-                    <span className="text-[15px] font-bold text-white">+₹50</span>
-                  </button>
                 </div>
               </div>
             )}
@@ -880,13 +855,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
                       <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Base Daily Rate</p>
                       <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{base}</h4>
-                      <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-2">
-                         <span className="text-white/70 font-medium">{logisticsType === 'Self-Pickup' ? 'Self-Pickup Adjustment' : 'Owner Delivery Adjustment'}</span>
-                         <span className={logisticsType === 'Self-Pickup' ? 'text-[#2DD4BF] font-medium' : 'text-[#A855F7] font-medium'}>
-                            {logisticsType === 'Self-Pickup' ? '-₹50' : '+₹50'}
-                         </span>
-                      </div>
-                      <div className="flex justify-between items-center text-[13px] mb-4">
+                      <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-4">
                          <span className="text-white/70 font-medium">Platform Fee (5%)</span>
                          <span className="text-white/70">-₹{base * 0.05}</span>
                       </div>

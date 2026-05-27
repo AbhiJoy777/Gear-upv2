@@ -4,7 +4,7 @@ import React, { useEffect, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
 import { collection, query, limit, onSnapshot, where } from 'firebase/firestore';
-import { Camera, PlusCircle, Loader2, MapPin, Truck } from 'lucide-react';
+import { Camera, PlusCircle, Loader2, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 
@@ -144,12 +144,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 <p className="text-[#707070] text-[12px] mb-4 line-clamp-2 font-medium leading-relaxed flex-1 flex flex-col gap-1.5">
                   <span>{item.category} <span className="opacity-50 mx-1">•</span> {itemCity} <span className="opacity-50 mx-1">•</span> {itemArea}</span>
 
-                  {item.logisticsType && (
-                    <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-fit max-w-full px-2 py-1 rounded-[6px] border border-white/[0.05]">
-                      {item.logisticsType === 'Owner Delivery' || item.logisticsType === 'delivery' ? <Truck size={12} className="text-[#A855F7]" /> : <MapPin size={12} className="text-[#A855F7]" />}
-                      {item.logisticsType === 'Owner Delivery' || item.logisticsType === 'delivery' ? 'Home Delivery' : 'Self-Pickup'}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1.5 text-[11px] bg-white/[0.03] text-white/70 w-fit max-w-full px-2 py-1 rounded-[6px] border border-white/[0.05]">
+                    <MapPin size={12} className="text-[#A855F7]" />
+                    Pickup only
+                  </span>
                 </p>
                   <div className="flex flex-wrap items-center justify-between gap-3 mt-auto pt-4 border-t border-white/10">
                     <div className="flex flex-col">

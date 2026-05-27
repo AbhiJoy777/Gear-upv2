@@ -1,14 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, MapPin, Truck, ArrowLeft, Clock, Zap } from 'lucide-react';
+import { X, ArrowLeft, Clock, Zap } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { recordPrepaidRentalTransactions } from '@/lib/transactions';
-import { getDefaultAddress, mapsUrl } from '@/lib/address';
-
-const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
+import { mapsUrl } from '@/lib/address';
 const DURATIONS = [
   { days: 1, label: '1 Day', labelShort: '1 Day', discountPercent: 0 },
   { days: 3, label: '3 Days', labelShort: '3 Days', discountPercent: 22 },
@@ -93,7 +91,7 @@ const postJson = async (url: string, body: Record<string, unknown>) => {
 };
 
 export default function BookingModal({ item, onClose }: { item: any, onClose: () => void }) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [duration, setDuration] = useState<number | 'Custom' | null>(null);
@@ -101,16 +99,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const [endDate, setEndDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('Morning (8 AM - 11 AM)');
   const [loading, setLoading] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    houseOrBuilding: '',
-    area: '',
-    city: item.location?.city || item.city || 'Hyderabad',
-    landmark: '',
-    instructions: '',
-    lat: null as number | null,
-    lng: null as number | null,
-    formattedAddress: '',
-  });
 
   // Compute final days based on selection or custom dates
   let finalDays = 0;
@@ -138,8 +126,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
 
   const baseTotalPrice = finalDays * itemPrice;
   const discountedBasePrice = duration !== 'Custom' && finalDays > 0 ? getDiscountedPrice(finalDays, itemPrice) : baseTotalPrice;
-  const logisticsAdj = item.logisticsAdjustment || 0;
-  const finalTotalPrice = discountedBasePrice + logisticsAdj;
+  const finalTotalPrice = discountedBasePrice;
   const pickupLocation = typeof item.location === 'object' ? item.location : {};
   const locationCity = pickupLocation.city || item.city || (typeof item.location === 'string' ? item.location : '') || 'Hyderabad';
   const locationHouse = pickupLocation.houseOrBuilding || '';
@@ -148,26 +135,8 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const locationInstructions = pickupLocation.instructions || '';
   const locationLat = typeof pickupLocation.lat === 'number' ? pickupLocation.lat : null;
   const locationLng = typeof pickupLocation.lng === 'number' ? pickupLocation.lng : null;
-  const isOwnerDelivery = item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery';
-  const deliveryReady = !isOwnerDelivery || Boolean(deliveryAddress.houseOrBuilding.trim() && deliveryAddress.area.trim() && deliveryAddress.city && deliveryAddress.landmark.trim());
-
-  useEffect(() => {
-    if (!profile || !isOwnerDelivery) return;
-    const profileAddress = getDefaultAddress(profile.addresses) || profile.address || profile.location || {};
-    setDeliveryAddress({
-      houseOrBuilding: profileAddress.houseOrBuilding || profile.houseOrBuilding || '',
-      area: profileAddress.area || profile.area || '',
-      city: profileAddress.city || profile.city || locationCity,
-      landmark: profileAddress.landmark || profile.landmark || '',
-      instructions: profileAddress.instructions || profile.deliveryInstructions || '',
-      lat: typeof profileAddress.lat === 'number' ? profileAddress.lat : null,
-      lng: typeof profileAddress.lng === 'number' ? profileAddress.lng : null,
-      formattedAddress: profileAddress.formattedAddress || '',
-    });
-  }, [profile, isOwnerDelivery, locationCity]);
-
   const handleConfirm = async () => {
-    if (!user || finalDays <= 0 || !startDate || loading || !deliveryReady) return;
+    if (!user || finalDays <= 0 || !startDate || loading) return;
     const razorpayKey = getRazorpayKey();
     console.log('Razorpay key:', razorpayKey);
     if (!razorpayKey) {
@@ -270,9 +239,8 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
           paymentStatus: 'paid',
           refundStatus: 'none',
           ownerResponseDeadlineAt,
-          logisticsType: isOwnerDelivery ? 'Owner Delivery' : 'Self-Pickup',
-          logisticsAdjustment: logisticsAdj,
-          pickupLocation: isOwnerDelivery ? null : {
+          logisticsType: 'Self-Pickup',
+          pickupLocation: {
             city: locationCity,
             houseOrBuilding: locationHouse,
             area: locationArea,
@@ -284,17 +252,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
             source: pickupLocation.source || 'manual',
             serviceRadiusKm: pickupLocation.serviceRadiusKm || 50,
           },
-          deliveryLocation: isOwnerDelivery ? {
-            city: deliveryAddress.city,
-            houseOrBuilding: deliveryAddress.houseOrBuilding.trim(),
-            area: deliveryAddress.area.trim(),
-            landmark: deliveryAddress.landmark.trim(),
-            instructions: deliveryAddress.instructions.trim(),
-            lat: deliveryAddress.lat,
-            lng: deliveryAddress.lng,
-            formattedAddress: deliveryAddress.formattedAddress,
-            source: deliveryAddress.lat && deliveryAddress.lng ? 'saved_address' : 'manual',
-          } : null,
           payment: {
             provider: 'razorpay',
             orderId: paymentResponse.razorpay_order_id,
@@ -368,7 +325,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const getPickupDateStr = () => {
     if (!startDate || finalDays <= 0) return '';
     const start = new Date(startDate);
-    // Buffer days: Start = Delivery, Middle = Use days, End = Return (+ 1 day)
+    // Buffer days: Start = Pickup, Middle = Use days, End = Return (+ 1 day)
     start.setDate(start.getDate() + finalDays + 1); 
     return start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   };
@@ -405,22 +362,20 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
               <h2 className="text-[20px] md:text-[24px] font-bold text-white mb-2 tracking-tight line-clamp-2 md:line-clamp-none">{item.title}</h2>
               <p className="text-[14px] text-white/50 mb-6">{item.category} • {locationCity} • {locationArea}</p>
 
-              {!isOwnerDelivery && (
-                <div className="p-4 bg-[#121212] border border-[#222] rounded-[18px] mb-6">
-                  <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
-                  {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
-                  <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
-                  <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
-                  {locationInstructions && (
-                    <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
-                  )}
-                  {locationLat && locationLng && (
-                    <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
-                      Open in Google Maps
-                    </a>
-                  )}
-                </div>
-              )}
+              <div className="p-4 bg-[#121212] border border-[#222] rounded-[18px] mb-6">
+                <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
+                {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
+                <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
+                <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
+                {locationInstructions && (
+                  <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
+                )}
+                {locationLat && locationLng && (
+                  <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                    Open in Google Maps
+                  </a>
+                )}
+              </div>
 
               <div className="space-y-4 pt-6 mt-auto border-t border-[#222]">
                  <h3 className="text-[12px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
@@ -428,7 +383,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                    Hardware Guidelines
                  </h3>
                  <ul className="text-[13px] text-white/70 space-y-2 list-disc list-inside">
-                    <li>Requires valid ID on delivery.</li>
+                    <li>Requires valid ID at pickup.</li>
                     <li>Inspect condition upon receipt.</li>
                     <li>Return with all cables/accessories.</li>
                  </ul>
@@ -492,14 +447,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                               ₹{discountedBasePrice}
                            </span>
                         </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                           <span className="text-white/70 flex items-center gap-1.5">
-                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
-                           </span>
-                           <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
-                              {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
-                           </span>
-                        </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
                           <span className="text-[14px] font-bold text-white/70">Rental Total</span>
                           <span className="text-[28px] font-black text-white tracking-tight">₹{Math.max(0, finalTotalPrice)}</span>
@@ -511,7 +458,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                   <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                        <div>
-                         <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">{isOwnerDelivery ? 'Delivery Date' : 'Pickup Date'}</label>
+                         <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider block mb-2">Pickup Date</label>
                          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[16px] p-4 text-[14px] focus:border-[#A855F7] outline-none transition-colors shadow-inner [color-scheme:dark]" />
                        </div>
                        
@@ -541,52 +488,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                       </div>
                     </div>
 
-                    {isOwnerDelivery ? (
-                      <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px] space-y-3">
-                        <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider">Delivery Address</p>
-                        <input
-                          value={deliveryAddress.houseOrBuilding}
-                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, houseOrBuilding: e.target.value })}
-                          placeholder="House / building"
-                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                        />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <input
-                            value={deliveryAddress.area}
-                            onChange={(e) => setDeliveryAddress({ ...deliveryAddress, area: e.target.value })}
-                            placeholder="Area / locality"
-                            className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                          />
-                          <select
-                            value={deliveryAddress.city}
-                            onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
-                            className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none"
-                          >
-                            {CITIES.map((cityName) => (
-                              <option key={cityName} value={cityName}>{cityName}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <input
-                          value={deliveryAddress.landmark}
-                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, landmark: e.target.value })}
-                          placeholder="Landmark"
-                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
-                        />
-                        <textarea
-                          value={deliveryAddress.instructions}
-                          onChange={(e) => setDeliveryAddress({ ...deliveryAddress, instructions: e.target.value })}
-                          placeholder="Delivery instructions"
-                          rows={2}
-                          className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
-                        />
-                        {deliveryAddress.lat && deliveryAddress.lng && (
-                          <a href={mapsUrl(deliveryAddress.lat, deliveryAddress.lng)} target="_blank" rel="noreferrer" className="inline-flex text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
-                            Open in Google Maps
-                          </a>
-                        )}
-                      </div>
-                    ) : (
                       <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
                         <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Pickup Point</p>
                         {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
@@ -598,7 +499,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                           </a>
                         )}
                       </div>
-                    )}
 
                     {startDate && duration !== 'Custom' && (
                       <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
@@ -614,14 +514,6 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                            <span className="text-white/70">Base ({finalDays} Days)</span>
                            <span className="font-medium text-white flex items-center gap-2">
                               ₹{baseTotalPrice}
-                           </span>
-                        </div>
-                        <div className="flex justify-between items-center text-[13px]">
-                           <span className="text-white/70 flex items-center gap-1.5">
-                             {isOwnerDelivery ? 'Delivery Fee' : 'Self-Pickup Adjustment'}
-                           </span>
-                           <span className={`font-medium ${logisticsAdj > 0 ? 'text-[#A855F7]' : 'text-[#2DD4BF]'}`}>
-                              {logisticsAdj > 0 ? `+₹${logisticsAdj}` : `-₹${Math.abs(logisticsAdj)}`}
                            </span>
                         </div>
                         <div className="pt-4 mt-2 border-t border-[#333] flex justify-between items-center">
@@ -657,7 +549,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                  ) : (
                    <button
                      onClick={handleConfirm}
-                     disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
+                     disabled={finalDays <= 0 || !startDate || loading}
                      className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-0 sm:min-w-[160px] whitespace-nowrap"
                    >
                      {loading ? <span className="animate-pulse">Processing...</span> : 'Pay & Request Booking'}

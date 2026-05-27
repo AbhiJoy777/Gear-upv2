@@ -165,7 +165,7 @@ const ProfileView = memo(() => {
               Address Book
             </h3>
             <p className="text-[#707070] text-[12px] mt-1">
-              {defaultAddress ? 'Your default pickup and delivery address is ready.' : 'Add one default address for faster listings and bookings.'}
+              {defaultAddress ? 'Your default pickup address is ready.' : 'Add one default address for faster listings and bookings.'}
             </p>
           </div>
           <button
@@ -179,7 +179,7 @@ const ProfileView = memo(() => {
         {addresses.length === 0 ? (
           <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-5">
             <p className="text-white font-semibold text-[14px]">No default address yet</p>
-            <p className="text-white/45 text-[12px] mt-1">Add one address so GearUp can prefill listing pickup and delivery details.</p>
+            <p className="text-white/45 text-[12px] mt-1">Add one address so GearUp can prefill listing pickup details.</p>
           </div>
         ) : (
           <div className="grid gap-3">
