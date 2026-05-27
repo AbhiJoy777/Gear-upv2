@@ -42,7 +42,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const HISTORY_RENTAL_STATUSES = ['RETURNED', 'DECLINED', 'CANCELLED'];
 
   const canChat = (status: string) =>
-    ['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
+    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING', 'ACTIVE_RENTAL', 'RETURN_DUE'].includes(status);
 
   const locationLabel = (rental: any) => {
     const location = rental.pickupLocation || rental.deliveryLocation || {};
@@ -736,7 +736,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 flex flex-wrap items-center gap-1.5 font-medium tracking-wide">
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
-                      {rental.status !== 'REQUESTED' && locationLabel(rental) && (
+                      {!['REQUESTED', 'PAID_REQUESTED'].includes(rental.status) && locationLabel(rental) && (
                         <div className="mb-4 space-y-2">
                           <p className="text-white/45 text-[12px] flex items-start gap-1.5 leading-relaxed">
                             <MapPin size={13} className="text-[#A855F7]" /> {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) ? 'Return to owner address' : 'Pickup at owner address'}: {locationLabel(rental)}
@@ -768,6 +768,17 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       <div className="mb-6">
                         <RentalTimelineSummary rental={rental} />
                       </div>
+
+                      {rental.status === 'PAID_REQUESTED' && (
+                        <div className="mb-6 p-4 bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 rounded-[16px]">
+                          <p className="text-[#2DD4BF] text-[12px] font-bold uppercase tracking-wider">Waiting for owner response</p>
+                          <p className="text-white/55 text-[12px] mt-1 leading-relaxed">
+                            {hasOwnerResponseDeadlinePassed(rental)
+                              ? 'Refund request available because the owner has not responded.'
+                              : 'Owner must accept within 12 hours.'}
+                          </p>
+                        </div>
+                      )}
                       
                       {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) && rental.actualStartTime && (
                         <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
@@ -876,7 +887,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               </button>
                             )}
 
-                            {['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
+                            {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
                               rental.status === 'PAYMENT_PENDING' ? (
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
@@ -888,7 +899,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openRentalMaps(rental); }}
                                   className={`w-full font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 ${
-                                    ['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING'].includes(rental.status)
+                                    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING'].includes(rental.status)
                                       ? 'bg-[#F97316] hover:bg-[#FB923C] text-white' 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
