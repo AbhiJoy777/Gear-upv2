@@ -603,33 +603,35 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
              </div>
 
              {/* Sticky Footer */}
-             <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col-reverse sm:flex-row justify-end gap-3 pb-6 md:pb-4">
+             <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col gap-3 pb-6 md:pb-4">
                {step === 2 && (
-                 <div className="w-full sm:mr-auto sm:max-w-[210px] text-[11px] leading-relaxed">
+                 <div className="w-full text-[11px] leading-relaxed">
                    <p className="text-[#2DD4BF]">Platform protected payment. Owner must respond within 12 hours.</p>
                    <p className="text-white/40 mt-1">
                      Razorpay key: <span className={getRazorpayKey() ? 'text-[#2DD4BF]' : 'text-red-400'}>{getRazorpayKey() ? 'Loaded' : 'Missing'}</span>
                    </p>
                  </div>
                )}
-               <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all">Cancel</button>
-               {step === 1 ? (
-                 <button 
-                   onClick={() => setStep(2)} 
-                   disabled={duration === null} 
-                   className="w-full sm:w-auto px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
-                 >
-                   Next: Choose Dates
-                 </button>
-               ) : (
-                 <button 
-                   onClick={handleConfirm} 
-                   disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
-                   className="w-full sm:w-auto px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-[160px]"
-                 >
-                   {loading ? <span className="animate-pulse">Processing...</span> : 'Pay & Request Booking'}
-                 </button>
-               )}
+               <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                 <button onClick={onClose} className="w-full sm:w-auto px-6 py-3 text-white/50 hover:text-white font-bold text-[13px] active:scale-95 transition-all rounded-[24px] hover:bg-white/5">Cancel</button>
+                 {step === 1 ? (
+                   <button
+                     onClick={() => setStep(2)}
+                     disabled={duration === null}
+                     className="w-full sm:w-auto px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95"
+                   >
+                     Next: Choose Dates
+                   </button>
+                 ) : (
+                   <button
+                     onClick={handleConfirm}
+                     disabled={finalDays <= 0 || !startDate || loading || !deliveryReady}
+                     className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-0 sm:min-w-[160px] whitespace-nowrap"
+                   >
+                     {loading ? <span className="animate-pulse">Processing...</span> : 'Pay & Request Booking'}
+                   </button>
+                 )}
+               </div>
              </div>
            </div>
          </motion.div>

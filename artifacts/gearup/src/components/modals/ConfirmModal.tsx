@@ -5,11 +5,12 @@ interface ConfirmModalProps {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export default function ConfirmModal({ open, title, message, confirmLabel = 'Delete', onConfirm, onCancel }: ConfirmModalProps) {
+export default function ConfirmModal({ open, title, message, confirmLabel = 'Delete', cancelLabel = 'Cancel', onConfirm, onCancel }: ConfirmModalProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -35,7 +36,7 @@ export default function ConfirmModal({ open, title, message, confirmLabel = 'Del
                 onClick={onCancel}
                 className="px-5 py-2.5 text-[13px] font-semibold text-white/50 hover:text-white transition-colors bg-transparent border-none cursor-pointer rounded-[12px] hover:bg-white/5"
               >
-                Cancel
+                {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}

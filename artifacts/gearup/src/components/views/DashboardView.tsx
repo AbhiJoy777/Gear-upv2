@@ -30,6 +30,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [rentalRole, setRentalRole] = useState<'owner' | 'renter'>('owner');
   const [initialHandshakeStep, setInitialHandshakeStep] = useState<any>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ rental: any; role: 'owner' | 'renter' } | null>(null);
   const [chatRental, setChatRental] = useState<any>(null);
   const [reportContext, setReportContext] = useState<any>(null);
   const [recordingReturnProofId, setRecordingReturnProofId] = useState<string | null>(null);
@@ -577,7 +578,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 
                                 {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); cancelRental(r, 'owner'); }}
+                                    onClick={(e) => { e.stopPropagation(); setCancelTarget({ rental: r, role: 'owner' }); }}
                                     className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
                                   >
                                     <Ban size={14} /> Cancel Renting
@@ -814,7 +815,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
                             {CANCELLABLE_RENTAL_STATUSES.includes(rental.status) && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); cancelRental(rental, 'renter'); }}
+                                onClick={(e) => { e.stopPropagation(); setCancelTarget({ rental, role: 'renter' }); }}
                                 className="w-full bg-red-500/10 text-red-400 font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
                               >
                                 <Ban size={16} /> Cancel Borrowing
@@ -914,6 +915,21 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             showToast('Listing deleted.', 'success');
           } catch (err) {
             showToast('Failed to delete listing.', 'error');
+          }
+        }}
+      />
+      <ConfirmModal
+        open={cancelTarget !== null}
+        title="Cancel booking?"
+        message="This action will cancel the rental request and cannot be undone."
+        cancelLabel="No"
+        confirmLabel="Yes, Cancel"
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={async () => {
+          const target = cancelTarget;
+          setCancelTarget(null);
+          if (target) {
+            await cancelRental(target.rental, target.role);
           }
         }}
       />

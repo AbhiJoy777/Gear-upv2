@@ -519,7 +519,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
           </div>
 
           {/* Body */}
-          <div className="px-5 md:px-8 py-6 md:py-8 flex-1 md:min-h-[460px] flex flex-col justify-start relative z-[70]">
+          <div className="px-5 md:px-8 py-6 md:py-8 flex-1 min-h-0 md:min-h-[460px] flex flex-col justify-start relative z-[70] overflow-y-auto md:overflow-visible overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             {step === 1 && (
               <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="text-center space-y-1 mb-4">
