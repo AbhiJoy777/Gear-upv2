@@ -13,6 +13,7 @@ import ChatModal from '../modals/ChatModal';
 import ReportIssueModal from '../modals/ReportIssueModal';
 import { createTransaction } from '@/lib/transactions';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+import { mapsUrl } from '@/lib/address';
 
 
 type Tab = 'listings' | 'rentals' | 'history';
@@ -53,6 +54,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     const landmark = location.landmark || '';
     return [house, area, city, landmark].filter(Boolean).join(' • ');
   };
+
+  const rentalLocation = (rental: any) =>
+    isOwnerDelivery(rental.logisticsType) ? rental.deliveryLocation || {} : rental.pickupLocation || {};
 
   const dedupeRentalCards = (items: any[]) => {
     const seen = new Set<string>();
@@ -507,9 +511,16 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                             {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
                           </p>
                           {locationLabel(activeRental) && (
-                          <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
-                              <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
-                            </p>
+                            <div className="space-y-2">
+                              <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
+                                <MapPin size={12} className="text-[#A855F7]" /> {isOwnerDelivery(activeRental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(activeRental)}
+                              </p>
+                              {rentalLocation(activeRental).lat && rentalLocation(activeRental).lng && (
+                                <a href={mapsUrl(rentalLocation(activeRental).lat, rentalLocation(activeRental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                                  Open in Google Maps
+                                </a>
+                              )}
+                            </div>
                           )}
                           {activeRental.returnProofRecorded && (
                             <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3">
@@ -572,7 +583,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 <div className="py-2 border-b border-white/5 mb-1">
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                   {locationLabel(r) && (
-                                    <p className="text-[11px] text-white/45 text-center mt-1 break-words">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
+                                    <div className="text-center mt-1">
+                                      <p className="text-[11px] text-white/45 break-words">{isOwnerDelivery(r.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(r)}</p>
+                                      {rentalLocation(r).lat && rentalLocation(r).lng && (
+                                        <a href={mapsUrl(rentalLocation(r).lat, rentalLocation(r).lng)} target="_blank" rel="noreferrer" className="inline-flex mt-1 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                                          Open in Google Maps
+                                        </a>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                                 
@@ -699,9 +717,16 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                         Owner: <span className="text-white/80">{rental.ownerEmail || 'GearUp Partner'}</span>
                       </p>
                       {rental.status !== 'REQUESTED' && locationLabel(rental) && (
-                        <p className="text-white/45 text-[12px] mb-4 flex items-start gap-1.5 leading-relaxed">
-                          <MapPin size={13} className="text-[#A855F7]" /> {isOwnerDelivery(rental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(rental)}
-                        </p>
+                        <div className="mb-4 space-y-2">
+                          <p className="text-white/45 text-[12px] flex items-start gap-1.5 leading-relaxed">
+                            <MapPin size={13} className="text-[#A855F7]" /> {isOwnerDelivery(rental.logisticsType) ? 'Delivery' : 'Pickup'}: {locationLabel(rental)}
+                          </p>
+                          {rentalLocation(rental).lat && rentalLocation(rental).lng && (
+                            <a href={mapsUrl(rentalLocation(rental).lat, rentalLocation(rental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                              Open in Google Maps
+                            </a>
+                          )}
+                        </div>
                       )}
                       
                       <div className="py-3 border-y border-white/5 mb-6 flex flex-wrap items-center justify-between gap-2">

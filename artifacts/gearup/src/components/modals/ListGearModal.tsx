@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, MapPin, Truck } from 'lucide-react';
+import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, MapPin, Truck, Navigation } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const CATS = [
@@ -150,7 +151,7 @@ function detectGpuPlatform(model: string): string {
 }
 
 export default function ListGearModal({ isOpen, onClose, editItem, selectedCity }: any) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [load, setLoad] = useState(false);
@@ -175,6 +176,10 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
   const [pickupInstructions, setPickupInstructions] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [locationSource, setLocationSource] = useState<'manual' | 'saved_address' | 'current_location'>('manual');
+  const [locating, setLocating] = useState(false);
 
   const [incMouse, setIncMouse] = useState(false);
   const [incKeyboard, setIncKeyboard] = useState(false);
@@ -187,6 +192,41 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
   const [controllerPlatform, setControllerPlatform] = useState('');
   const [controllerModel, setControllerModel] = useState('');
+  const defaultAddress = getDefaultAddress(profile?.addresses || []);
+
+  const applyAddress = (address: GearUpAddress, source: 'saved_address' | 'current_location') => {
+    setHouseOrBuilding(address.houseOrBuilding || '');
+    setCity(address.city || selectedCity || 'Hyderabad');
+    setArea(address.area || '');
+    setLandmark(address.landmark || '');
+    setPickupInstructions(address.instructions || '');
+    setLat(typeof address.lat === 'number' ? address.lat : null);
+    setLng(typeof address.lng === 'number' ? address.lng : null);
+    setLocationSource(source);
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('Current location is not supported on this browser.', 'error');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLat(position.coords.latitude);
+        setLng(position.coords.longitude);
+        setLocationSource('current_location');
+        showToast('Location captured. Fill the address details to publish.', 'success');
+        setLocating(false);
+      },
+      () => {
+        showToast('Location permission denied. Enter the address manually.', 'error');
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const title = useMemo(() => {
     if (!c) return 'Gear Title';
@@ -359,6 +399,10 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         area: area.trim(),
         landmark: landmark.trim(),
         instructions: pickupInstructions.trim(),
+        lat,
+        lng,
+        formattedAddress: formatAddress({ city, houseOrBuilding: houseOrBuilding.trim(), area: area.trim(), landmark: landmark.trim() }),
+        source: locationSource,
         serviceRadiusKm: 50,
       };
 
@@ -408,6 +452,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea('');
     setLandmark('');
     setPickupInstructions('');
+    setLat(null);
+    setLng(null);
+    setLocationSource('manual');
 
     setImgs([]); 
   };
@@ -426,6 +473,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea(existingLocation.area || '');
     setLandmark(existingLocation.landmark || '');
     setPickupInstructions(existingLocation.instructions || '');
+    setLat(typeof existingLocation.lat === 'number' ? existingLocation.lat : null);
+    setLng(typeof existingLocation.lng === 'number' ? existingLocation.lng : null);
+    setLocationSource(existingLocation.source || 'manual');
     if (['Laptops', 'Desktops'].includes(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
@@ -696,12 +746,41 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                 </div>
                 
                 <div className="space-y-4">
+                  {defaultAddress && (
+                    <div className="bg-[#0A0A0A] border border-white/10 rounded-[18px] p-4">
+                      <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Default Address</p>
+                      <p className="text-white text-[13px] font-bold">{defaultAddress.label}</p>
+                      <p className="text-white/55 text-[12px] mt-1 leading-relaxed">{defaultAddress.formattedAddress || formatAddress(defaultAddress)}</p>
+                      <button
+                        onClick={() => applyAddress(defaultAddress, 'saved_address')}
+                        className="mt-3 w-full bg-[#A855F7]/10 border border-[#A855F7]/20 text-[#A855F7] font-bold py-2.5 rounded-[12px] text-[12px] hover:bg-[#A855F7]/20"
+                      >
+                        Use this address
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={useCurrentLocation}
+                    disabled={locating}
+                    className="w-full bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] font-bold py-3 rounded-[16px] text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <Navigation size={16} />
+                    {locating ? 'Getting location...' : 'Use Current Location'}
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-px bg-white/10 flex-1" />
+                    <span className="text-[10px] text-white/30 font-bold uppercase tracking-wider">Add New Address</span>
+                    <div className="h-px bg-white/10 flex-1" />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
                       <select
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) => { setCity(e.target.value); setLocationSource(locationSource === 'current_location' ? 'current_location' : 'manual'); }}
                         className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none cursor-pointer"
                       >
                         {CITIES.map((cityName) => (
@@ -716,7 +795,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">House / Building</label>
                       <input
                         value={houseOrBuilding}
-                        onChange={(e) => setHouseOrBuilding(e.target.value)}
+                        onChange={(e) => { setHouseOrBuilding(e.target.value); setLocationSource(locationSource === 'current_location' ? 'current_location' : 'manual'); }}
                         placeholder="Flat 402, GearUp Towers"
                         className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                       />
@@ -728,7 +807,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Area / Locality</label>
                       <input
                         value={area}
-                        onChange={(e) => setArea(e.target.value)}
+                        onChange={(e) => { setArea(e.target.value); setLocationSource(locationSource === 'current_location' ? 'current_location' : 'manual'); }}
                         placeholder="Banjara Hills"
                         className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                       />
@@ -738,7 +817,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Landmark</label>
                       <input
                         value={landmark}
-                        onChange={(e) => setLandmark(e.target.value)}
+                        onChange={(e) => { setLandmark(e.target.value); setLocationSource(locationSource === 'current_location' ? 'current_location' : 'manual'); }}
                         placeholder="Near metro gate / main road"
                         className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
                       />
@@ -749,12 +828,18 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                     <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Pickup Instructions</label>
                     <textarea
                       value={pickupInstructions}
-                      onChange={(e) => setPickupInstructions(e.target.value)}
+                      onChange={(e) => { setPickupInstructions(e.target.value); setLocationSource(locationSource === 'current_location' ? 'current_location' : 'manual'); }}
                       placeholder="Share parking, security, or call-ahead details"
                       rows={3}
                       className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
                     />
                   </div>
+
+                  {lat && lng && (
+                    <p className="text-[11px] text-[#2DD4BF] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 rounded-[12px] p-3">
+                      Location coordinates attached: {lat.toFixed(5)}, {lng.toFixed(5)}
+                    </p>
+                  )}
 
                   <button onClick={() => setLogisticsType('Self-Pickup')} className={`w-full flex items-center p-4 rounded-[16px] border transition-all cursor-pointer ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/10 border-[#A855F7]' : 'bg-[#121212] border-white/10 hover:border-white/20'}`}>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mr-4 transition-colors ${logisticsType === 'Self-Pickup' ? 'bg-[#A855F7]/20 text-[#A855F7]' : 'bg-white/5 text-white/50'}`}>

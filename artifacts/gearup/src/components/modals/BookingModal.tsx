@@ -6,6 +6,7 @@ import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { recordPrepaidRentalTransactions } from '@/lib/transactions';
+import { getDefaultAddress, mapsUrl } from '@/lib/address';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const DURATIONS = [
@@ -106,6 +107,9 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
     city: item.location?.city || item.city || 'Hyderabad',
     landmark: '',
     instructions: '',
+    lat: null as number | null,
+    lng: null as number | null,
+    formattedAddress: '',
   });
 
   // Compute final days based on selection or custom dates
@@ -142,18 +146,23 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const locationArea = pickupLocation.area || 'Area pending';
   const locationLandmark = pickupLocation.landmark || 'Landmark pending';
   const locationInstructions = pickupLocation.instructions || '';
+  const locationLat = typeof pickupLocation.lat === 'number' ? pickupLocation.lat : null;
+  const locationLng = typeof pickupLocation.lng === 'number' ? pickupLocation.lng : null;
   const isOwnerDelivery = item.logisticsType === 'delivery' || item.logisticsType === 'Owner Delivery';
   const deliveryReady = !isOwnerDelivery || Boolean(deliveryAddress.houseOrBuilding.trim() && deliveryAddress.area.trim() && deliveryAddress.city && deliveryAddress.landmark.trim());
 
   useEffect(() => {
     if (!profile || !isOwnerDelivery) return;
-    const profileAddress = profile.address || profile.location || {};
+    const profileAddress = getDefaultAddress(profile.addresses) || profile.address || profile.location || {};
     setDeliveryAddress({
       houseOrBuilding: profileAddress.houseOrBuilding || profile.houseOrBuilding || '',
       area: profileAddress.area || profile.area || '',
       city: profileAddress.city || profile.city || locationCity,
       landmark: profileAddress.landmark || profile.landmark || '',
       instructions: profileAddress.instructions || profile.deliveryInstructions || '',
+      lat: typeof profileAddress.lat === 'number' ? profileAddress.lat : null,
+      lng: typeof profileAddress.lng === 'number' ? profileAddress.lng : null,
+      formattedAddress: profileAddress.formattedAddress || '',
     });
   }, [profile, isOwnerDelivery, locationCity]);
 
@@ -269,6 +278,10 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
             area: locationArea,
             landmark: locationLandmark,
             instructions: locationInstructions,
+            lat: locationLat,
+            lng: locationLng,
+            formattedAddress: pickupLocation.formattedAddress || '',
+            source: pickupLocation.source || 'manual',
             serviceRadiusKm: pickupLocation.serviceRadiusKm || 50,
           },
           deliveryLocation: isOwnerDelivery ? {
@@ -277,6 +290,10 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
             area: deliveryAddress.area.trim(),
             landmark: deliveryAddress.landmark.trim(),
             instructions: deliveryAddress.instructions.trim(),
+            lat: deliveryAddress.lat,
+            lng: deliveryAddress.lng,
+            formattedAddress: deliveryAddress.formattedAddress,
+            source: deliveryAddress.lat && deliveryAddress.lng ? 'saved_address' : 'manual',
           } : null,
           payment: {
             provider: 'razorpay',
@@ -396,6 +413,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                   <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
                   {locationInstructions && (
                     <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
+                  )}
+                  {locationLat && locationLng && (
+                    <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                      Open in Google Maps
+                    </a>
                   )}
                 </div>
               )}
@@ -558,6 +580,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                           rows={2}
                           className="w-full bg-[#1A1A1A] text-white border border-[#333] rounded-[14px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
                         />
+                        {deliveryAddress.lat && deliveryAddress.lng && (
+                          <a href={mapsUrl(deliveryAddress.lat, deliveryAddress.lng)} target="_blank" rel="noreferrer" className="inline-flex text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                            Open in Google Maps
+                          </a>
+                        )}
                       </div>
                     ) : (
                       <div className="p-4 bg-[#121212] border border-[#222] rounded-[16px]">
@@ -565,6 +592,11 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
                         <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
                         <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
+                        {locationLat && locationLng && (
+                          <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                            Open in Google Maps
+                          </a>
+                        )}
                       </div>
                     )}
 

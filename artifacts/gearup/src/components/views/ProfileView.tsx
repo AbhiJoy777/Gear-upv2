@@ -2,12 +2,14 @@ import React, { memo, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save } from 'lucide-react';
+import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
+import AddressModal from '../modals/AddressModal';
+import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
 
 const VERIFICATION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -30,6 +32,8 @@ const ProfileView = memo(() => {
   const [editOpen, setEditOpen] = useState(false);
   const [verificationOpen, setVerificationOpen] = useState(false);
   const [phoneVerificationOpen, setPhoneVerificationOpen] = useState(false);
+  const [addressOpen, setAddressOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<GearUpAddress | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -72,6 +76,8 @@ const ProfileView = memo(() => {
 
   const verificationStatus = profile?.verificationStatus || 'not_started';
   const phoneVerified = !!profile?.phoneVerified;
+  const addresses: GearUpAddress[] = profile?.addresses || [];
+  const defaultAddress = getDefaultAddress(addresses);
   const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
   const verificationAction =
     verificationStatus === 'not_started'
@@ -87,6 +93,22 @@ const ProfileView = memo(() => {
     { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
+
+  const setDefaultAddress = async (addressId: string) => {
+    if (!user) return;
+    try {
+      const nextAddresses = addresses.map((address) => ({ ...address, isDefault: address.id === addressId }));
+      const selectedAddress = nextAddresses.find((address) => address.id === addressId);
+      await updateDoc(doc(db, 'users', user.uid), {
+        addresses: nextAddresses,
+        city: selectedAddress?.city || profile?.city || 'Hyderabad',
+      });
+      showToast('Default address updated.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update default address.', 'error');
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 md:p-12 max-w-4xl mx-auto space-y-8">
@@ -129,6 +151,78 @@ const ProfileView = memo(() => {
           <Pencil size={16} />
           Edit Profile
         </button>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-[#121212] rounded-[28px] border-[0.5px] border-white/[0.04] p-5 sm:p-6 space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="text-[16px] font-bold text-white tracking-tight flex items-center gap-2">
+              <MapPin size={18} className="text-[#A855F7]" />
+              Address Book
+            </h3>
+            <p className="text-[#707070] text-[12px] mt-1">
+              {defaultAddress ? 'Your default pickup and delivery address is ready.' : 'Add one default address for faster listings and bookings.'}
+            </p>
+          </div>
+          <button
+            onClick={() => { setEditingAddress(null); setAddressOpen(true); }}
+            className="w-full sm:w-auto px-4 py-2.5 bg-[#A855F7] text-white font-bold rounded-[18px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#9333EA] transition-all"
+          >
+            <Plus size={15} /> Add Address
+          </button>
+        </div>
+
+        {addresses.length === 0 ? (
+          <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-5">
+            <p className="text-white font-semibold text-[14px]">No default address yet</p>
+            <p className="text-white/45 text-[12px] mt-1">Add one address so GearUp can prefill listing pickup and delivery details.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {addresses.map((address) => {
+              const Icon = address.label === 'Work' ? Briefcase : Home;
+              return (
+                <div key={address.id} className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4 flex flex-col sm:flex-row sm:items-start gap-3">
+                  <div className="w-10 h-10 rounded-[14px] bg-[#A855F7]/10 flex items-center justify-center shrink-0">
+                    <Icon size={17} className="text-[#A855F7]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-white text-[14px] font-bold">{address.label}</p>
+                      {address.isDefault && (
+                        <span className="text-[10px] text-[#2DD4BF] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 rounded-full px-2 py-0.5 font-bold uppercase">Default</span>
+                      )}
+                    </div>
+                    <p className="text-white/60 text-[12px] mt-1 leading-relaxed">{address.formattedAddress || [address.houseOrBuilding, address.area, address.city, address.landmark].filter(Boolean).join(' • ')}</p>
+                    {address.instructions && <p className="text-white/35 text-[11px] mt-1">{address.instructions}</p>}
+                    {address.lat && address.lng && (
+                      <a href={mapsUrl(address.lat, address.lng)} target="_blank" rel="noreferrer" className="inline-flex mt-2 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                        Open in Google Maps
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex sm:flex-col gap-2">
+                    {!address.isDefault && (
+                      <button onClick={() => setDefaultAddress(address.id)} className="flex-1 sm:flex-none px-3 py-2 bg-white/5 text-white/70 rounded-[12px] text-[11px] font-bold hover:bg-white/10">
+                        Set Default
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setEditingAddress(address); setAddressOpen(true); }}
+                      className="flex-1 sm:flex-none px-3 py-2 bg-white/5 text-white/70 rounded-[12px] text-[11px] font-bold hover:bg-white/10"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </motion.div>
 
       <div className="grid gap-4">
@@ -276,6 +370,11 @@ const ProfileView = memo(() => {
           <PhoneVerificationModal onClose={() => setPhoneVerificationOpen(false)} />
         )}
       </AnimatePresence>
+      <AddressModal
+        open={addressOpen}
+        editAddress={editingAddress}
+        onClose={() => { setAddressOpen(false); setEditingAddress(null); }}
+      />
     </div>
   );
 });
