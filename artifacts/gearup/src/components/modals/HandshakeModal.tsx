@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+import { mapsUrl } from '@/lib/address';
 
 interface HandshakeModalProps {
   rental: any;
@@ -25,6 +26,17 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [loading, setLoading] = useState(false);
   const paymentSecured = rental.payment?.status === 'paid' || rental.paymentStatus === 'paid';
   const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || window.__GEARUP_CONFIG__?.razorpayKey;
+  const pickupLocation = rental.pickupLocation || rental.deliveryLocation || {};
+  const addressLabel = pickupLocation.formattedAddress || [pickupLocation.houseOrBuilding, pickupLocation.area, pickupLocation.city, pickupLocation.landmark].filter(Boolean).join(' • ');
+  const navigationUrl = typeof pickupLocation.lat === 'number' && typeof pickupLocation.lng === 'number'
+    ? mapsUrl(pickupLocation.lat, pickupLocation.lng)
+    : addressLabel
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressLabel)}`
+      : '';
+  const isReturnPhase = rental.status === 'RETURN_DUE';
+  const navigationLabel = isReturnPhase
+    ? userRole === 'owner' ? 'Track Return' : 'Navigate to Return Address'
+    : userRole === 'owner' ? 'Track Borrower' : 'Navigate to Pickup';
 
   console.log('Razorpay key:', razorpayKey);
   
@@ -175,8 +187,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              {step === 'tracking' && (
                <motion.div key="tracking" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                   <div className="text-center space-y-2">
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">Live Tracking</h3>
-                    <p className="text-[13px] text-white/50">Handover coordinates in real-time.</p>
+                    <h3 className="text-[20px] font-bold text-white tracking-tight">{isReturnPhase ? 'Return to Pickup Address' : 'Pickup at Owner Address'}</h3>
+                    <p className="text-[13px] text-white/50">{isReturnPhase ? 'Borrower returns gear to the owner pickup address.' : 'Borrower travels to the owner pickup address.'}</p>
                   </div>
 
                   <div className="h-[300px] bg-[#0A0A0A] rounded-[24px] border border-[#222] relative overflow-hidden flex flex-col items-center justify-center gap-4 group">
@@ -188,8 +200,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                            <MapPin size={32} />
                         </div>
                         <div className="text-center">
-                           <p className="text-white font-bold text-[14px]">Route Active</p>
-                           <p className="text-white/50 text-[12px]">Est. time: 12 mins</p>
+                           <p className="text-white font-bold text-[14px]">{isReturnPhase ? 'Return Address' : 'Pickup Address'}</p>
+                           <p className="text-white/50 text-[12px] px-6">{addressLabel || 'Address pending'}</p>
                         </div>
                      </div>
 
@@ -199,6 +211,13 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                         </div>
                      </div>
                   </div>
+                  <button
+                    onClick={() => navigationUrl && window.open(navigationUrl, '_blank', 'noopener,noreferrer')}
+                    disabled={!navigationUrl}
+                    className="w-full py-3.5 bg-[#F97316] hover:bg-[#FB923C] text-white font-bold rounded-[16px] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <MapPin size={18} /> {navigationLabel}
+                  </button>
                </motion.div>
              )}
 

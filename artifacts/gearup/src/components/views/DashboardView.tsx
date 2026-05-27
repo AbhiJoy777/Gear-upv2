@@ -56,6 +56,21 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const rentalLocation = (rental: any) =>
     rental.pickupLocation || rental.deliveryLocation || {};
 
+  const rentalMapsUrl = (rental: any) => {
+    const location = rentalLocation(rental);
+    if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+      return mapsUrl(location.lat, location.lng);
+    }
+    const queryText = location.formattedAddress || [location.houseOrBuilding, location.area, location.city, location.landmark].filter(Boolean).join(', ') || locationLabel(rental);
+    return queryText ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryText)}` : '';
+  };
+
+  const openRentalMaps = (rental: any) => {
+    const url = rentalMapsUrl(rental);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    else showToast('Pickup address is not available yet.', 'error');
+  };
+
   const dedupeRentalCards = (items: any[]) => {
     const seen = new Set<string>();
     return items.filter((rental) => {
@@ -511,14 +526,22 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           {locationLabel(activeRental) && (
                             <div className="space-y-2">
                               <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
-                                <MapPin size={12} className="text-[#A855F7]" /> Return to: {locationLabel(activeRental)}
+                                <MapPin size={12} className="text-[#A855F7]" /> Return to owner address: {locationLabel(activeRental)}
                               </p>
-                              {rentalLocation(activeRental).lat && rentalLocation(activeRental).lng && (
-                                <a href={mapsUrl(rentalLocation(activeRental).lat, rentalLocation(activeRental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                              {rentalMapsUrl(activeRental) && (
+                                <a href={rentalMapsUrl(activeRental)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                                   Open in Google Maps
                                 </a>
                               )}
                             </div>
+                          )}
+                          {rentalMapsUrl(activeRental) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openRentalMaps(activeRental); }}
+                              className="w-full bg-[#F97316] text-white font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-[#FB923C] transition-all"
+                            >
+                              <Navigation size={13} /> {activeRental.status === 'RETURN_DUE' ? 'Track Return' : 'Track Borrower'}
+                            </button>
                           )}
                           {activeRental.returnProofRecorded && (
                             <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3">
@@ -582,9 +605,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
                                   {locationLabel(r) && (
                                     <div className="text-center mt-1">
-                                      <p className="text-[11px] text-white/45 break-words">Pickup: {locationLabel(r)}</p>
-                                      {rentalLocation(r).lat && rentalLocation(r).lng && (
-                                        <a href={mapsUrl(rentalLocation(r).lat, rentalLocation(r).lng)} target="_blank" rel="noreferrer" className="inline-flex mt-1 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                                      <p className="text-[11px] text-white/45 break-words">Pickup at owner address: {locationLabel(r)}</p>
+                                      {rentalMapsUrl(r) && (
+                                        <a href={rentalMapsUrl(r)} target="_blank" rel="noreferrer" className="inline-flex mt-1 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                                           Open in Google Maps
                                         </a>
                                       )}
@@ -615,15 +638,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 )}
                                 
                                 <button 
-                                  onClick={(e) => { e.stopPropagation(); openHandshake(r, 'owner', 'tracking'); }}
-                                  disabled={r.status === 'ACCEPTED'}
+                                  onClick={(e) => { e.stopPropagation(); openRentalMaps(r); }}
                                   className={`w-full font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 ${
-                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
+                                    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
                                       ? 'bg-[#F97316] hover:bg-[#FB923C] text-white' 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
                                 >
-                                  <Navigation size={14} /> Handover Details
+                                  <Navigation size={14} /> Track Borrower
                                 </button>
                                 {canChat(r.status) && (
                                   <button
@@ -717,10 +739,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                       {rental.status !== 'REQUESTED' && locationLabel(rental) && (
                         <div className="mb-4 space-y-2">
                           <p className="text-white/45 text-[12px] flex items-start gap-1.5 leading-relaxed">
-                            <MapPin size={13} className="text-[#A855F7]" /> {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) ? 'Return to' : 'Pickup'}: {locationLabel(rental)}
+                            <MapPin size={13} className="text-[#A855F7]" /> {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) ? 'Return to owner address' : 'Pickup at owner address'}: {locationLabel(rental)}
                           </p>
-                          {rentalLocation(rental).lat && rentalLocation(rental).lng && (
-                            <a href={mapsUrl(rentalLocation(rental).lat, rentalLocation(rental).lng)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
+                          {rentalMapsUrl(rental) && (
+                            <a href={rentalMapsUrl(rental)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                               Open in Google Maps
                             </a>
                           )}
@@ -799,6 +821,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           )}
 
                           {rental.status === 'RETURN_DUE' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openRentalMaps(rental); }}
+                              className="w-full bg-[#F97316] text-white font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#FB923C] transition-all"
+                            >
+                              <Navigation size={14} /> Navigate to Return Address
+                            </button>
+                          )}
+
+                          {rental.status === 'RETURN_DUE' && (
                             rental.returnProofRecorded ? (
                               <div className="w-full bg-[#2DD4BF]/10 text-[#2DD4BF] font-bold py-3 rounded-[14px] text-[12px] flex items-center justify-center gap-2 border border-[#2DD4BF]/20">
                                 <Check size={14} /> Return Proof Recorded
@@ -845,7 +876,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               </button>
                             )}
 
-                            {['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
+                            {['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(rental.status) && (
                               rental.status === 'PAYMENT_PENDING' ? (
                                <button 
                                   onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'payment_scan'); }}
@@ -855,10 +886,9 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                </button>
                             ) : (
                                <button 
-                                  onClick={(e) => { e.stopPropagation(); openHandshake(rental, 'renter', 'tracking'); }}
-                                  disabled={rental.status === 'ACCEPTED'}
+                                  onClick={(e) => { e.stopPropagation(); openRentalMaps(rental); }}
                                   className={`w-full font-bold py-3.5 rounded-[16px] text-[13px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 ${
-                                    rental.status !== 'ACCEPTED' 
+                                    ['PAID_REQUESTED', 'ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING'].includes(rental.status)
                                       ? 'bg-[#F97316] hover:bg-[#FB923C] text-white' 
                                       : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
                                   }`}
