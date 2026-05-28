@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
+import { mapsUrl } from '@/lib/address';
 
 interface HandshakeModalProps {
   rental: any;
@@ -15,7 +16,7 @@ interface HandshakeModalProps {
   initialStep?: HandshakeStep;
 }
 
-type HandshakeStep = 'proof_of_life' | 'tracking' | 'logistics' | 'qr_handover' | 'payment_scan';
+type HandshakeStep = 'proof_of_life' | 'tracking' | 'qr_handover' | 'payment_scan';
 
 export default function HandshakeModal({ rental, onClose, userRole, initialStep }: HandshakeModalProps) {
   const { showToast } = useToast();
@@ -25,6 +26,17 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   const [loading, setLoading] = useState(false);
   const paymentSecured = rental.payment?.status === 'paid' || rental.paymentStatus === 'paid';
   const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || window.__GEARUP_CONFIG__?.razorpayKey;
+  const pickupLocation = rental.pickupLocation || rental.deliveryLocation || {};
+  const addressLabel = pickupLocation.formattedAddress || [pickupLocation.houseOrBuilding, pickupLocation.area, pickupLocation.city, pickupLocation.landmark].filter(Boolean).join(' • ');
+  const navigationUrl = typeof pickupLocation.lat === 'number' && typeof pickupLocation.lng === 'number'
+    ? mapsUrl(pickupLocation.lat, pickupLocation.lng)
+    : addressLabel
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressLabel)}`
+      : '';
+  const isReturnPhase = rental.status === 'RETURN_DUE';
+  const navigationLabel = isReturnPhase
+    ? userRole === 'owner' ? 'Track Return' : 'Navigate to Return Address'
+    : userRole === 'owner' ? 'Track Borrower' : 'Navigate to Pickup';
 
   console.log('Razorpay key:', razorpayKey);
   
@@ -39,7 +51,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     } else if (rental.status === 'PROOF_RECORDED') {
       setStep('tracking');
     } else if (rental.status === 'LOGISTICS_PENDING') {
-      setStep('logistics');
+      setStep(userRole === 'owner' ? 'qr_handover' : 'payment_scan');
     } else if (rental.status === 'PAYMENT_PENDING') {
        if (userRole === 'owner') setStep('qr_handover');
        else setStep('payment_scan');
@@ -78,40 +90,6 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     }
   };
 
-  // Logistics Selection
-  const handleSelectLogistics = async (type: 'drop_off' | 'owner_pickup') => {
-    setLoading(true);
-    try {
-      await updateDoc(doc(db, 'rentals', rental.id), {
-        status: paymentSecured ? 'ACTIVE_RENTAL' : 'PAYMENT_PENDING',
-        returnLogistics: type,
-        logisticsPendingAt: serverTimestamp(),
-        ...(paymentSecured ? {
-          actualStartTime: serverTimestamp(),
-          activeAt: serverTimestamp(),
-          paymentCompletedAt: serverTimestamp(),
-          returnDueAt: null,
-        } : {}),
-      });
-      if (paymentSecured) {
-        await updateDoc(doc(db, 'listings', rental.gearId), {
-          status: 'IN_USE',
-          updatedAt: serverTimestamp(),
-        });
-        showToast('Payment already secured. Rental is now active.', 'success');
-        onClose();
-        return;
-      }
-
-      setStep(userRole === 'owner' ? 'qr_handover' : 'payment_scan');
-    } catch (err) {
-      console.error(err);
-      showToast('Could not update return logistics. Please try again.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const completeHandover = async () => {
     if (!paymentSecured) {
       throw new Error('PAYMENT_NOT_SECURED');
@@ -119,6 +97,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
 
     await updateDoc(doc(db, 'rentals', rental.id), {
       status: 'ACTIVE_RENTAL',
+      returnMethod: 'BORROWER_DROPOFF',
       actualStartTime: serverTimestamp(),
       activeAt: serverTimestamp(),
       paymentCompletedAt: serverTimestamp(),
@@ -208,8 +187,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
              {step === 'tracking' && (
                <motion.div key="tracking" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                   <div className="text-center space-y-2">
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">Live Tracking</h3>
-                    <p className="text-[13px] text-white/50">Handover coordinates in real-time.</p>
+                    <h3 className="text-[20px] font-bold text-white tracking-tight">{isReturnPhase ? 'Return to Pickup Address' : 'Pickup at Owner Address'}</h3>
+                    <p className="text-[13px] text-white/50">{isReturnPhase ? 'Borrower returns gear to the owner pickup address.' : 'Borrower travels to the owner pickup address.'}</p>
                   </div>
 
                   <div className="h-[300px] bg-[#0A0A0A] rounded-[24px] border border-[#222] relative overflow-hidden flex flex-col items-center justify-center gap-4 group">
@@ -221,8 +200,8 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                            <MapPin size={32} />
                         </div>
                         <div className="text-center">
-                           <p className="text-white font-bold text-[14px]">Route Active</p>
-                           <p className="text-white/50 text-[12px]">Est. time: 12 mins</p>
+                           <p className="text-white font-bold text-[14px]">{isReturnPhase ? 'Return Address' : 'Pickup Address'}</p>
+                           <p className="text-white/50 text-[12px] px-6">{addressLabel || 'Address pending'}</p>
                         </div>
                      </div>
 
@@ -232,34 +211,13 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                         </div>
                      </div>
                   </div>
-               </motion.div>
-             )}
-
-             {step === 'logistics' && (
-               <motion.div key="logistics" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                  <div className="text-center space-y-2">
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">Return Logistics</h3>
-                    <p className="text-[13px] text-white/50">Determine how the gear returns home.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                     <button 
-                       onClick={() => handleSelectLogistics('drop_off')}
-                       className="w-full p-6 bg-[#121212] border border-[#222] hover:border-[#A855F7] rounded-[24px] text-left transition-all group cursor-pointer"
-                     >
-                        <h4 className="text-white font-bold text-[15px] group-hover:text-[#A855F7]">Borrower Drops Off</h4>
-                        <p className="text-[#707070] text-[12px] mt-1 italic">Borrower returns it to your location.</p>
-                     </button>
-                     <button 
-                       onClick={() => handleSelectLogistics('owner_pickup')}
-                       className="w-full p-6 bg-[#121212] border border-[#222] hover:border-[#2DD4BF] rounded-[24px] text-left transition-all group cursor-pointer"
-                     >
-                        <h4 className="text-white font-bold text-[15px] group-hover:text-[#2DD4BF]">Owner Picks Up</h4>
-                        <p className="text-[#707070] text-[12px] mt-1 italic">You visit the borrower to collect gear.</p>
-                     </button>
-                  </div>
-
-                  {loading && <div className="flex justify-center"><Loader2 className="animate-spin text-[#A855F7]" /></div>}
+                  <button
+                    onClick={() => navigationUrl && window.open(navigationUrl, '_blank', 'noopener,noreferrer')}
+                    disabled={!navigationUrl}
+                    className="w-full py-3.5 bg-[#F97316] hover:bg-[#FB923C] text-white font-bold rounded-[16px] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <MapPin size={18} /> {navigationLabel}
+                  </button>
                </motion.div>
              )}
 
@@ -274,6 +232,11 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                      <CheckCircle2 size={48} className="text-[#2DD4BF] mx-auto mb-3" />
                      <p className="text-white font-bold text-[15px]">Payment already secured.</p>
                      <p className="text-white/45 text-[12px] mt-1">Complete the physical handover when both sides are ready.</p>
+                  </div>
+
+                  <div className="bg-[#0A0A0A] border border-[#222] rounded-[20px] p-4 text-left">
+                    <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider">Return Method</p>
+                    <p className="text-white/70 text-[13px] mt-1">Borrower returns gear to the owner's pickup address.</p>
                   </div>
 
                   <button
@@ -313,6 +276,11 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     <p className="text-white/40 text-[11px] mt-3">
                       Razorpay key: <span className={razorpayKey ? 'text-[#2DD4BF]' : 'text-red-400'}>{razorpayKey ? 'Loaded' : 'Missing'}</span>
                     </p>
+                  </div>
+
+                  <div className="bg-[#0A0A0A] border border-[#222] rounded-[20px] p-4 text-left">
+                    <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider">Return Method</p>
+                    <p className="text-white/70 text-[13px] mt-1">Borrower returns gear to the owner's pickup address.</p>
                   </div>
 
                   <div className="space-y-3">

@@ -10,6 +10,7 @@ import ProfileView from '../views/ProfileView';
 import AdminView from '../views/AdminView';
 import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
+import AddressModal from '../modals/AddressModal';
 
 export type AppTab = 'marketplace' | 'dashboard' | 'wallet' | 'profile' | 'admin';
 
@@ -20,6 +21,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [profileModalDismissed, setProfileModalDismissed] = useState(false);
+  const [addressModalDismissed, setAddressModalDismissed] = useState(false);
   const [selectedCity, setSelectedCity] = useState('Hyderabad');
   const isAdmin = profile?.role === 'admin';
 
@@ -55,6 +57,13 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
     (!profile?.username || !profile?.fullName || !profile?.phone);
 
   const showProfileCompletion = profileIncomplete && !profileModalDismissed;
+  const showAddressPrompt =
+    !loading &&
+    user !== null &&
+    profile !== null &&
+    !profileIncomplete &&
+    (!profile?.addresses || profile.addresses.length === 0) &&
+    !addressModalDismissed;
 
   if (loading && !user) {
     return (
@@ -113,6 +122,10 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
       {showProfileCompletion && (
         <ProfileCompletionModal onSkip={() => setProfileModalDismissed(true)} />
       )}
+      <AddressModal
+        open={showAddressPrompt}
+        onClose={() => setAddressModalDismissed(true)}
+      />
     </div>
   );
 }
