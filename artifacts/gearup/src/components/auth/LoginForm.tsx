@@ -17,6 +17,12 @@ export default function LoginForm() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
+      console.error('Email/password login failed:', {
+        code: err?.code,
+        message: err?.message,
+        projectId: auth.app.options.projectId,
+        authAppName: auth.app.name,
+      });
       setLoginFailed(true);
       showToast('Wrong email or password.', 'error');
     } finally {
