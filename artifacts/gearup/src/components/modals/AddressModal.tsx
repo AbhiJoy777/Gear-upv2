@@ -15,9 +15,24 @@ declare global {
 
 let googleMapsPromise: Promise<void> | null = null;
 
-const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+type GearUpRuntimeWindow = Window & {
+  __GEARUP_CONFIG__?: {
+    razorpayKey?: string;
+    googleMapsKey?: string;
+  };
+};
+
+const runtimeWindow = window as GearUpRuntimeWindow;
+const getGoogleMapsKey = () => import.meta.env.VITE_GOOGLE_MAPS_API_KEY || runtimeWindow.__GEARUP_CONFIG__?.googleMapsKey || '';
+
+const SERVICE_CITY_CENTERS = [
+  { city: 'Hyderabad', lat: 17.385, lng: 78.4867, radiusKm: 30 },
+  { city: 'Bangalore', lat: 12.9716, lng: 77.5946, radiusKm: 30 },
+  { city: 'Mumbai', lat: 19.076, lng: 72.8777, radiusKm: 30 },
+];
 
 const loadGoogleMaps = () => {
+  const googleMapsKey = getGoogleMapsKey();
   if (!googleMapsKey) return Promise.reject(new Error('GOOGLE_MAPS_KEY_MISSING'));
   if (window.google?.maps?.places) return Promise.resolve();
   if (googleMapsPromise) return googleMapsPromise;
@@ -77,6 +92,22 @@ const placeToAddressFields = (place: any) => {
   };
 };
 
+const distanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * earthRadiusKm * Math.asin(Math.sqrt(h));
+};
+
+const getSupportedServiceCity = (lat: number | null, lng: number | null) => {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  return SERVICE_CITY_CENTERS.find((center) => distanceKm({ lat, lng }, center) <= center.radiusKm) || null;
+};
+
 type AddressModalProps = {
   open: boolean;
   onClose: () => void;
@@ -88,6 +119,7 @@ type Step = 'location' | 'details';
 export default function AddressModal({ open, onClose, editAddress }: AddressModalProps) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
+  const googleMapsKey = getGoogleMapsKey();
   const addresses: GearUpAddress[] = profile?.addresses || [];
   const placesHostRef = useRef<HTMLDivElement | null>(null);
   const placesServiceRef = useRef<any>(null);
@@ -114,6 +146,10 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   });
 
   const selectedLocationReady = Boolean(form.formattedAddress || (form.lat && form.lng));
+
+  useEffect(() => {
+    if (open) console.log('Google Maps key loaded:', !!googleMapsKey);
+  }, [open, googleMapsKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -165,7 +201,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
         setMapsReady(false);
       })
       .finally(() => setMapsLoading(false));
-  }, [open]);
+  }, [open, googleMapsKey]);
 
   useEffect(() => {
     if (!open || !mapsReady || !placesHostRef.current) return;
@@ -202,10 +238,15 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
 
   const applyPlace = (place: any) => {
     const next = placeToAddressFields(place);
+    const serviceCity = getSupportedServiceCity(next.lat, next.lng);
+    if (!serviceCity) {
+      showToast('This area is currently outside GearUp service range.', 'error');
+      return;
+    }
     setForm((current) => ({
       ...current,
       formattedAddress: next.formattedAddress,
-      city: next.city || current.city,
+      city: serviceCity.city || next.city || current.city,
       area: next.area || current.area,
       lat: next.lat,
       lng: next.lng,
@@ -263,13 +304,19 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        const serviceCity = getSupportedServiceCity(lat, lng);
+        if (!serviceCity) {
+          showToast('This area is currently outside GearUp service range.', 'error');
+          setLocating(false);
+          return;
+        }
         const geocoded = await reverseGeocode(lat, lng);
         setForm((current) => ({
           ...current,
           lat,
           lng,
           formattedAddress: geocoded?.formattedAddress || current.formattedAddress,
-          city: geocoded?.city || current.city,
+          city: serviceCity.city || geocoded?.city || current.city,
           area: geocoded?.area || current.area,
         }));
         setSearchQuery(geocoded?.formattedAddress || 'Current location');
@@ -384,7 +431,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={googleMapsKey ? mapsLoading ? 'Loading Google Places...' : 'Search building, area, or place' : 'Google Maps key missing. Continue manually.'}
-                        disabled={mapsLoading || !googleMapsKey}
+                        disabled={mapsLoading}
                         className="w-full h-14 bg-[#0A0A0A] text-white border border-white/10 rounded-[18px] pl-12 pr-4 text-[14px] focus:border-[#A855F7] outline-none placeholder:text-white/25 disabled:opacity-60"
                       />
                     </div>
