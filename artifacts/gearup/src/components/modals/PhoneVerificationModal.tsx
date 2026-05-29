@@ -38,6 +38,8 @@ const getPhoneAuthErrorMessage = (err: any) => {
       return 'The OTP is incorrect or expired.';
     case 'auth/code-expired':
       return 'The OTP has expired. Please request a new one.';
+    case 'auth/billing-not-enabled':
+      return 'OTP verification is temporarily unavailable during beta. Please add your phone number in profile.';
     case 'auth/requires-recent-login':
       return 'Please sign in again before verifying your phone.';
     case 'auth/credential-already-in-use':
