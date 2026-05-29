@@ -2,13 +2,14 @@ import React, { memo, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase } from 'lucide-react';
+import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
+import ConfirmModal from '../modals/ConfirmModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
 
 const VERIFICATION_LABELS: Record<string, string> = {
@@ -32,8 +33,10 @@ const ProfileView = memo(() => {
   const [editOpen, setEditOpen] = useState(false);
   const [verificationOpen, setVerificationOpen] = useState(false);
   const [phoneVerificationOpen, setPhoneVerificationOpen] = useState(false);
+  const [addressManagerOpen, setAddressManagerOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<GearUpAddress | null>(null);
+  const [deleteAddressTarget, setDeleteAddressTarget] = useState<GearUpAddress | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -91,6 +94,7 @@ const ProfileView = memo(() => {
   const menuItems = [
     { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
     { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
+    { icon: MapPin, label: 'Addresses', subtitle: 'Manage pickup addresses', status: defaultAddress ? 'Manage' : 'Add', interactive: true, type: 'addresses' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
@@ -107,6 +111,26 @@ const ProfileView = memo(() => {
     } catch (err) {
       console.error(err);
       showToast('Failed to update default address.', 'error');
+    }
+  };
+
+  const deleteAddress = async () => {
+    if (!user || !deleteAddressTarget) return;
+    try {
+      const remainingAddresses = addresses.filter((address) => address.id !== deleteAddressTarget.id);
+      const nextAddresses = remainingAddresses.length > 0 && !remainingAddresses.some((address) => address.isDefault)
+        ? remainingAddresses.map((address, index) => ({ ...address, isDefault: index === 0 }))
+        : remainingAddresses;
+      const nextDefault = getDefaultAddress(nextAddresses);
+      await updateDoc(doc(db, 'users', user.uid), {
+        addresses: nextAddresses,
+        city: nextDefault?.city || profile?.city || 'Hyderabad',
+      });
+      showToast('Address deleted.', 'success');
+      setDeleteAddressTarget(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete address.', 'error');
     }
   };
 
@@ -153,77 +177,6 @@ const ProfileView = memo(() => {
         </button>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-[#121212] rounded-[28px] border-[0.5px] border-white/[0.04] p-5 sm:p-6 space-y-4"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h3 className="text-[16px] font-bold text-white tracking-tight flex items-center gap-2">
-              <MapPin size={18} className="text-[#A855F7]" />
-              Address Book
-            </h3>
-            <p className="text-[#707070] text-[12px] mt-1">
-              {defaultAddress ? 'Your default pickup address is ready.' : 'Add one default address for faster listings and bookings.'}
-            </p>
-          </div>
-          <button
-            onClick={() => { setEditingAddress(null); setAddressOpen(true); }}
-            className="w-full sm:w-auto px-4 py-2.5 bg-[#A855F7] text-white font-bold rounded-[18px] text-[12px] flex items-center justify-center gap-2 hover:bg-[#9333EA] transition-all"
-          >
-            <Plus size={15} /> Add Address
-          </button>
-        </div>
-
-        {addresses.length === 0 ? (
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-5">
-            <p className="text-white font-semibold text-[14px]">No default address yet</p>
-            <p className="text-white/45 text-[12px] mt-1">Add one address so GearUp can prefill listing pickup details.</p>
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {addresses.map((address) => {
-              const Icon = address.label === 'Work' ? Briefcase : Home;
-              return (
-                <div key={address.id} className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4 flex flex-col sm:flex-row sm:items-start gap-3">
-                  <div className="w-10 h-10 rounded-[14px] bg-[#A855F7]/10 flex items-center justify-center shrink-0">
-                    <Icon size={17} className="text-[#A855F7]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-white text-[14px] font-bold">{address.label}</p>
-                      {address.isDefault && (
-                        <span className="text-[10px] text-[#2DD4BF] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 rounded-full px-2 py-0.5 font-bold uppercase">Default</span>
-                      )}
-                    </div>
-                    <p className="text-white/60 text-[12px] mt-1 leading-relaxed">{address.formattedAddress || [address.houseOrBuilding, address.area, address.city, address.landmark].filter(Boolean).join(' • ')}</p>
-                    {address.instructions && <p className="text-white/35 text-[11px] mt-1">{address.instructions}</p>}
-                    {address.lat && address.lng && (
-                      <a href={mapsUrl(address.lat, address.lng)} target="_blank" rel="noreferrer" className="inline-flex mt-2 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
-                        Open in Google Maps
-                      </a>
-                    )}
-                  </div>
-                  <div className="flex sm:flex-col gap-2">
-                    {!address.isDefault && (
-                      <button onClick={() => setDefaultAddress(address.id)} className="flex-1 sm:flex-none px-3 py-2 bg-white/5 text-white/70 rounded-[12px] text-[11px] font-bold hover:bg-white/10">
-                        Set Default
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setEditingAddress(address); setAddressOpen(true); }}
-                      className="flex-1 sm:flex-none px-3 py-2 bg-white/5 text-white/70 rounded-[12px] text-[11px] font-bold hover:bg-white/10"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </motion.div>
 
       <div className="grid gap-4">
         {menuItems.map((item, idx) => (
@@ -233,6 +186,10 @@ const ProfileView = memo(() => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             onClick={() => {
+              if (item.type === 'addresses') {
+                setAddressManagerOpen(true);
+                return;
+              }
               if (item.type === 'phone') {
                 if (!phoneVerified) setPhoneVerificationOpen(true);
                 return;
@@ -240,23 +197,28 @@ const ProfileView = memo(() => {
               if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
             className={`bg-[#121212] p-4 sm:p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between gap-3 group transition-all ${
-              (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+              item.type === 'addresses' || (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
             }`}
           >
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div className="p-2.5 bg-black/40 rounded-lg text-white/50 group-hover:text-[#A855F7] transition-colors shrink-0">
                 <item.icon size={18} />
               </div>
-              <span className="font-medium text-white tracking-tight text-[13px] truncate">{item.label}</span>
+              <div className="min-w-0">
+                <span className="font-medium text-white tracking-tight text-[13px] truncate block">{item.label}</span>
+                {item.subtitle && <span className="text-[#707070] text-[11px] truncate block mt-0.5">{item.subtitle}</span>}
+              </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <span className={`text-[11px] font-semibold tracking-wider ${
                 item.type === 'phone'
                   ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
+                  : item.type === 'addresses' ? 'text-[#707070]'
                   : item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
               }`}>{item.status}</span>
               {item.type === 'phone' && !phoneVerified && <ChevronRight size={16} className="text-white/20" />}
-              {item.type !== 'phone' && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
+              {item.type === 'addresses' && <ChevronRight size={16} className="text-white/20" />}
+              {!item.type && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
             </div>
           </motion.div>
         ))}
@@ -361,6 +323,133 @@ const ProfileView = memo(() => {
       </AnimatePresence>
 
       <AnimatePresence>
+        {addressManagerOpen && (
+          <div className="fixed inset-0 z-[190] flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAddressManagerOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 18 }}
+              className="relative z-10 w-full max-w-[540px] max-h-[92dvh] bg-[#121212] border border-white/10 rounded-[28px] shadow-[0_0_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+            >
+              <div className="px-5 sm:px-6 py-5 flex items-center justify-between border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-[14px] bg-[#A855F7]/10 border border-[#A855F7]/20 flex items-center justify-center shrink-0">
+                    <MapPin size={18} className="text-[#A855F7]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-[16px] font-bold text-white tracking-tight">Addresses</h2>
+                    <p className="text-[11px] text-white/40 truncate">Manage pickup addresses</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAddressManagerOpen(false)}
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <button
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setAddressOpen(true);
+                  }}
+                  className="w-full bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 active:scale-[0.99]"
+                >
+                  <Plus size={16} />
+                  Add Address
+                </button>
+
+                {addresses.length === 0 ? (
+                  <div className="bg-[#0A0A0A] border border-white/10 rounded-[22px] p-6 text-center">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-3">
+                      <MapPin size={20} className="text-white/35" />
+                    </div>
+                    <p className="text-white font-bold text-[14px]">No saved addresses yet</p>
+                    <p className="text-white/40 text-[12px] mt-1">Add a pickup address for faster listing setup.</p>
+                  </div>
+                ) : (
+                  addresses.map((address) => {
+                    const Icon = address.label === 'Work' ? Briefcase : Home;
+                    const addressText = address.formattedAddress || [address.houseOrBuilding, address.area, address.city, address.landmark].filter(Boolean).join(', ');
+                    const mapHref = mapsUrl(address.lat, address.lng);
+
+                    return (
+                      <div key={address.id} className="bg-[#0A0A0A] border border-white/10 rounded-[22px] p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-[14px] bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                            <Icon size={17} className="text-[#A855F7]" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-white text-[13px] font-bold">{address.label}</p>
+                              {address.isDefault && (
+                                <span className="px-2 py-1 rounded-full bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] text-[10px] font-bold uppercase tracking-wider">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-white/55 text-[12px] leading-relaxed mt-1">{addressText}</p>
+                            {address.instructions && <p className="text-white/35 text-[11px] mt-1">{address.instructions}</p>}
+                            {mapHref && (
+                              <a
+                                href={mapHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex mt-2 text-[11px] font-bold text-[#2DD4BF] hover:text-[#5EEAD4]"
+                              >
+                                Open in Google Maps
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                          {!address.isDefault && (
+                            <button
+                              onClick={() => setDefaultAddress(address.id)}
+                              className="px-3 py-2.5 rounded-[14px] bg-white/5 border border-white/10 text-white/70 hover:text-white text-[12px] font-bold transition-all"
+                            >
+                              Set Default
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEditingAddress(address);
+                              setAddressOpen(true);
+                            }}
+                            className="px-3 py-2.5 rounded-[14px] bg-white/5 border border-white/10 text-white/70 hover:text-white text-[12px] font-bold transition-all"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteAddressTarget(address)}
+                            className="px-3 py-2.5 rounded-[14px] bg-red-500/10 border border-red-500/20 text-red-300 hover:text-red-200 text-[12px] font-bold transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Trash2 size={13} />
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {verificationOpen && (
           <VerificationRequestModal onClose={() => setVerificationOpen(false)} />
         )}
@@ -374,6 +463,15 @@ const ProfileView = memo(() => {
         open={addressOpen}
         editAddress={editingAddress}
         onClose={() => { setAddressOpen(false); setEditingAddress(null); }}
+      />
+      <ConfirmModal
+        open={!!deleteAddressTarget}
+        title="Delete address?"
+        message="This address will be removed from your address book."
+        confirmLabel="Delete"
+        cancelLabel="No"
+        onConfirm={deleteAddress}
+        onCancel={() => setDeleteAddressTarget(null)}
       />
     </div>
   );
