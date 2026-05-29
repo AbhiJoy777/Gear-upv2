@@ -1,13 +1,21 @@
 
 
 import React, { memo } from 'react';
-import { Package, Wallet, User as UserIcon, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { Package, Store, Wallet, User as UserIcon, ShoppingBag, ShieldCheck } from 'lucide-react';
 import { AppTab } from './ThemeLayout';
 
-const BASE_NAV_LINKS: { name: string; icon: any; id: AppTab }[] = [
+const DESKTOP_NAV_LINKS: { name: string; icon: any; id: AppTab }[] = [
   { name: 'Marketplace', icon: ShoppingBag, id: 'marketplace' },
   { name: 'My Dashboard', icon: Package, id: 'dashboard' },
+  { name: 'Sell', icon: Store, id: 'sell' },
   { name: 'Wallet', icon: Wallet, id: 'wallet' },
+  { name: 'Profile', icon: UserIcon, id: 'profile' },
+];
+
+const MOBILE_NAV_LINKS: { name: string; icon: any; id: AppTab }[] = [
+  { name: 'Marketplace', icon: ShoppingBag, id: 'marketplace' },
+  { name: 'Dashboard', icon: Package, id: 'dashboard' },
+  { name: 'Sell', icon: Store, id: 'sell' },
   { name: 'Profile', icon: UserIcon, id: 'profile' },
 ];
 
@@ -20,14 +28,15 @@ interface SidebarProps {
 }
 
 const Sidebar = memo(({ activeTab, onTabChange, isAdmin = false }: SidebarProps) => {
-  const navLinks = isAdmin ? [...BASE_NAV_LINKS, ADMIN_NAV_LINK] : BASE_NAV_LINKS;
+  const desktopNavLinks = isAdmin ? [...DESKTOP_NAV_LINKS, ADMIN_NAV_LINK] : DESKTOP_NAV_LINKS;
+  const mobileNavLinks = isAdmin ? [...MOBILE_NAV_LINKS, ADMIN_NAV_LINK] : MOBILE_NAV_LINKS;
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-20 lg:w-[260px] bg-[#080808] border-r-[1px] border-white/5 flex-col py-8 shrink-0 z-40">
         <nav className="flex-1 px-4 space-y-2">
-          {navLinks.map((link) => (
+          {desktopNavLinks.map((link) => (
             <button 
               key={link.id}
               onClick={() => onTabChange(link.id)}
@@ -49,7 +58,7 @@ const Sidebar = memo(({ activeTab, onTabChange, isAdmin = false }: SidebarProps)
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-[#080808]/95 border-t-[1px] border-white/5 backdrop-blur-2xl flex items-center justify-around px-2 z-50 pointer-events-auto">
-        {navLinks.map((link) => (
+        {mobileNavLinks.map((link) => (
           <button 
             key={link.id}
             onClick={() => onTabChange(link.id)}

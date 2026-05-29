@@ -2,7 +2,7 @@ import React, { memo, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase } from 'lucide-react';
+import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase, Wallet } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
@@ -25,7 +25,7 @@ const VERIFICATION_STYLES: Record<string, string> = {
   rejected: 'text-red-400 border-red-500/20 bg-red-500/10',
 };
 
-const ProfileView = memo(() => {
+const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const { user, profile } = useAuth();
   const { logout } = useAuthActions();
   const { showToast } = useToast();
@@ -91,6 +91,7 @@ const ProfileView = memo(() => {
   const menuItems = [
     { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
     { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
+    { icon: Wallet, label: 'Wallet', status: 'Open', interactive: true, type: 'wallet' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
@@ -237,10 +238,14 @@ const ProfileView = memo(() => {
                 if (!phoneVerified) setPhoneVerificationOpen(true);
                 return;
               }
+              if (item.type === 'wallet') {
+                onOpenWallet?.();
+                return;
+              }
               if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
             className={`bg-[#121212] p-4 sm:p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between gap-3 group transition-all ${
-              (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+              item.type === 'wallet' || (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
             }`}
           >
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -253,10 +258,12 @@ const ProfileView = memo(() => {
               <span className={`text-[11px] font-semibold tracking-wider ${
                 item.type === 'phone'
                   ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
+                  : item.type === 'wallet' ? 'text-[#707070]'
                   : item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
               }`}>{item.status}</span>
               {item.type === 'phone' && !phoneVerified && <ChevronRight size={16} className="text-white/20" />}
-              {item.type !== 'phone' && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
+              {item.type === 'wallet' && <ChevronRight size={16} className="text-white/20" />}
+              {!item.type && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
             </div>
           </motion.div>
         ))}
