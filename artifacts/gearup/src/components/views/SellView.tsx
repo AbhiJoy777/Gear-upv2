@@ -1,13 +1,14 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, CheckCircle2, Cpu, Gamepad2, ImagePlus, Laptop, MessageCircle, Monitor, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
 import ConfirmModal from '../modals/ConfirmModal';
 import SaleChatModal from '../modals/SaleChatModal';
+import AddressModal from '../modals/AddressModal';
 
 const SELL_CATEGORIES = [
   { name: 'Laptops', Icon: Laptop },
@@ -23,7 +24,7 @@ const SELL_CATEGORIES = [
 
 const CONDITIONS = ['Like New', 'Excellent', 'Good', 'Fair', 'Needs Repair'];
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
-const TABS = ['Selling', 'Sold', 'History'] as const;
+const TABS = ['Selling', 'Sold', 'History', 'Chats'] as const;
 
 type SellTab = typeof TABS[number];
 type SaleListingStatus = 'ACTIVE' | 'SOLD' | 'INACTIVE' | 'DELETED';
@@ -59,6 +60,7 @@ const SellView = memo(() => {
   const [editingListing, setEditingListing] = useState<SaleListing | null>(null);
   const [soldTarget, setSoldTarget] = useState<SaleListing | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SaleListing | null>(null);
+  const [deleteChatTarget, setDeleteChatTarget] = useState<any | null>(null);
   const [chatThread, setChatThread] = useState<any | null>(null);
 
   const canPublish = !!user;
@@ -83,10 +85,11 @@ const SellView = memo(() => {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, 'chats'), where('sellerId', '==', user.uid), where('type', '==', 'sale'));
+    const q = query(collection(db, 'chats'), where('type', '==', 'sale'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const next = snapshot.docs
         .map((item) => ({ id: item.id, ...item.data() }))
+        .filter((item: any) => (item.sellerId === user.uid || item.buyerId === user.uid) && !item.hiddenFor?.includes(user.uid))
         .sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
       setInquiries(next);
     }, (error) => {
@@ -98,6 +101,7 @@ const SellView = memo(() => {
   const visibleListings = useMemo(() => {
     if (activeTab === 'Selling') return listings.filter((item) => item.status === 'ACTIVE');
     if (activeTab === 'Sold') return listings.filter((item) => item.status === 'SOLD');
+    if (activeTab === 'Chats') return [];
     return listings.filter((item) => ['SOLD', 'INACTIVE', 'DELETED'].includes(item.status));
   }, [activeTab, listings]);
 
@@ -122,6 +126,21 @@ const SellView = memo(() => {
   const openEditModal = (listing: SaleListing) => {
     setEditingListing(listing);
     setModalOpen(true);
+  };
+
+  const hideChat = async () => {
+    if (!user || !deleteChatTarget) return;
+    try {
+      await updateDoc(doc(db, 'chats', deleteChatTarget.id), {
+        hiddenFor: arrayUnion(user.uid),
+        updatedAt: serverTimestamp(),
+      });
+      showToast('Chat removed from your list.', 'success');
+      setDeleteChatTarget(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not remove chat.', 'error');
+    }
   };
 
   return (
@@ -157,7 +176,14 @@ const SellView = memo(() => {
         ))}
       </div>
 
-      {loading ? (
+      {activeTab === 'Chats' ? (
+        <SaleChatsList
+          chats={inquiries}
+          currentUserId={user?.uid}
+          onOpen={setChatThread}
+          onDelete={setDeleteChatTarget}
+        />
+      ) : loading ? (
         <div className="min-h-[260px] flex items-center justify-center">
           <div className="w-10 h-10 border-4 border-[#A855F7] border-t-transparent rounded-full animate-spin" />
         </div>
@@ -165,29 +191,6 @@ const SellView = memo(() => {
         <EmptyState tab={activeTab} canPublish={canPublish} onCreate={openCreateModal} />
       ) : (
         <>
-          {activeTab === 'Selling' && inquiries.length > 0 && (
-            <div className="bg-[#121212] border border-white/[0.05] rounded-[26px] p-5 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-white font-bold text-[15px]">Sale inquiries</p>
-                  <p className="text-white/40 text-[12px] mt-1">Buyer chats for your active sale listings.</p>
-                </div>
-                <MessageCircle size={18} className="text-[#A855F7]" />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {inquiries.slice(0, 4).map((inquiry) => (
-                  <button
-                    key={inquiry.id}
-                    onClick={() => setChatThread(inquiry)}
-                    className="text-left bg-[#0A0A0A] border border-white/10 rounded-[18px] p-4 hover:border-[#A855F7]/30 transition-all"
-                  >
-                    <p className="text-white text-[13px] font-bold line-clamp-1">{inquiry.listingTitle || 'Sale listing'}</p>
-                    <p className="text-white/45 text-[11px] mt-1">Buyer: {inquiry.buyerName || 'GearUp Buyer'}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {visibleListings.map((listing) => (
               <SaleListingCard
@@ -228,10 +231,57 @@ const SellView = memo(() => {
         }}
         onCancel={() => setDeleteTarget(null)}
       />
+      <ConfirmModal
+        open={!!deleteChatTarget}
+        title="Delete chat?"
+        message="This will remove it from your chat list."
+        confirmLabel="Delete"
+        cancelLabel="No"
+        onConfirm={hideChat}
+        onCancel={() => setDeleteChatTarget(null)}
+      />
       {chatThread && <SaleChatModal chatThread={chatThread} onClose={() => setChatThread(null)} />}
     </div>
   );
 });
+
+function SaleChatsList({ chats, currentUserId, onOpen, onDelete }: { chats: any[]; currentUserId?: string; onOpen: (chat: any) => void; onDelete: (chat: any) => void }) {
+  if (chats.length === 0) {
+    return (
+      <div className="min-h-[300px] bg-[#121212] border border-white/[0.04] rounded-[28px] flex flex-col items-center justify-center text-center p-8">
+        <MessageCircle size={30} className="text-white/25 mb-4" />
+        <p className="text-white font-bold text-[16px]">No sale chats yet</p>
+        <p className="text-white/40 text-[13px] mt-2 max-w-sm">Buyer and seller conversations for sale listings will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {chats.map((chat) => {
+        const isSeller = chat.sellerId === currentUserId;
+        const otherName = isSeller ? (chat.buyerName || 'GearUp Buyer') : (chat.sellerName || 'GearUp Seller');
+        const otherEmail = isSeller ? chat.buyerEmail : chat.sellerEmail;
+        const updated = chat.updatedAt?.toDate ? chat.updatedAt.toDate().toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
+        return (
+          <div key={chat.id} className="bg-[#121212] border border-white/[0.05] rounded-[22px] p-4 flex items-start gap-3">
+            <button onClick={() => onOpen(chat)} className="flex-1 min-w-0 text-left">
+              <p className="text-white text-[14px] font-bold line-clamp-1">{chat.listingTitle || 'Sale listing'}</p>
+              <p className="text-white/45 text-[12px] mt-1 line-clamp-1">{isSeller ? 'Buyer' : 'Seller'}: {otherName}</p>
+              {otherEmail && <p className="text-white/30 text-[11px] mt-0.5 line-clamp-1">{otherEmail}</p>}
+              <p className="text-white/35 text-[12px] mt-2 line-clamp-1">{chat.lastMessage || 'No messages yet'}</p>
+              {updated && <p className="text-white/25 text-[10px] mt-2">{updated}</p>}
+            </button>
+            <button onClick={() => onDelete(chat)} className="p-2 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 hover:text-red-200">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function EmptyState({ tab, canPublish, onCreate }: { tab: SellTab; canPublish: boolean; onCreate: () => void }) {
   return (
@@ -323,7 +373,12 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
   const [condition, setCondition] = useState('');
   const [city, setCity] = useState(profile?.city || 'Hyderabad');
   const [address, setAddress] = useState<GearUpAddress | null>(null);
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
   const defaultAddress = getDefaultAddress(profile?.addresses || []);
+  const cityAddresses: GearUpAddress[] = useMemo(
+    () => (profile?.addresses || []).filter((item: GearUpAddress) => item.city === city),
+    [city, profile?.addresses]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -342,6 +397,12 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
     setCity(profile?.city || defaultAddress?.city || 'Hyderabad');
     setAddress(defaultAddress);
   }, [defaultAddress, editListing, open, profile?.city]);
+
+  useEffect(() => {
+    if (!open || step !== 4 || editListing) return;
+    if (address && address.city === city) return;
+    setAddress(cityAddresses[0] || null);
+  }, [address, city, cityAddresses, editListing, open, step]);
 
   const reset = () => {
     setStep(1);
@@ -364,7 +425,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
     if (step === 1) return !!category;
     if (step === 2) return photos.length > 0;
     if (step === 3) return !!title.trim() && !!description.trim() && Number(price) > 0 && !!condition;
-    if (step === 4) return !!city && !!address;
+    if (step === 4) return !!city && !!address && address.city === city;
     return false;
   };
 
@@ -492,28 +553,35 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <Select label="City" value={city} onChange={setCity} options={CITIES} />
-                  {defaultAddress ? (
-                    <div className={`border rounded-[20px] p-4 ${address?.id === defaultAddress.id ? 'border-[#A855F7]/50 bg-[#A855F7]/5' : 'border-white/10 bg-[#0A0A0A]'}`}>
-                      <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">Default Pickup Address</p>
-                      <p className="text-white text-[13px] font-bold">{defaultAddress.label}</p>
-                      <p className="text-white/55 text-[12px] mt-1 leading-relaxed">{defaultAddress.formattedAddress || formatAddress(defaultAddress)}</p>
-                      <button
-                        onClick={() => {
-                          setAddress(defaultAddress);
-                          setCity(defaultAddress.city || city);
-                        }}
-                        className="mt-3 w-full bg-[#A855F7]/10 border border-[#A855F7]/20 text-[#A855F7] font-bold py-2.5 rounded-[14px] text-[12px]"
-                      >
-                        Use this address
-                      </button>
+                  <Select label="City" value={city} onChange={(value) => { setCity(value); setAddress(null); }} options={CITIES} />
+                  {cityAddresses.length > 0 ? (
+                    <div className="space-y-3">
+                      {cityAddresses.map((savedAddress) => (
+                        <div key={savedAddress.id} className={`border rounded-[20px] p-4 ${address?.id === savedAddress.id ? 'border-[#A855F7]/50 bg-[#A855F7]/5' : 'border-white/10 bg-[#0A0A0A]'}`}>
+                          <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2">{savedAddress.isDefault ? 'Default Pickup Address' : 'Saved Pickup Address'}</p>
+                          <p className="text-white text-[13px] font-bold">{savedAddress.label}</p>
+                          <p className="text-white/55 text-[12px] mt-1 leading-relaxed">{savedAddress.formattedAddress || formatAddress(savedAddress)}</p>
+                          <button
+                            onClick={() => setAddress(savedAddress)}
+                            className="mt-3 w-full bg-[#A855F7]/10 border border-[#A855F7]/20 text-[#A855F7] font-bold py-2.5 rounded-[14px] text-[12px]"
+                          >
+                            {address?.id === savedAddress.id ? 'Selected' : 'Use this address'}
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
-                      <p className="text-white font-bold text-[13px]">No saved address</p>
-                      <p className="text-white/45 text-[12px] mt-1">Add a pickup address in Profile before publishing a sale listing.</p>
+                      <p className="text-white font-bold text-[13px]">No saved address in {city}</p>
+                      <p className="text-white/45 text-[12px] mt-1">Add a pickup address for this city to publish your sale listing.</p>
                     </div>
                   )}
+                  <button
+                    onClick={() => setAddressModalOpen(true)}
+                    className="w-full bg-white/5 border border-white/10 text-white/70 font-bold py-3 rounded-[16px] text-[13px] hover:bg-white/10 transition-all"
+                  >
+                    Add new address
+                  </button>
                 </div>
               )}
             </div>
@@ -533,6 +601,10 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
               )}
             </div>
           </motion.div>
+          <AddressModal
+            open={addressModalOpen}
+            onClose={() => setAddressModalOpen(false)}
+          />
         </div>
       )}
     </AnimatePresence>

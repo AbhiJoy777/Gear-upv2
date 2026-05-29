@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Send, MessageCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayRemove, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
@@ -40,7 +40,9 @@ export default function SaleChatModal({ saleListing, chatThread, onClose }: { sa
             listingTitle: title,
             listingPrice: Number(price || 0),
             buyerName: profile?.name || profile?.username || user.email || 'GearUp Buyer',
+            buyerEmail: user.email || '',
             sellerName: saleListing?.sellerName || chatThread?.sellerName || 'GearUp Seller',
+            sellerEmail: saleListing?.sellerEmail || chatThread?.sellerEmail || '',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -52,7 +54,10 @@ export default function SaleChatModal({ saleListing, chatThread, onClose }: { sa
             createdAt: serverTimestamp(),
           });
         } else {
-          await setDoc(chatRef, { updatedAt: serverTimestamp() }, { merge: true });
+          await setDoc(chatRef, {
+            hiddenFor: arrayRemove(user.uid),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
         }
       } catch (err) {
         console.error('Sale chat setup failed:', err);
@@ -91,7 +96,12 @@ export default function SaleChatModal({ saleListing, chatThread, onClose }: { sa
         text: text.trim(),
         createdAt: serverTimestamp(),
       });
-      await setDoc(doc(db, 'chats', chatId), { updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(doc(db, 'chats', chatId), {
+        lastMessage: text.trim(),
+        lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
       setText('');
     } catch (err) {
       console.error(err);
