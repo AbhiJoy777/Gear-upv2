@@ -6,6 +6,7 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
+import { BETA_LAUNCH_MODE } from '@/lib/beta';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const CATS = [
@@ -205,6 +206,10 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   };
 
   const useCurrentLocation = () => {
+    if (BETA_LAUNCH_MODE) {
+      showToast('Maps and current location open soon for beta testers.', 'warning');
+      return;
+    }
     if (!navigator.geolocation) {
       showToast('Current location is not supported on this browser.', 'error');
       return;
@@ -758,11 +763,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
                   <button
                     onClick={useCurrentLocation}
-                    disabled={locating}
+                    disabled={locating || BETA_LAUNCH_MODE}
                     className="w-full bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] font-bold py-3 rounded-[16px] text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <Navigation size={16} />
-                    {locating ? 'Getting location...' : 'Use Current Location'}
+                    {BETA_LAUNCH_MODE ? 'Current location opens soon' : locating ? 'Getting location...' : 'Use Current Location'}
                   </button>
 
                   <div className="flex items-center gap-3">

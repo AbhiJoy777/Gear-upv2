@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { CITIES, createAddressId, formatAddress, GearUpAddress } from '@/lib/address';
+import { BETA_LAUNCH_MODE } from '@/lib/beta';
 
 declare global {
   interface Window {
@@ -15,7 +16,7 @@ declare global {
 
 let googleMapsPromise: Promise<void> | null = null;
 
-const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const googleMapsKey = BETA_LAUNCH_MODE ? '' : import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 const loadGoogleMaps = () => {
   if (!googleMapsKey) return Promise.reject(new Error('GOOGLE_MAPS_KEY_MISSING'));
@@ -201,6 +202,10 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   };
 
   const useCurrentLocation = () => {
+    if (BETA_LAUNCH_MODE) {
+      showToast('Maps and current location open soon for beta testers.', 'warning');
+      return;
+    }
     if (!navigator.geolocation) {
       showToast('Current location is not supported on this browser.', 'error');
       return;
@@ -334,11 +339,11 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
 
               <button
                 onClick={useCurrentLocation}
-                disabled={locating}
+                disabled={locating || BETA_LAUNCH_MODE}
                 className="w-full bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] font-bold py-3 rounded-[16px] text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Navigation size={16} />
-                {locating ? 'Getting location...' : 'Use Current Location'}
+                {BETA_LAUNCH_MODE ? 'Current location opens soon' : locating ? 'Getting location...' : 'Use Current Location'}
               </button>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { Wallet, History, TrendingUp, ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3, XCircle } from 'lucide-react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { BETA_LAUNCH_MODE } from '@/lib/beta';
 
 const WalletView = memo(() => {
   const { user, profile } = useAuth();
@@ -76,13 +77,16 @@ const WalletView = memo(() => {
           <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-8 break-words">{currency(profile?.walletBalance)}</h2>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <button className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide">
-              Add Funds
+            <button disabled={BETA_LAUNCH_MODE} className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-semibold rounded-[24px] hover:bg-[#9333EA] hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] active:bg-[#7e22ce] active:scale-95 transition-all text-[13px] tracking-wide disabled:opacity-50 disabled:hover:bg-[#A855F7] disabled:shadow-none">
+              {BETA_LAUNCH_MODE ? 'Add Funds Soon' : 'Add Funds'}
             </button>
-            <button className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-medium rounded-[24px] hover:bg-white/5 hover:text-white transition-all text-[13px] tracking-wide active:scale-95">
-              Withdraw
+            <button disabled={BETA_LAUNCH_MODE} className="cursor-pointer w-full sm:w-auto px-6 py-3 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-[#707070] font-medium rounded-[24px] hover:bg-white/5 hover:text-white transition-all text-[13px] tracking-wide active:scale-95 disabled:opacity-50 disabled:hover:text-[#707070]">
+              {BETA_LAUNCH_MODE ? 'Payouts Soon' : 'Withdraw'}
             </button>
           </div>
+          {BETA_LAUNCH_MODE && (
+            <p className="text-white/40 text-[12px] mt-4">Wallet history is visible in beta. Add funds, checkout, and payouts open soon.</p>
+          )}
         </div>
 
         <Wallet className="absolute -right-16 -bottom-16 w-48 h-48 sm:w-64 sm:h-64 text-white/5 rotate-12" />

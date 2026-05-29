@@ -4,12 +4,13 @@ import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase, Wallet } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
+import { BETA_LAUNCH_MODE, DEFAULT_LAUNCH_INTEREST } from '@/lib/beta';
 
 const VERIFICATION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -77,6 +78,10 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const verificationStatus = profile?.verificationStatus || 'not_started';
   const phoneVerified = !!profile?.phoneVerified;
   const addresses: GearUpAddress[] = profile?.addresses || [];
+  const launchInterest = {
+    ...DEFAULT_LAUNCH_INTEREST,
+    ...(profile?.launchInterest || {}),
+  };
   const defaultAddress = getDefaultAddress(addresses);
   const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
   const verificationAction =
@@ -108,6 +113,20 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     } catch (err) {
       console.error(err);
       showToast('Failed to update default address.', 'error');
+    }
+  };
+
+  const toggleLaunchInterest = async (key: keyof typeof DEFAULT_LAUNCH_INTEREST) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        betaJoined: true,
+        betaJoinedAt: profile?.betaJoinedAt || serverTimestamp(),
+        [`launchInterest.${key}`]: !launchInterest[key],
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Could not update beta preference.', 'error');
     }
   };
 
@@ -153,6 +172,40 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
           Edit Profile
         </button>
       </motion.div>
+
+      {BETA_LAUNCH_MODE && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-[#121212] rounded-[28px] border-[0.5px] border-[#A855F7]/20 p-5 sm:p-6"
+        >
+          <p className="text-[#2DD4BF] text-[11px] font-black uppercase tracking-[0.2em] mb-2">Beta Launch</p>
+          <h3 className="text-white text-[17px] font-bold tracking-tight">What are you here to try?</h3>
+          <p className="text-white/45 text-[12px] mt-1 mb-4">This helps GearUp prioritize beta access for rentals, listings, and selling.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { key: 'wantsToRent', label: 'Rent gear' },
+              { key: 'wantsToList', label: 'List gear' },
+              { key: 'wantsToSell', label: 'Sell tech' },
+            ].map((item) => {
+              const checked = launchInterest[item.key as keyof typeof launchInterest];
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => toggleLaunchInterest(item.key as keyof typeof DEFAULT_LAUNCH_INTEREST)}
+                  className={`p-3 rounded-[18px] border text-[12px] font-bold transition-all ${
+                    checked
+                      ? 'bg-[#A855F7]/10 border-[#A855F7]/40 text-white'
+                      : 'bg-[#0A0A0A] border-white/10 text-white/45 hover:text-white'
+                  }`}
+                >
+                  {checked ? 'Interested: ' : ''}{item.label}
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -200,7 +253,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                     </div>
                     <p className="text-white/60 text-[12px] mt-1 leading-relaxed">{address.formattedAddress || [address.houseOrBuilding, address.area, address.city, address.landmark].filter(Boolean).join(' • ')}</p>
                     {address.instructions && <p className="text-white/35 text-[11px] mt-1">{address.instructions}</p>}
-                    {address.lat && address.lng && (
+                    {!BETA_LAUNCH_MODE && address.lat && address.lng && (
                       <a href={mapsUrl(address.lat, address.lng)} target="_blank" rel="noreferrer" className="inline-flex mt-2 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                         Open in Google Maps
                       </a>

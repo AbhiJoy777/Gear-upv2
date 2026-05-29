@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { DEFAULT_LAUNCH_INTEREST } from '@/lib/beta';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 interface Props {
@@ -18,6 +19,7 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('Hyderabad');
+  const [launchInterest, setLaunchInterest] = useState(DEFAULT_LAUNCH_INTEREST);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -36,6 +38,9 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
         city,
         role: profile?.role || 'user',
         verificationStatus: profile?.verificationStatus || 'not_started',
+        betaJoined: true,
+        betaJoinedAt: profile?.betaJoinedAt || serverTimestamp(),
+        launchInterest,
         updatedAt: serverTimestamp(),
       });
       showToast('Profile saved!', 'success');
@@ -133,6 +138,25 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="bg-[#0A0A0A] border border-white/5 rounded-[16px] p-4 space-y-3">
+                <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">Beta interests</p>
+                {[
+                  { key: 'wantsToRent', label: 'Rent gear' },
+                  { key: 'wantsToList', label: 'List rental gear' },
+                  { key: 'wantsToSell', label: 'Sell tech gear' },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-3 text-[13px] text-white/70 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={launchInterest[item.key as keyof typeof launchInterest]}
+                      onChange={(e) => setLaunchInterest((current) => ({ ...current, [item.key]: e.target.checked }))}
+                      className="rounded bg-[#121212] border-white/10 text-[#A855F7] focus:ring-[#A855F7]"
+                    />
+                    {item.label}
+                  </label>
+                ))}
               </div>
 
               <div className="flex items-center gap-3 pt-2">

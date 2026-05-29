@@ -14,6 +14,7 @@ import ReportIssueModal from '../modals/ReportIssueModal';
 import { createTransaction } from '@/lib/transactions';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 import { mapsUrl } from '@/lib/address';
+import { BETA_DISABLED_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
 
 
 type Tab = 'listings' | 'rentals' | 'chats' | 'history';
@@ -68,6 +69,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const openRentalMaps = (rental: any) => {
+    if (BETA_LAUNCH_MODE) {
+      showToast('Maps and live navigation open soon.', 'warning');
+      return;
+    }
     const url = rentalMapsUrl(rental);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
     else showToast('Pickup address is not available yet.', 'error');
@@ -135,6 +140,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const moveToReturnDue = async (rental: any) => {
     if (!rental?.id || rental.status !== 'ACTIVE_RENTAL') return;
+    if (BETA_LAUNCH_MODE) {
+      showToast(BETA_DISABLED_MESSAGE, 'warning');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'rentals', rental.id), {
         status: 'RETURN_DUE',
@@ -148,6 +157,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
 
   const recordReturnProof = async (rental: any) => {
     if (!user || !rental?.id) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast('Proof recording opens soon.', 'warning');
+      return;
+    }
     setRecordingReturnProofId(rental.id);
     try {
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
@@ -166,6 +179,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const handleReturnGear = async (rental: any) => {
+    if (BETA_LAUNCH_MODE) {
+      showToast(BETA_DISABLED_MESSAGE, 'warning');
+      return;
+    }
     if (!rental.returnProofRecorded) {
       showToast('Record return proof before returning the gear.', 'warning');
       return;
@@ -310,6 +327,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   const openHandshake = (rental: any, role: 'owner' | 'renter', step?: string) => {
+    if (BETA_LAUNCH_MODE) {
+      showToast('Proof, handover, and rental transactions open soon.', 'warning');
+      return;
+    }
     setSelectedRental(rental);
     setRentalRole(role);
     setInitialHandshakeStep(step);
@@ -577,14 +598,14 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                               <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
                                 <MapPin size={12} className="text-[#A855F7]" /> Return to owner address: {locationLabel(activeRental)}
                               </p>
-                              {rentalMapsUrl(activeRental) && (
+                              {!BETA_LAUNCH_MODE && rentalMapsUrl(activeRental) && (
                                 <a href={rentalMapsUrl(activeRental)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                                   Open in Google Maps
                                 </a>
                               )}
                             </div>
                           )}
-                          {rentalMapsUrl(activeRental) && (
+                          {!BETA_LAUNCH_MODE && rentalMapsUrl(activeRental) && (
                             <button
                               onClick={(e) => { e.stopPropagation(); openRentalMaps(activeRental); }}
                               className="w-full bg-[#F97316] text-white font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-[#FB923C] transition-all"
@@ -655,7 +676,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                   {locationLabel(r) && (
                                     <div className="text-center mt-1">
                                       <p className="text-[11px] text-white/45 break-words">Pickup at owner address: {locationLabel(r)}</p>
-                                      {rentalMapsUrl(r) && (
+                                      {!BETA_LAUNCH_MODE && rentalMapsUrl(r) && (
                                         <a href={rentalMapsUrl(r)} target="_blank" rel="noreferrer" className="inline-flex mt-1 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                                           Open in Google Maps
                                         </a>
@@ -790,7 +811,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                           <p className="text-white/45 text-[12px] flex items-start gap-1.5 leading-relaxed">
                             <MapPin size={13} className="text-[#A855F7]" /> {['ACTIVE_RENTAL', 'RETURN_DUE'].includes(rental.status) ? 'Return to owner address' : 'Pickup at owner address'}: {locationLabel(rental)}
                           </p>
-                          {rentalMapsUrl(rental) && (
+                          {!BETA_LAUNCH_MODE && rentalMapsUrl(rental) && (
                             <a href={rentalMapsUrl(rental)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                               Open in Google Maps
                             </a>

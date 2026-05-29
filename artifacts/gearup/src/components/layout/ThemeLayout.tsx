@@ -12,6 +12,7 @@ import AdminView from '../views/AdminView';
 import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 import AddressModal from '../modals/AddressModal';
+import { BETA_LAUNCH_MODE, BETA_MESSAGE } from '@/lib/beta';
 
 export type AppTab = 'marketplace' | 'dashboard' | 'sell' | 'wallet' | 'profile' | 'admin';
 
@@ -81,6 +82,14 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col text-white font-sans">
       <Header selectedCity={selectedCity} onCityChange={setSelectedCity} />
+      {BETA_LAUNCH_MODE && (
+        <div className="px-4 sm:px-6 py-3 bg-[#A855F7]/10 border-b border-[#A855F7]/20 text-center">
+          <p className="text-[12px] sm:text-[13px] text-white/80 font-medium leading-relaxed">
+            <span className="text-[#2DD4BF] font-bold">GearUp Beta is live.</span>{' '}
+            {BETA_MESSAGE.replace('GearUp Beta is live. ', '')}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />

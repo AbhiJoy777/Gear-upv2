@@ -9,8 +9,79 @@ import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import { formatAddress } from '@/lib/address';
+import { BETA_LAUNCH_MODE } from '@/lib/beta';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
+
+const DEMO_RENT_LISTINGS = [
+  {
+    id: 'demo-rent-rtx-laptop',
+    isDemo: true,
+    title: 'Demo Gaming Laptop - RTX 4060',
+    category: 'Laptops',
+    tier: 'Mid',
+    pricePerDay: 900,
+    status: 'AVAILABLE',
+    city: 'Hyderabad',
+    location: { city: 'Hyderabad', area: 'Madhapur', landmark: 'Demo pickup zone' },
+    isGaming: true,
+  },
+  {
+    id: 'demo-rent-ps5',
+    isDemo: true,
+    title: 'Demo PlayStation 5 Bundle',
+    category: 'Consoles',
+    tier: 'Mid',
+    pricePerDay: 600,
+    status: 'AVAILABLE',
+    city: 'Bangalore',
+    location: { city: 'Bangalore', area: 'Indiranagar', landmark: 'Demo pickup zone' },
+  },
+  {
+    id: 'demo-rent-monitor',
+    isDemo: true,
+    title: 'Demo 27-inch 2K Monitor',
+    category: 'Monitors',
+    tier: 'Low',
+    pricePerDay: 500,
+    status: 'AVAILABLE',
+    city: 'Mumbai',
+    location: { city: 'Mumbai', area: 'Andheri West', landmark: 'Demo pickup zone' },
+  },
+];
+
+const DEMO_SALE_LISTINGS = [
+  {
+    id: 'demo-sale-gpu',
+    isDemo: true,
+    sellerId: 'demo-seller',
+    sellerName: 'GearUp Demo Seller',
+    title: 'Demo RTX 3060 GPU',
+    category: 'GPUs',
+    condition: 'Good',
+    price: 18000,
+    description: 'Demo sale listing for beta browsing.',
+    status: 'ACTIVE',
+    city: 'Hyderabad',
+    photos: [],
+    addressSnapshot: { city: 'Hyderabad', area: 'Kondapur', formattedAddress: 'Kondapur, Hyderabad' },
+  },
+  {
+    id: 'demo-sale-camera',
+    isDemo: true,
+    sellerId: 'demo-seller',
+    sellerName: 'GearUp Demo Seller',
+    title: 'Demo Mirrorless Camera Kit',
+    category: 'Cameras',
+    condition: 'Excellent',
+    price: 42000,
+    description: 'Demo sale listing for beta browsing.',
+    status: 'ACTIVE',
+    city: 'Mumbai',
+    photos: [],
+    addressSnapshot: { city: 'Mumbai', area: 'Bandra', formattedAddress: 'Bandra, Mumbai' },
+  },
+];
 
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
@@ -76,7 +147,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     return 'text-white border-white/20 bg-white/5';
   };
 
-  const filteredItems = items.filter((item) => {
+  const rentBrowseItems = BETA_LAUNCH_MODE ? [...items, ...DEMO_RENT_LISTINGS] : items;
+  const saleBrowseItems = BETA_LAUNCH_MODE ? [...saleItems, ...DEMO_SALE_LISTINGS] : saleItems;
+
+  const filteredItems = rentBrowseItems.filter((item) => {
     const itemCity = item.location?.city || item.city || 'Hyderabad';
     const isAvailable = !item.status || item.status === 'AVAILABLE';
     const cityMatches = itemCity === selectedCity;
@@ -84,7 +158,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     return isAvailable && cityMatches && categoryMatches;
   });
 
-  const filteredSaleItems = saleItems.filter((item) => {
+  const filteredSaleItems = saleBrowseItems.filter((item) => {
     const itemCity = item.addressSnapshot?.city || item.city || 'Hyderabad';
     const cityMatches = itemCity === selectedCity;
     const categoryMatches = selectedCategory === 'All Gear' || item.category === selectedCategory;
@@ -208,7 +282,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-                      {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}
+                      {item.ownerId === user?.uid ? 'Owned' : BETA_LAUNCH_MODE ? 'Preview' : 'Book Now'}
                     </button>
                   </div>
                 </div>
@@ -265,7 +339,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
   const address = item.addressSnapshot || {};
   const city = address.city || item.city || 'Hyderabad';
   const area = address.area || 'Area pending';
-  const owned = item.sellerId === currentUserId;
+  const owned = item.sellerId === currentUserId || item.isDemo;
 
   return (
     <motion.div
@@ -303,7 +377,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
             <span className="text-[16px] font-bold text-white tracking-tight shrink-0">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
           </div>
           <button onClick={(e) => { e.stopPropagation(); if (!owned) onChat(); }} disabled={owned} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-            {owned ? 'Owned' : 'Chat'}
+            {item.isDemo ? 'Demo' : owned ? 'Owned' : 'Chat'}
           </button>
         </div>
       </div>
@@ -314,7 +388,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
 function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item: any; currentUserId?: string; onClose: () => void; onChat: () => void }) {
   const address = item.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
-  const owned = item.sellerId === currentUserId;
+  const owned = item.sellerId === currentUserId || item.isDemo;
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
@@ -372,7 +446,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
               className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
             >
               <MessageCircle size={16} />
-              {owned ? 'Your Listing' : 'Chat with Seller'}
+              {item.isDemo ? 'Demo Listing' : owned ? 'Your Listing' : 'Chat with Seller'}
             </button>
           </div>
         </div>

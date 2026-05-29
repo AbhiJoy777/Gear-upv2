@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { BETA_LAUNCH_MODE, DEFAULT_LAUNCH_INTEREST } from '@/lib/beta';
 
 interface AuthContextType {
   user: User | null;
@@ -34,12 +35,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+        const existing = snap.exists() ? snap.data() : {};
         const base: any = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL || null,
           updatedAt: serverTimestamp(),
         };
+        if (BETA_LAUNCH_MODE) {
+          base.betaJoined = true;
+          base.launchInterest = {
+            ...DEFAULT_LAUNCH_INTEREST,
+            ...(existing.launchInterest || {}),
+          };
+          if (!existing.betaJoinedAt) {
+            base.betaJoinedAt = serverTimestamp();
+          }
+        }
         if (!snap.exists()) {
           base.createdAt = serverTimestamp();
           await setDoc(userRef, base);

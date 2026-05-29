@@ -8,6 +8,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 import { mapsUrl } from '@/lib/address';
+import { BETA_DISABLED_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
 
 interface HandshakeModalProps {
   rental: any;
@@ -38,7 +39,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
     ? userRole === 'owner' ? 'Track Return' : 'Navigate to Return Address'
     : userRole === 'owner' ? 'Track Borrower' : 'Navigate to Pickup';
 
-  console.log('Razorpay key:', razorpayKey);
+  if (!BETA_LAUNCH_MODE) {
+    console.log('Razorpay key:', razorpayKey);
+  }
   
   useEffect(() => {
     if (initialStep) {
@@ -60,6 +63,10 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
 
   // Proof of Life Simulation
   const startRecording = async () => {
+    if (BETA_LAUNCH_MODE) {
+      showToast('Proof recording opens soon.', 'warning');
+      return;
+    }
     setRecording(true);
     let progress = 0;
     const interval = setInterval(() => {
@@ -91,6 +98,9 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
   };
 
   const completeHandover = async () => {
+    if (BETA_LAUNCH_MODE) {
+      throw new Error('BETA_DISABLED');
+    }
     if (!paymentSecured) {
       throw new Error('PAYMENT_NOT_SECURED');
     }
@@ -213,10 +223,10 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                   </div>
                   <button
                     onClick={() => navigationUrl && window.open(navigationUrl, '_blank', 'noopener,noreferrer')}
-                    disabled={!navigationUrl}
+                    disabled={!navigationUrl || BETA_LAUNCH_MODE}
                     className="w-full py-3.5 bg-[#F97316] hover:bg-[#FB923C] text-white font-bold rounded-[16px] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    <MapPin size={18} /> {navigationLabel}
+                    <MapPin size={18} /> {BETA_LAUNCH_MODE ? 'Maps Open Soon' : navigationLabel}
                   </button>
                </motion.div>
              )}
@@ -248,7 +258,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                         onClose();
                       } catch (err) {
                         console.error(err);
-                        showToast('Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
+                        showToast((err as Error)?.message === 'BETA_DISABLED' ? BETA_DISABLED_MESSAGE : 'Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
                       } finally {
                         setLoading(false);
                       }
@@ -273,9 +283,11 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                     <CheckCircle2 size={48} className="text-[#2DD4BF] mx-auto mb-3" />
                     <p className="text-white font-bold text-[15px]">Payment already secured.</p>
                     <p className="text-white/45 text-[12px] mt-1">Confirm the physical handover to start the rental.</p>
-                    <p className="text-white/40 text-[11px] mt-3">
-                      Razorpay key: <span className={razorpayKey ? 'text-[#2DD4BF]' : 'text-red-400'}>{razorpayKey ? 'Loaded' : 'Missing'}</span>
-                    </p>
+                    {!BETA_LAUNCH_MODE && (
+                      <p className="text-white/40 text-[11px] mt-3">
+                        Razorpay key: <span className={razorpayKey ? 'text-[#2DD4BF]' : 'text-red-400'}>{razorpayKey ? 'Loaded' : 'Missing'}</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="bg-[#0A0A0A] border border-[#222] rounded-[20px] p-4 text-left">
@@ -293,7 +305,7 @@ export default function HandshakeModal({ rental, onClose, userRole, initialStep 
                           onClose();
                         } catch (err) {
                           console.error(err);
-                          showToast('Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
+                          showToast((err as Error)?.message === 'BETA_DISABLED' ? BETA_DISABLED_MESSAGE : 'Payment is not secured yet. Please try again after booking payment is confirmed.', 'error');
                         } finally {
                           setLoading(false);
                         }
