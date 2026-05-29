@@ -22,6 +22,9 @@ type GearUpRuntimeWindow = Window & {
   };
 };
 
+type Step = 'location' | 'details';
+type LatLng = { lat: number; lng: number };
+
 const runtimeWindow = window as GearUpRuntimeWindow;
 const getGoogleMapsKey = () => import.meta.env.VITE_GOOGLE_MAPS_API_KEY || runtimeWindow.__GEARUP_CONFIG__?.googleMapsKey || '';
 
@@ -30,6 +33,9 @@ const SERVICE_CITY_CENTERS = [
   { city: 'Bangalore', lat: 12.9716, lng: 77.5946, radiusKm: 30 },
   { city: 'Mumbai', lat: 19.076, lng: 72.8777, radiusKm: 30 },
 ];
+
+const DEFAULT_CENTER: LatLng = { lat: 17.385, lng: 78.4867 };
+const OUT_OF_RANGE_MESSAGE = 'This area is currently outside GearUp service range.';
 
 const loadGoogleMaps = () => {
   const googleMapsKey = getGoogleMapsKey();
@@ -40,13 +46,17 @@ const loadGoogleMaps = () => {
   googleMapsPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[data-gearup-google-maps="true"]');
     if (existing) {
+      if (window.google?.maps?.places) {
+        resolve();
+        return;
+      }
       existing.addEventListener('load', () => resolve(), { once: true });
       existing.addEventListener('error', () => reject(new Error('GOOGLE_MAPS_LOAD_FAILED')), { once: true });
       return;
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places&v=weekly`;
     script.async = true;
     script.defer = true;
     script.dataset.gearupGoogleMaps = 'true';
@@ -92,7 +102,7 @@ const placeToAddressFields = (place: any) => {
   };
 };
 
-const distanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+const distanceKm = (a: LatLng, b: LatLng) => {
   const toRad = (value: number) => (value * Math.PI) / 180;
   const earthRadiusKm = 6371;
   const dLat = toRad(b.lat - a.lat);
@@ -114,8 +124,6 @@ type AddressModalProps = {
   editAddress?: GearUpAddress | null;
 };
 
-type Step = 'location' | 'details';
-
 export default function AddressModal({ open, onClose, editAddress }: AddressModalProps) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -124,14 +132,19 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   const placesHostRef = useRef<HTMLDivElement | null>(null);
   const placesServiceRef = useRef<any>(null);
   const autocompleteServiceRef = useRef<any>(null);
+  const reverseLookupRef = useRef(0);
+  const lastReverseLookupRef = useRef('');
   const [step, setStep] = useState<Step>('location');
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [mapsReady, setMapsReady] = useState(false);
+  const [placesReady, setPlacesReady] = useState(false);
   const [mapsLoading, setMapsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [predictions, setPredictions] = useState<any[]>([]);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_CENTER);
+  const [locationError, setLocationError] = useState('');
   const [form, setForm] = useState({
     label: 'Home' as GearUpAddress['label'],
     city: profile?.city || 'Hyderabad',
@@ -145,20 +158,35 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
     formattedAddress: '',
   });
 
-  const selectedLocationReady = Boolean(form.formattedAddress || (form.lat && form.lng));
+  const selectedLocationReady = typeof form.lat === 'number' && typeof form.lng === 'number';
+  const manualFallback = !googleMapsKey;
+  const canConfirmLocation = selectedLocationReady && !locationError;
+  const canSaveAddress = saving || (!manualFallback && !selectedLocationReady) || !form.houseFlat.trim();
 
   useEffect(() => {
-    if (open) console.log('Google Maps key loaded:', !!googleMapsKey);
+    if (!open) return;
+    console.log('Google Maps key loaded:', !!googleMapsKey);
+    if (!googleMapsKey) {
+      console.log('Google Maps script loaded:', false);
+      console.log('Places service ready:', false);
+    }
   }, [open, googleMapsKey]);
 
   useEffect(() => {
     if (!open) return;
     autocompleteServiceRef.current = null;
     placesServiceRef.current = null;
+    reverseLookupRef.current = 0;
+    lastReverseLookupRef.current = '';
     setPredictions([]);
     setSearchQuery('');
+    setPlacesReady(false);
+    setLocationError('');
 
     if (editAddress) {
+      const lat = typeof editAddress.lat === 'number' ? editAddress.lat : null;
+      const lng = typeof editAddress.lng === 'number' ? editAddress.lng : null;
+      if (lat && lng) setMapCenter({ lat, lng });
       setStep('details');
       setForm({
         label: editAddress.label || 'Home',
@@ -168,14 +196,15 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
         area: editAddress.area || '',
         landmark: editAddress.landmark || '',
         instructions: editAddress.instructions || '',
-        lat: typeof editAddress.lat === 'number' ? editAddress.lat : null,
-        lng: typeof editAddress.lng === 'number' ? editAddress.lng : null,
+        lat,
+        lng,
         formattedAddress: editAddress.formattedAddress || '',
       });
       return;
     }
 
-    setStep('location');
+    setStep(manualFallback ? 'details' : 'location');
+    setMapCenter(DEFAULT_CENTER);
     setForm({
       label: 'Home',
       city: profile?.city || 'Hyderabad',
@@ -188,15 +217,20 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
       lng: null,
       formattedAddress: '',
     });
-  }, [open, editAddress, profile?.city]);
+  }, [open, editAddress, profile?.city, manualFallback]);
 
   useEffect(() => {
     if (!open || !googleMapsKey) return;
 
     setMapsLoading(true);
     loadGoogleMaps()
-      .then(() => setMapsReady(true))
+      .then(() => {
+        console.log('Google Maps script loaded:', true);
+        setMapsReady(true);
+      })
       .catch((err) => {
+        console.log('Google Maps script loaded:', false);
+        console.log('Places service ready:', false);
         console.error('Google Maps load failed', err);
         setMapsReady(false);
       })
@@ -205,12 +239,34 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
 
   useEffect(() => {
     if (!open || !mapsReady || !placesHostRef.current) return;
-    if (!autocompleteServiceRef.current) autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-    if (!placesServiceRef.current) placesServiceRef.current = new window.google.maps.places.PlacesService(placesHostRef.current);
+    if (!window.google?.maps?.places?.AutocompleteService || !window.google?.maps?.places?.PlacesService) {
+      setPlacesReady(false);
+      console.log('Places service ready:', false);
+      return;
+    }
+    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+    placesServiceRef.current = new window.google.maps.places.PlacesService(placesHostRef.current);
+    setPlacesReady(true);
+    console.log('Places service ready:', true);
   }, [open, mapsReady]);
 
   useEffect(() => {
-    if (!mapsReady || !autocompleteServiceRef.current || searchQuery.trim().length < 2) {
+    if (!open || !mapsReady || editAddress || manualFallback) return;
+    if (!navigator.permissions || !navigator.geolocation) return;
+
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((permission) => {
+        if (permission.state !== 'granted') return;
+        navigator.geolocation.getCurrentPosition((position) => {
+          updateLocationFromCoordinates(position.coords.latitude, position.coords.longitude, { silent: true });
+        });
+      })
+      .catch(() => undefined);
+  }, [open, mapsReady, editAddress, manualFallback]);
+
+  useEffect(() => {
+    if (!placesReady || !autocompleteServiceRef.current || searchQuery.trim().length < 2) {
       setPredictions([]);
       return;
     }
@@ -228,50 +284,13 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
             setPredictions([]);
             return;
           }
-          setPredictions(results.slice(0, 5));
+          setPredictions(results.slice(0, 6));
         }
       );
     }, 180);
 
     return () => window.clearTimeout(timeout);
-  }, [mapsReady, searchQuery]);
-
-  const applyPlace = (place: any) => {
-    const next = placeToAddressFields(place);
-    const serviceCity = getSupportedServiceCity(next.lat, next.lng);
-    if (!serviceCity) {
-      showToast('This area is currently outside GearUp service range.', 'error');
-      return;
-    }
-    setForm((current) => ({
-      ...current,
-      formattedAddress: next.formattedAddress,
-      city: serviceCity.city || next.city || current.city,
-      area: next.area || current.area,
-      lat: next.lat,
-      lng: next.lng,
-    }));
-    setSearchQuery(next.formattedAddress);
-    setPredictions([]);
-    setStep('details');
-  };
-
-  const selectPrediction = (prediction: any) => {
-    if (!placesServiceRef.current) return;
-    placesServiceRef.current.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address', 'geometry', 'name'],
-      },
-      (place: any, status: string) => {
-        if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
-          showToast('Could not read that place. Try another result.', 'error');
-          return;
-        }
-        applyPlace(place);
-      }
-    );
-  };
+  }, [placesReady, searchQuery]);
 
   const reverseGeocode = async (lat: number, lng: number) => {
     if (!googleMapsKey) return null;
@@ -293,6 +312,88 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
     }
   };
 
+  const updateLocationFromCoordinates = async (
+    lat: number,
+    lng: number,
+    options: { silent?: boolean; successMessage?: string } = {}
+  ) => {
+    const roundedKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    setMapCenter({ lat, lng });
+
+    if (lastReverseLookupRef.current === roundedKey) return true;
+    lastReverseLookupRef.current = roundedKey;
+    const lookupId = reverseLookupRef.current + 1;
+    reverseLookupRef.current = lookupId;
+
+    const serviceCity = getSupportedServiceCity(lat, lng);
+    if (!serviceCity) {
+      setLocationError(OUT_OF_RANGE_MESSAGE);
+      setForm((current) => ({ ...current, lat, lng, formattedAddress: '', area: '' }));
+      if (!options.silent) showToast(OUT_OF_RANGE_MESSAGE, 'error');
+      return false;
+    }
+
+    setLocationError('');
+    const geocoded = await reverseGeocode(lat, lng);
+    if (lookupId !== reverseLookupRef.current) return true;
+
+    setForm((current) => ({
+      ...current,
+      lat,
+      lng,
+      formattedAddress: geocoded?.formattedAddress || current.formattedAddress || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+      city: serviceCity.city || geocoded?.city || current.city,
+      area: geocoded?.area || current.area,
+    }));
+    if (options.successMessage) showToast(options.successMessage, 'success');
+    return true;
+  };
+
+  const applyPlace = (place: any) => {
+    const next = placeToAddressFields(place);
+    const serviceCity = getSupportedServiceCity(next.lat, next.lng);
+    if (!serviceCity || typeof next.lat !== 'number' || typeof next.lng !== 'number') {
+      setLocationError(OUT_OF_RANGE_MESSAGE);
+      showToast(OUT_OF_RANGE_MESSAGE, 'error');
+      return;
+    }
+
+    setLocationError('');
+    setMapCenter({ lat: next.lat, lng: next.lng });
+    setForm((current) => ({
+      ...current,
+      formattedAddress: next.formattedAddress,
+      city: serviceCity.city || next.city || current.city,
+      area: next.area || current.area,
+      lat: next.lat,
+      lng: next.lng,
+    }));
+    setSearchQuery(next.formattedAddress);
+    setPredictions([]);
+    lastReverseLookupRef.current = `${next.lat.toFixed(5)},${next.lng.toFixed(5)}`;
+  };
+
+  const selectPrediction = (prediction: any) => {
+    if (!placesServiceRef.current) {
+      showToast('Places search is still loading. Try again in a moment.', 'warning');
+      return;
+    }
+
+    placesServiceRef.current.getDetails(
+      {
+        placeId: prediction.place_id,
+        fields: ['address_components', 'formatted_address', 'geometry', 'name'],
+      },
+      (place: any, status: string) => {
+        if (status !== window.google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
+          showToast('Could not read that place. Try another result.', 'error');
+          return;
+        }
+        applyPlace(place);
+      }
+    );
+  };
+
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       showToast('Current location is not supported on this browser.', 'error');
@@ -302,41 +403,37 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const serviceCity = getSupportedServiceCity(lat, lng);
-        if (!serviceCity) {
-          showToast('This area is currently outside GearUp service range.', 'error');
-          setLocating(false);
-          return;
-        }
-        const geocoded = await reverseGeocode(lat, lng);
-        setForm((current) => ({
-          ...current,
-          lat,
-          lng,
-          formattedAddress: geocoded?.formattedAddress || current.formattedAddress,
-          city: serviceCity.city || geocoded?.city || current.city,
-          area: geocoded?.area || current.area,
-        }));
-        setSearchQuery(geocoded?.formattedAddress || 'Current location');
-        setStep('details');
-        showToast(geocoded ? 'Location detected. Add address details.' : 'Location captured. Add address details.', 'success');
+        const updated = await updateLocationFromCoordinates(position.coords.latitude, position.coords.longitude, {
+          successMessage: 'Location detected. Confirm it on the map.',
+        });
+        if (!updated) setSearchQuery('');
         setLocating(false);
       },
       () => {
-        showToast('Location permission denied. You can enter the address manually.', 'error');
+        showToast('Location permission denied. Search for your area instead.', 'error');
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
+  const confirmLocation = () => {
+    if (!canConfirmLocation) {
+      showToast(locationError || 'Choose a location on the map first.', 'error');
+      return;
+    }
+    setStep('details');
+  };
+
   const saveAddress = async () => {
     if (!user) return;
     const houseOrBuilding = [form.houseFlat.trim(), form.building.trim()].filter(Boolean).join(', ');
-    if (!houseOrBuilding || !form.area.trim() || !form.city || !form.landmark.trim()) {
-      showToast('Please complete the address fields.', 'warning');
+    if (!houseOrBuilding) {
+      showToast('Please add your house or flat details.', 'warning');
+      return;
+    }
+    if (!manualFallback && !selectedLocationReady) {
+      showToast('Please confirm a pickup location first.', 'warning');
       return;
     }
 
@@ -390,11 +487,11 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
             initial={{ opacity: 0, scale: 0.95, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 18 }}
-            className="relative z-10 w-full max-w-[520px] max-h-[92dvh] bg-[#121212] border border-white/10 rounded-[28px] shadow-[0_0_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+            className="relative z-10 w-full max-w-[560px] max-h-[92dvh] bg-[#121212] border border-white/10 rounded-[28px] shadow-[0_0_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
           >
             <div className="px-5 sm:px-6 py-5 flex items-center justify-between border-b border-white/5 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                {step === 'details' && !editAddress && (
+                {step === 'details' && !manualFallback && (
                   <button
                     onClick={() => setStep('location')}
                     className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
@@ -406,8 +503,12 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                   <MapPin size={18} className="text-[#A855F7]" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-[16px] font-bold text-white tracking-tight">{editAddress ? 'Edit Address' : step === 'location' ? 'Select Location' : 'Address Details'}</h2>
-                  <p className="text-[11px] text-white/40 truncate">{step === 'location' ? 'Search or use current location' : 'Add house and delivery instructions'}</p>
+                  <h2 className="text-[16px] font-bold text-white tracking-tight">
+                    {editAddress ? 'Edit Address' : step === 'location' ? 'Select Your Location' : 'Add Address Details'}
+                  </h2>
+                  <p className="text-[11px] text-white/40 truncate">
+                    {step === 'location' ? 'Search, use current location, or adjust the map' : 'Add house and pickup notes'}
+                  </p>
                 </div>
               </div>
               <button onClick={onClose} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all">
@@ -426,58 +527,86 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                     className="p-5 sm:p-6 space-y-4"
                   >
                     <div className="relative">
-                      <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35" />
+                      <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35 z-10" />
                       <input
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={googleMapsKey ? mapsLoading ? 'Loading Google Places...' : 'Search building, area, or place' : 'Google Maps key missing. Continue manually.'}
+                        placeholder="Search for apartment, street name, landmark..."
                         disabled={mapsLoading}
                         className="w-full h-14 bg-[#0A0A0A] text-white border border-white/10 rounded-[18px] pl-12 pr-4 text-[14px] focus:border-[#A855F7] outline-none placeholder:text-white/25 disabled:opacity-60"
                       />
                     </div>
 
-                    {googleMapsKey && (
-                      <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] overflow-hidden min-h-[52px]">
-                        {loadingPredictions ? (
-                          <div className="p-4 flex items-center gap-2 text-white/45 text-[13px]">
-                            <Loader2 size={15} className="animate-spin" /> Searching nearby places...
+                    {googleMapsKey ? (
+                      <div className="relative z-20">
+                        {(loadingPredictions || predictions.length > 0 || searchQuery.trim().length >= 2) && (
+                          <div className="absolute left-0 right-0 top-0 bg-[#0A0A0A] border border-white/10 rounded-[20px] overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.65)] max-h-[230px] overflow-y-auto">
+                            {loadingPredictions ? (
+                              <div className="p-4 flex items-center gap-2 text-white/45 text-[13px]">
+                                <Loader2 size={15} className="animate-spin" /> Searching nearby places...
+                              </div>
+                            ) : predictions.length > 0 ? (
+                              predictions.map((prediction) => (
+                                <button
+                                  key={prediction.place_id}
+                                  onClick={() => selectPrediction(prediction)}
+                                  className="w-full p-4 text-left flex items-start gap-3 hover:bg-white/5 transition-all border-b border-white/5 last:border-b-0"
+                                >
+                                  <MapPin size={16} className="text-[#A855F7] mt-0.5 shrink-0" />
+                                  <span className="min-w-0">
+                                    <span className="block text-white text-[13px] font-semibold truncate">{prediction.structured_formatting?.main_text || prediction.description}</span>
+                                    <span className="block text-white/40 text-[11px] mt-0.5 line-clamp-1">{prediction.structured_formatting?.secondary_text || prediction.description}</span>
+                                  </span>
+                                </button>
+                              ))
+                            ) : (
+                              <p className="p-4 text-white/35 text-[12px]">{placesReady ? 'No places found. Try a nearby landmark.' : 'Places search is loading...'}</p>
+                            )}
                           </div>
-                        ) : predictions.length > 0 ? (
-                          predictions.map((prediction) => (
-                            <button
-                              key={prediction.place_id}
-                              onClick={() => selectPrediction(prediction)}
-                              className="w-full p-4 text-left flex items-start gap-3 hover:bg-white/5 transition-all border-b border-white/5 last:border-b-0"
-                            >
-                              <MapPin size={16} className="text-[#A855F7] mt-0.5 shrink-0" />
-                              <span className="min-w-0">
-                                <span className="block text-white text-[13px] font-semibold truncate">{prediction.structured_formatting?.main_text || prediction.description}</span>
-                                <span className="block text-white/40 text-[11px] mt-0.5 line-clamp-1">{prediction.structured_formatting?.secondary_text || prediction.description}</span>
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="p-4 text-white/35 text-[12px]">{mapsReady ? 'Search for a place to see suggestions.' : 'Manual address entry is available below.'}</p>
                         )}
+                      </div>
+                    ) : (
+                      <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+                        <p className="text-white text-[13px] font-bold">Google Maps is not configured</p>
+                        <p className="text-white/45 text-[12px] mt-1">Add the address manually for now. Maps search will appear when the key is available.</p>
+                        <button
+                          onClick={() => setStep('details')}
+                          className="mt-4 w-full bg-white/5 border border-white/10 text-white/70 font-bold py-3 rounded-[16px] text-[13px] hover:bg-white/10 transition-all"
+                        >
+                          Continue Manually
+                        </button>
                       </div>
                     )}
 
                     <button
                       onClick={useCurrentLocation}
-                      disabled={locating}
+                      disabled={locating || !googleMapsKey}
                       className="w-full bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] font-bold py-3.5 rounded-[18px] text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {locating ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
                       {locating ? 'Detecting location...' : 'Use Current Location'}
                     </button>
 
-                    <MapPreview lat={form.lat} lng={form.lng} label={form.formattedAddress || 'Choose a pickup point'} large />
+                    <GoogleMapCanvas
+                      mapsReady={mapsReady}
+                      center={mapCenter}
+                      onCenterChange={(lat, lng) => updateLocationFromCoordinates(lat, lng, { silent: true })}
+                    />
+
+                    <LocationSummary
+                      loading={mapsReady && selectedLocationReady && !form.formattedAddress}
+                      error={locationError}
+                      area={form.area}
+                      city={form.city}
+                      formattedAddress={form.formattedAddress}
+                    />
 
                     <button
-                      onClick={() => setStep('details')}
-                      className="w-full bg-white/5 border border-white/10 text-white/70 font-bold py-3.5 rounded-[18px] text-[13px] hover:bg-white/10 transition-all"
+                      onClick={confirmLocation}
+                      disabled={!canConfirmLocation}
+                      className="w-full bg-[#A855F7] text-white font-bold py-3.5 rounded-[18px] text-[13px] hover:bg-[#9333EA] transition-all disabled:opacity-50 disabled:hover:bg-[#A855F7]"
                     >
-                      {selectedLocationReady ? 'Confirm Location' : 'Enter Address Manually'}
+                      Confirm Location
                     </button>
                   </motion.div>
                 ) : (
@@ -488,16 +617,34 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                     exit={{ opacity: 0, x: -12 }}
                     className="p-5 sm:p-6 space-y-4"
                   >
-                    <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
-                      <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider">Selected Location</p>
-                      <p className="text-white text-[13px] font-semibold mt-1 leading-relaxed">{form.formattedAddress || formatAddress({ city: form.city, area: form.area }) || 'Manual address'}</p>
-                    </div>
+                    {!manualFallback && (
+                      <>
+                        <MapPreview lat={form.lat} lng={form.lng} label={form.formattedAddress || 'Selected location'} />
+                        <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider">Selected Location</p>
+                            <p className="text-white text-[13px] font-semibold mt-1 leading-relaxed">{form.formattedAddress || formatAddress({ city: form.city, area: form.area })}</p>
+                          </div>
+                          <button
+                            onClick={() => setStep('location')}
+                            className="px-3 py-2 rounded-[14px] bg-white/5 border border-white/10 text-white/70 hover:text-white text-[12px] font-bold transition-all shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      </>
+                    )}
 
-                    <MapPreview lat={form.lat} lng={form.lng} label={form.formattedAddress || 'Address pin'} />
+                    {manualFallback && (
+                      <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+                        <p className="text-white text-[13px] font-bold">Manual address</p>
+                        <p className="text-white/45 text-[12px] mt-1">Google Maps key is missing, so location pin details can be added later.</p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <Field label="House / Flat No" value={form.houseFlat} onChange={(value) => setForm({ ...form, houseFlat: value })} />
-                      <Field label="Apartment / Building" value={form.building} onChange={(value) => setForm({ ...form, building: value })} />
+                      <Field label="House No. & Floor" required value={form.houseFlat} onChange={(value) => setForm({ ...form, houseFlat: value })} />
+                      <Field label="Building & Block No." value={form.building} onChange={(value) => setForm({ ...form, building: value })} />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -514,7 +661,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                       </div>
                     </div>
 
-                    <Field label="Landmark" value={form.landmark} onChange={(value) => setForm({ ...form, landmark: value, formattedAddress: '' })} />
+                    <Field label="Landmark & Area Name" value={form.landmark} onChange={(value) => setForm({ ...form, landmark: value, formattedAddress: '' })} />
 
                     <div>
                       <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Instructions</label>
@@ -552,7 +699,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
               {step === 'details' && (
                 <button
                   onClick={saveAddress}
-                  disabled={saving}
+                  disabled={canSaveAddress}
                   className="w-full sm:w-auto px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <Save size={16} />
@@ -569,9 +716,93 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   );
 }
 
-function MapPreview({ lat, lng, label, large = false }: { lat: number | null; lng: number | null; label: string; large?: boolean }) {
+function GoogleMapCanvas({ mapsReady, center, onCenterChange }: { mapsReady: boolean; center: LatLng; onCenterChange: (lat: number, lng: number) => void }) {
+  const mapNodeRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const listenerRef = useRef<any>(null);
+  const onCenterChangeRef = useRef(onCenterChange);
+
+  useEffect(() => {
+    onCenterChangeRef.current = onCenterChange;
+  }, [onCenterChange]);
+
+  useEffect(() => {
+    if (!mapsReady || !mapNodeRef.current || mapRef.current) return;
+
+    mapRef.current = new window.google.maps.Map(mapNodeRef.current, {
+      center,
+      zoom: 15,
+      disableDefaultUI: true,
+      zoomControl: true,
+      gestureHandling: 'greedy',
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#171717' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#d6d6d6' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#171717' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#242424' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+      ],
+    });
+
+    listenerRef.current = mapRef.current.addListener('idle', () => {
+      const nextCenter = mapRef.current?.getCenter?.();
+      if (!nextCenter) return;
+      onCenterChangeRef.current(nextCenter.lat(), nextCenter.lng());
+    });
+
+    return () => {
+      listenerRef.current?.remove?.();
+      listenerRef.current = null;
+      mapRef.current = null;
+    };
+  }, [mapsReady]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.panTo(center);
+  }, [center.lat, center.lng]);
+
   return (
-    <div className={`${large ? 'h-[230px]' : 'h-[150px]'} rounded-[22px] overflow-hidden border border-white/10 bg-[#0A0A0A] relative`}>
+    <div className="h-[280px] sm:h-[320px] rounded-[24px] overflow-hidden border border-white/10 bg-[#0A0A0A] relative">
+      {mapsReady ? (
+        <div ref={mapNodeRef} className="w-full h-full" />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-8">
+          <Loader2 size={24} className="text-[#A855F7] animate-spin" />
+          <p className="text-white/50 text-[13px] leading-relaxed">Loading map...</p>
+        </div>
+      )}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full pointer-events-none">
+        <MapPin size={34} className="text-[#A855F7] drop-shadow-[0_0_14px_rgba(168,85,247,0.9)]" fill="#A855F7" />
+      </div>
+    </div>
+  );
+}
+
+function LocationSummary({ loading, error, area, city, formattedAddress }: { loading: boolean; error: string; area: string; city: string; formattedAddress: string }) {
+  return (
+    <div className={`bg-[#0A0A0A] border rounded-[20px] p-4 ${error ? 'border-red-500/30' : 'border-white/10'}`}>
+      <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider">Selected Location</p>
+      {error ? (
+        <p className="text-red-300 text-[13px] font-semibold mt-1">{error}</p>
+      ) : loading ? (
+        <p className="text-white/45 text-[13px] mt-1">Finding this location...</p>
+      ) : formattedAddress || area || city ? (
+        <>
+          <p className="text-white text-[13px] font-semibold mt-1">{area || formattedAddress || 'Pinned location'}</p>
+          <p className="text-white/45 text-[12px] mt-0.5">{city || formattedAddress}</p>
+        </>
+      ) : (
+        <p className="text-white/45 text-[13px] mt-1">Move the map or search to choose a pickup point.</p>
+      )}
+    </div>
+  );
+}
+
+function MapPreview({ lat, lng, label }: { lat: number | null; lng: number | null; label: string }) {
+  return (
+    <div className="h-[150px] rounded-[22px] overflow-hidden border border-white/10 bg-[#0A0A0A] relative">
       {lat && lng ? (
         <iframe
           title="Selected address map preview"
@@ -596,10 +827,12 @@ function MapPreview({ lat, lng, label, large = false }: { lat: number | null; ln
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Field({ label, value, onChange, required = false }: { label: string; value: string; onChange: (value: string) => void; required?: boolean }) {
   return (
     <div>
-      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">{label}</label>
+      <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+        {label} {required && <span className="text-[#A855F7]">*</span>}
+      </label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
