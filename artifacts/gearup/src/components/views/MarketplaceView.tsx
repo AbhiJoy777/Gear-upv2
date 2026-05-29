@@ -9,83 +9,15 @@ import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import { formatAddress } from '@/lib/address';
-import { BETA_LAUNCH_MODE } from '@/lib/beta';
+import { BETA_BOOKING_MESSAGE, BETA_DEMO_MESSAGE, BETA_LAUNCH_MODE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS } from '@/lib/beta';
+import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
-
-const DEMO_RENT_LISTINGS = [
-  {
-    id: 'demo-rent-rtx-laptop',
-    isDemo: true,
-    title: 'Demo Gaming Laptop - RTX 4060',
-    category: 'Laptops',
-    tier: 'Mid',
-    pricePerDay: 900,
-    status: 'AVAILABLE',
-    city: 'Hyderabad',
-    location: { city: 'Hyderabad', area: 'Madhapur', landmark: 'Demo pickup zone' },
-    isGaming: true,
-  },
-  {
-    id: 'demo-rent-ps5',
-    isDemo: true,
-    title: 'Demo PlayStation 5 Bundle',
-    category: 'Consoles',
-    tier: 'Mid',
-    pricePerDay: 600,
-    status: 'AVAILABLE',
-    city: 'Bangalore',
-    location: { city: 'Bangalore', area: 'Indiranagar', landmark: 'Demo pickup zone' },
-  },
-  {
-    id: 'demo-rent-monitor',
-    isDemo: true,
-    title: 'Demo 27-inch 2K Monitor',
-    category: 'Monitors',
-    tier: 'Low',
-    pricePerDay: 500,
-    status: 'AVAILABLE',
-    city: 'Mumbai',
-    location: { city: 'Mumbai', area: 'Andheri West', landmark: 'Demo pickup zone' },
-  },
-];
-
-const DEMO_SALE_LISTINGS = [
-  {
-    id: 'demo-sale-gpu',
-    isDemo: true,
-    sellerId: 'demo-seller',
-    sellerName: 'GearUp Demo Seller',
-    title: 'Demo RTX 3060 GPU',
-    category: 'GPUs',
-    condition: 'Good',
-    price: 18000,
-    description: 'Demo sale listing for beta browsing.',
-    status: 'ACTIVE',
-    city: 'Hyderabad',
-    photos: [],
-    addressSnapshot: { city: 'Hyderabad', area: 'Kondapur', formattedAddress: 'Kondapur, Hyderabad' },
-  },
-  {
-    id: 'demo-sale-camera',
-    isDemo: true,
-    sellerId: 'demo-seller',
-    sellerName: 'GearUp Demo Seller',
-    title: 'Demo Mirrorless Camera Kit',
-    category: 'Cameras',
-    condition: 'Excellent',
-    price: 42000,
-    description: 'Demo sale listing for beta browsing.',
-    status: 'ACTIVE',
-    city: 'Mumbai',
-    photos: [],
-    addressSnapshot: { city: 'Mumbai', area: 'Bandra', formattedAddress: 'Bandra, Mumbai' },
-  },
-];
 
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [saleItems, setSaleItems] = useState<any[]>([]);
   const [fetchingItems, setFetchingItems] = useState(true);
@@ -138,6 +70,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const handleBook = async (item: any) => {
     if (!user) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast(item.isDemo ? BETA_DEMO_MESSAGE : BETA_BOOKING_MESSAGE, 'warning');
+      return;
+    }
     setBookingItem(item);
   };
 
@@ -172,7 +108,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   return (
     <div className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10">
       <div className="mb-2">
-        <h2 className="text-4xl sm:text-6xl md:text-8xl font-black mb-8 md:mb-12 tracking-tighter">
+        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-6 md:mb-10 tracking-tighter leading-[0.95]">
           <span className="text-white">Explore the </span>
           <span className="text-[#2DD4BF] italic">Armory.</span>
         </h2>
@@ -292,7 +228,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 key={item.id}
                 item={item}
                 currentUserId={user?.uid}
-                onOpen={() => setSelectedSaleListing(item)}
+                onOpen={() => {
+                  if (item.isDemo) showToast(BETA_DEMO_MESSAGE, 'warning');
+                  setSelectedSaleListing(item);
+                }}
                 onChat={() => setSaleChatListing(item)}
               />
             ))}

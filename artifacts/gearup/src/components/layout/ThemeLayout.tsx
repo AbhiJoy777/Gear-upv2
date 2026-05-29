@@ -12,12 +12,15 @@ import AdminView from '../views/AdminView';
 import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 import AddressModal from '../modals/AddressModal';
-import { BETA_LAUNCH_MODE, BETA_MESSAGE } from '@/lib/beta';
+import BetaWelcomeModal from '../modals/BetaWelcomeModal';
+import { BETA_LAUNCH_MODE, BETA_MESSAGE, BETA_LISTING_PHONE_MESSAGE, canListDuringBeta } from '@/lib/beta';
+import { useToast } from '@/context/ToastContext';
 
 export type AppTab = 'marketplace' | 'dashboard' | 'sell' | 'wallet' | 'profile' | 'admin';
 
 export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
+  const { showToast } = useToast();
   const [pathname, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<AppTab>('marketplace');
   const [isListModalOpen, setIsListModalOpen] = useState(false);
@@ -33,7 +36,14 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
 
 
   React.useEffect(() => {
-    const handleOpen = () => { setEditItem(null); setIsListModalOpen(true); };
+    const handleOpen = () => {
+      if (!canListDuringBeta(profile)) {
+        showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+        return;
+      }
+      setEditItem(null);
+      setIsListModalOpen(true);
+    };
     const handleEdit = (e: any) => { setEditItem(e.detail.item); setIsListModalOpen(true); };
     window.addEventListener('open-list-modal', handleOpen);
     window.addEventListener('open-edit-modal', handleEdit);
@@ -41,7 +51,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
       window.removeEventListener('open-list-modal', handleOpen);
       window.removeEventListener('open-edit-modal', handleEdit);
     };
-  }, []);
+  }, [profile, showToast]);
 
   const handleTabChange = useCallback((tab: AppTab) => {
     setIsListModalOpen(false);
@@ -52,18 +62,23 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   }, [pathname, setLocation]);
 
   // Show profile completion when user is logged in, profile is loaded, and fields are missing
+  const profileHasName = Boolean(profile?.username || profile?.fullName);
+  const profileHasPhone = Boolean(profile?.phone || profile?.phoneVerified);
+  const profileHasCity = Boolean(profile?.city);
   const profileIncomplete =
     !loading &&
     user !== null &&
     profile !== null &&
-    (!profile?.username || !profile?.fullName || !profile?.phone);
+    (!profileHasName || !profileHasPhone || !profileHasCity);
 
-  const showProfileCompletion = profileIncomplete && !profileModalDismissed;
+  const showBetaWelcome = BETA_LAUNCH_MODE && !loading && user !== null && profile !== null && profile?.betaIntroCompleted !== true;
+  const showProfileCompletion = profileIncomplete && !profileModalDismissed && !showBetaWelcome;
   const showAddressPrompt =
     !loading &&
     user !== null &&
     profile !== null &&
     !profileIncomplete &&
+    !showBetaWelcome &&
     (!profile?.addresses || profile.addresses.length === 0) &&
     !addressModalDismissed;
 
@@ -134,6 +149,9 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
 
       {showProfileCompletion && (
         <ProfileCompletionModal onSkip={() => setProfileModalDismissed(true)} />
+      )}
+      {showBetaWelcome && (
+        <BetaWelcomeModal />
       )}
       <AddressModal
         open={showAddressPrompt}

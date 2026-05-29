@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { recordPrepaidRentalTransactions } from '@/lib/transactions';
 import { mapsUrl } from '@/lib/address';
-import { BETA_DISABLED_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
+import { BETA_BOOKING_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
 const DURATIONS = [
   { days: 1, label: '1 Day', labelShort: '1 Day', discountPercent: 0 },
   { days: 3, label: '3 Days', labelShort: '3 Days', discountPercent: 22 },
@@ -139,7 +139,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate || loading) return;
     if (BETA_LAUNCH_MODE) {
-      showToast(BETA_DISABLED_MESSAGE, 'warning');
+      showToast(BETA_BOOKING_MESSAGE, 'warning');
       return;
     }
     const razorpayKey = getRazorpayKey();
