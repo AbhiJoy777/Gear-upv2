@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Send, MessageCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { addDoc, arrayRemove, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
@@ -14,7 +14,35 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!rental?.id) return;
+    if (!user || !rental?.id) return;
+
+    const ensureThread = async () => {
+      try {
+        const chatRef = doc(db, 'chats', rental.id);
+        const snap = await getDoc(chatRef);
+        const otherUserId = user.uid === rental.ownerId ? rental.renterId : rental.ownerId;
+        const otherUserName = user.uid === rental.ownerId ? rental.renterName : rental.ownerName;
+        await setDoc(chatRef, {
+          ...(snap.exists() ? {} : {
+            type: 'rental',
+            rentalId: rental.id,
+            ownerId: rental.ownerId,
+            renterId: rental.renterId,
+            gearTitle: rental.gearTitle || 'Rental',
+            rentalStatus: rental.status,
+            otherUserId,
+            otherUserName: otherUserName || 'GearUp User',
+            createdAt: serverTimestamp(),
+          }),
+          hiddenFor: arrayRemove(user.uid),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (err) {
+        console.error('Rental chat setup failed:', err);
+      }
+    };
+
+    ensureThread();
 
     const messagesRef = collection(db, 'chats', rental.id, 'messages');
     const q = query(messagesRef, orderBy('createdAt', 'asc'));
@@ -27,7 +55,7 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
     });
 
     return () => unsubscribe();
-  }, [rental?.id]);
+  }, [rental, user]);
 
   const sendMessage = async () => {
     if (!user || !text.trim()) return;
@@ -41,6 +69,18 @@ export default function ChatModal({ rental, onClose }: { rental: any; onClose: (
         text: text.trim(),
         createdAt: serverTimestamp(),
       });
+      await setDoc(doc(db, 'chats', rental.id), {
+        type: 'rental',
+        rentalId: rental.id,
+        ownerId: rental.ownerId,
+        renterId: rental.renterId,
+        gearTitle: rental.gearTitle || 'Rental',
+        rentalStatus: rental.status,
+        lastMessage: text.trim(),
+        lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
       setText('');
     } catch (err) {

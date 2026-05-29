@@ -5,6 +5,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import MarketplaceView from '../views/MarketplaceView';
 import DashboardView from '../views/DashboardView';
+import SellView from '../views/SellView';
 import WalletView from '../views/WalletView';
 import ProfileView from '../views/ProfileView';
 import AdminView from '../views/AdminView';
@@ -12,7 +13,7 @@ import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 import AddressModal from '../modals/AddressModal';
 
-export type AppTab = 'marketplace' | 'dashboard' | 'wallet' | 'profile' | 'admin';
+export type AppTab = 'marketplace' | 'dashboard' | 'sell' | 'wallet' | 'profile' | 'admin';
 
 export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -94,11 +95,14 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
                 <div key="dashboard" className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
                   <DashboardView />
                 </div>
+                <div key="sell" className={activeTab === 'sell' ? 'block' : 'hidden'}>
+                  <SellView />
+                </div>
                 <div key="wallet" className={activeTab === 'wallet' ? 'block' : 'hidden'}>
                   <WalletView />
                 </div>
                 <div key="profile" className={activeTab === 'profile' ? 'block' : 'hidden'}>
-                  <ProfileView />
+                  <ProfileView onOpenWallet={() => handleTabChange('wallet')} />
                 </div>
                 {isAdmin && (
                   <div key="admin" className={activeTab === 'admin' ? 'block' : 'hidden'}>

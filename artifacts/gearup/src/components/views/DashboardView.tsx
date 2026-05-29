@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin } from 'lucide-react';
+import { Box, PlusCircle, ShoppingBag, Loader2, Camera, Check, X, ShieldCheck, Navigation, MessageCircle, RotateCcw, AlertTriangle, Ban, Flag, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { arrayUnion, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import HandshakeModal from '../modals/HandshakeModal';
 import { useToast } from '@/context/ToastContext';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -16,7 +16,7 @@ import { RentalTimelineSummary } from '@/components/common/RentalTimeline';
 import { mapsUrl } from '@/lib/address';
 
 
-type Tab = 'listings' | 'rentals' | 'history';
+type Tab = 'listings' | 'rentals' | 'chats' | 'history';
 
 const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) => void }) => {
   const { user } = useAuth();
@@ -33,6 +33,8 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<{ rental: any; role: 'owner' | 'renter' } | null>(null);
   const [chatRental, setChatRental] = useState<any>(null);
+  const [rentalChatMetas, setRentalChatMetas] = useState<any[]>([]);
+  const [deleteChatTarget, setDeleteChatTarget] = useState<any | null>(null);
   const [reportContext, setReportContext] = useState<any>(null);
   const [recordingReturnProofId, setRecordingReturnProofId] = useState<string | null>(null);
 
@@ -261,6 +263,22 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+    const chatsRef = collection(db, 'chats');
+    const qChats = query(chatsRef, where('type', '==', 'rental'));
+    const unsubscribeChats = onSnapshot(qChats, (snapshot) => {
+      const next = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .filter((item: any) => (item.ownerId === user.uid || item.renterId === user.uid) && !item.hiddenFor?.includes(user.uid))
+        .sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
+      setRentalChatMetas(next);
+    }, (error) => {
+      console.error('Rental chat inbox load failed:', error);
+    });
+    return () => unsubscribeChats();
+  }, [user]);
+
+  useEffect(() => {
     const active = [...rentals, ...ownerRentals].filter((r) => r.status === 'ACTIVE_RENTAL');
     if (active.length === 0) return;
 
@@ -331,8 +349,38 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     return 'text-white border-white/20 bg-white/5';
   };
 
+  const hideRentalChat = async () => {
+    if (!user || !deleteChatTarget) return;
+    const rental = deleteChatTarget.rental || deleteChatTarget;
+    try {
+      await setDoc(doc(db, 'chats', rental.id), {
+        type: 'rental',
+        rentalId: rental.id,
+        ownerId: rental.ownerId,
+        renterId: rental.renterId,
+        gearTitle: rental.gearTitle || 'Rental',
+        rentalStatus: rental.status,
+        hiddenFor: arrayUnion(user.uid),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      showToast('Chat removed from your list.', 'success');
+      setDeleteChatTarget(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not remove chat.', 'error');
+    }
+  };
+
   const visibleOwnerRentals = dedupeRentalCards(ownerRentals);
   const liveRentals = dedupeRentalCards(rentals.filter((rental) => LIVE_RENTAL_STATUSES.includes(rental.status)));
+  const rentalChats = [...ownerRentals, ...rentals]
+    .filter((rental) => canChat(rental.status))
+    .filter((rental, index, all) => all.findIndex((item) => item.id === rental.id) === index)
+    .map((rental) => ({
+      rental,
+      meta: rentalChatMetas.find((chat) => chat.id === rental.id || chat.rentalId === rental.id),
+    }))
+    .filter(({ meta }) => !meta?.hiddenFor?.includes(user?.uid));
   const historyRentals = [
     ...ownerRentals
       .filter((rental) => HISTORY_RENTAL_STATUSES.includes(rental.status))
@@ -441,6 +489,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
         {[
           { key: 'listings', label: 'My Listings' },
           { key: 'rentals', label: 'My Rentals' },
+          { key: 'chats', label: 'Chats' },
           { key: 'history', label: 'History' },
         ].map((tab) => (
           <button
@@ -938,6 +987,13 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                 </button>
               </div>
             )
+          ) : activeTab === 'chats' ? (
+            <RentalChatsList
+              chats={rentalChats}
+              currentUserId={user?.uid}
+              onOpen={(rental) => setChatRental(rental)}
+              onDelete={(rental) => setDeleteChatTarget({ rental })}
+            />
           ) : (
             renderHistoryCards(historyRentals)
           )}
@@ -997,6 +1053,15 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
           }
         }}
       />
+      <ConfirmModal
+        open={deleteChatTarget !== null}
+        title="Delete chat?"
+        message="This will remove it from your chat list."
+        cancelLabel="No"
+        confirmLabel="Delete"
+        onCancel={() => setDeleteChatTarget(null)}
+        onConfirm={hideRentalChat}
+      />
       <AnimatePresence>
         {reportContext && (
           <ReportIssueModal
@@ -1008,6 +1073,45 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
     </div>
   );
 });
+
+function RentalChatsList({ chats, currentUserId, onOpen, onDelete }: { chats: any[]; currentUserId?: string; onOpen: (rental: any) => void; onDelete: (rental: any) => void }) {
+  if (chats.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="p-8 sm:p-10 bg-[#121212] rounded-[24px] mx-auto w-fit border-[0.5px] border-white/[0.04]">
+          <MessageCircle size={56} className="text-white/20" />
+        </div>
+        <h3 className="text-[18px] font-semibold text-white tracking-tight">No rental chats yet</h3>
+        <p className="text-[#707070] text-[13px] max-w-sm mx-auto font-medium px-4 sm:px-8 leading-relaxed">
+          Booking chats unlock after a rental is accepted and will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {chats.map(({ rental, meta }) => {
+        const isOwner = rental.ownerId === currentUserId;
+        const otherUser = isOwner ? (rental.renterEmail || rental.renterName || 'Borrower') : (rental.ownerEmail || rental.ownerName || 'Owner');
+
+        return (
+          <div key={rental.id} className="bg-[#121212] border border-white/[0.05] rounded-[22px] p-4 flex items-start gap-3 text-left">
+            <button onClick={() => onOpen(rental)} className="flex-1 min-w-0 text-left">
+              <p className="text-white text-[14px] font-bold line-clamp-1">{rental.gearTitle || meta?.gearTitle || 'Rental chat'}</p>
+              <p className="text-white/45 text-[12px] mt-1 line-clamp-1">{isOwner ? 'Borrower' : 'Owner'}: {otherUser}</p>
+              <p className="text-[#A855F7] text-[10px] font-bold uppercase tracking-wider mt-2">{rental.status || meta?.rentalStatus}</p>
+              <p className="text-white/35 text-[12px] mt-2 line-clamp-1">{meta?.lastMessage || 'No messages yet'}</p>
+            </button>
+            <button onClick={() => onDelete(rental)} className="p-2 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 hover:text-red-200">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 DashboardView.displayName = 'DashboardView';
 
