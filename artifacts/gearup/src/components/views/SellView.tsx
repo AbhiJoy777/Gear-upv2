@@ -1,11 +1,13 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Camera, CheckCircle2, Cpu, Gamepad2, ImagePlus, Laptop, Lock, Monitor, Package, Plus, Trash2, X } from 'lucide-react';
+import { Camera, CheckCircle2, Cpu, Gamepad2, ImagePlus, Laptop, MessageCircle, Monitor, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
+import ConfirmModal from '../modals/ConfirmModal';
+import SaleChatModal from '../modals/SaleChatModal';
 
 const SELL_CATEGORIES = [
   { name: 'Laptops', Icon: Laptop },
@@ -51,12 +53,15 @@ const SellView = memo(() => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<SellTab>('Selling');
   const [listings, setListings] = useState<SaleListing[]>([]);
+  const [inquiries, setInquiries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<SaleListing | null>(null);
+  const [soldTarget, setSoldTarget] = useState<SaleListing | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SaleListing | null>(null);
+  const [chatThread, setChatThread] = useState<any | null>(null);
 
-  const isVerified = profile?.verificationStatus === 'verified';
-  const sellerActive = !!profile?.sellerStatus?.active && !!profile?.sellerStatus?.feePaid;
-  const canPublish = isVerified && sellerActive;
+  const canPublish = !!user;
 
   useEffect(() => {
     if (!user) return;
@@ -75,6 +80,20 @@ const SellView = memo(() => {
     });
     return () => unsubscribe();
   }, [showToast, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'chats'), where('sellerId', '==', user.uid), where('type', '==', 'sale'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const next = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
+      setInquiries(next);
+    }, (error) => {
+      console.error('Sale inquiries load failed:', error);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const visibleListings = useMemo(() => {
     if (activeTab === 'Selling') return listings.filter((item) => item.status === 'ACTIVE');
@@ -95,6 +114,16 @@ const SellView = memo(() => {
     }
   };
 
+  const openCreateModal = () => {
+    setEditingListing(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (listing: SaleListing) => {
+    setEditingListing(listing);
+    setModalOpen(true);
+  };
+
   return (
     <div className="p-4 sm:p-6 md:p-10 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -106,33 +135,13 @@ const SellView = memo(() => {
           </p>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
-          disabled={!canPublish}
+          onClick={openCreateModal}
           className="w-full md:w-auto px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[22px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-45 disabled:hover:bg-[#A855F7]"
         >
           <Plus size={16} />
           Create Sale Listing
         </button>
       </div>
-
-      {!canPublish && (
-        <div className="bg-[#121212] border border-[#F97316]/20 rounded-[26px] p-5 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
-          <div className="flex gap-4">
-            <div className="w-11 h-11 rounded-[16px] bg-[#F97316]/10 border border-[#F97316]/20 flex items-center justify-center shrink-0">
-              <Lock size={19} className="text-[#F97316]" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-[15px]">Seller account locked</p>
-              <p className="text-white/45 text-[12px] mt-1 leading-relaxed">
-                {isVerified ? 'Pay ₹50 to activate seller account. Payment wiring is separate from rental payments and is not enabled yet.' : 'Complete identity verification before selling tech gear.'}
-              </p>
-            </div>
-          </div>
-          <button disabled className="px-4 py-2.5 rounded-[18px] bg-white/5 border border-white/10 text-white/40 text-[12px] font-bold">
-            Pay ₹50 to activate seller account
-          </button>
-        </div>
-      )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {TABS.map((tab) => (
@@ -153,22 +162,73 @@ const SellView = memo(() => {
           <div className="w-10 h-10 border-4 border-[#A855F7] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : visibleListings.length === 0 ? (
-        <EmptyState tab={activeTab} canPublish={canPublish} onCreate={() => setModalOpen(true)} />
+        <EmptyState tab={activeTab} canPublish={canPublish} onCreate={openCreateModal} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {visibleListings.map((listing) => (
-            <SaleListingCard
-              key={listing.id}
-              listing={listing}
-              activeTab={activeTab}
-              onSold={() => updateStatus(listing, 'SOLD')}
-              onDelete={() => updateStatus(listing, 'DELETED')}
-            />
-          ))}
-        </div>
+        <>
+          {activeTab === 'Selling' && inquiries.length > 0 && (
+            <div className="bg-[#121212] border border-white/[0.05] rounded-[26px] p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-white font-bold text-[15px]">Sale inquiries</p>
+                  <p className="text-white/40 text-[12px] mt-1">Buyer chats for your active sale listings.</p>
+                </div>
+                <MessageCircle size={18} className="text-[#A855F7]" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {inquiries.slice(0, 4).map((inquiry) => (
+                  <button
+                    key={inquiry.id}
+                    onClick={() => setChatThread(inquiry)}
+                    className="text-left bg-[#0A0A0A] border border-white/10 rounded-[18px] p-4 hover:border-[#A855F7]/30 transition-all"
+                  >
+                    <p className="text-white text-[13px] font-bold line-clamp-1">{inquiry.listingTitle || 'Sale listing'}</p>
+                    <p className="text-white/45 text-[11px] mt-1">Buyer: {inquiry.buyerName || 'GearUp Buyer'}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {visibleListings.map((listing) => (
+              <SaleListingCard
+                key={listing.id}
+                listing={listing}
+                activeTab={activeTab}
+                onEdit={() => openEditModal(listing)}
+                onSold={() => setSoldTarget(listing)}
+                onDelete={() => setDeleteTarget(listing)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
-      <SellListingModal open={modalOpen} canPublish={canPublish} onClose={() => setModalOpen(false)} />
+      <SellListingModal open={modalOpen} editListing={editingListing} onClose={() => { setModalOpen(false); setEditingListing(null); }} />
+      <ConfirmModal
+        open={!!soldTarget}
+        title="Mark as sold?"
+        message="This listing will move to Sold and buyers will no longer see it."
+        confirmLabel="Mark Sold"
+        cancelLabel="No"
+        onConfirm={() => {
+          if (soldTarget) updateStatus(soldTarget, 'SOLD');
+          setSoldTarget(null);
+        }}
+        onCancel={() => setSoldTarget(null)}
+      />
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete listing?"
+        message="This listing will be removed from active selling."
+        confirmLabel="Delete"
+        cancelLabel="No"
+        onConfirm={() => {
+          if (deleteTarget) updateStatus(deleteTarget, 'DELETED');
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      {chatThread && <SaleChatModal chatThread={chatThread} onClose={() => setChatThread(null)} />}
     </div>
   );
 });
@@ -196,7 +256,7 @@ function EmptyState({ tab, canPublish, onCreate }: { tab: SellTab; canPublish: b
   );
 }
 
-function SaleListingCard({ listing, activeTab, onSold, onDelete }: { listing: SaleListing; activeTab: SellTab; onSold: () => void; onDelete: () => void }) {
+function SaleListingCard({ listing, activeTab, onEdit, onSold, onDelete }: { listing: SaleListing; activeTab: SellTab; onEdit: () => void; onSold: () => void; onDelete: () => void }) {
   const address = listing.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
 
@@ -230,10 +290,14 @@ function SaleListingCard({ listing, activeTab, onSold, onDelete }: { listing: Sa
           <p className="text-white/35 text-[11px] mt-0.5">Buyer chat/contact CTA placeholder. No sale checkout yet.</p>
         </div>
         {activeTab === 'Selling' && (
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <button onClick={onEdit} className="py-2.5 rounded-[14px] bg-white/5 border border-white/10 text-white/70 text-[12px] font-bold flex items-center justify-center gap-1.5">
+              <Pencil size={14} />
+              Edit
+            </button>
             <button onClick={onSold} className="py-2.5 rounded-[14px] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 text-[#2DD4BF] text-[12px] font-bold flex items-center justify-center gap-1.5">
               <CheckCircle2 size={14} />
-              Mark Sold
+              Sold
             </button>
             <button onClick={onDelete} className="py-2.5 rounded-[14px] bg-red-500/10 border border-red-500/20 text-red-300 text-[12px] font-bold flex items-center justify-center gap-1.5">
               <Trash2 size={14} />
@@ -246,7 +310,7 @@ function SaleListingCard({ listing, activeTab, onSold, onDelete }: { listing: Sa
   );
 }
 
-function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPublish: boolean; onClose: () => void }) {
+function SellListingModal({ open, editListing, onClose }: { open: boolean; editListing?: SaleListing | null; onClose: () => void }) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
   const [step, setStep] = useState(1);
@@ -263,9 +327,21 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
 
   useEffect(() => {
     if (!open) return;
+    if (editListing) {
+      setStep(1);
+      setCategory(editListing.category || '');
+      setPhotos(editListing.photos || []);
+      setTitle(editListing.title || '');
+      setDescription(editListing.description || '');
+      setPrice(String(editListing.price || ''));
+      setCondition(editListing.condition || '');
+      setCity(editListing.city || editListing.addressSnapshot?.city || profile?.city || 'Hyderabad');
+      setAddress((editListing.addressSnapshot as GearUpAddress) || defaultAddress);
+      return;
+    }
     setCity(profile?.city || defaultAddress?.city || 'Hyderabad');
     setAddress(defaultAddress);
-  }, [defaultAddress, open, profile?.city]);
+  }, [defaultAddress, editListing, open, profile?.city]);
 
   const reset = () => {
     setStep(1);
@@ -293,10 +369,10 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
   };
 
   const publish = async () => {
-    if (!user || !canPublish || !canContinue()) return;
+    if (!user || !canContinue()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, 'saleListings'), {
+      const payload = {
         sellerId: user.uid,
         sellerName: profile?.name || profile?.username || user.displayName || 'GearUp Seller',
         sellerEmail: profile?.email || user.email || '',
@@ -308,11 +384,18 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
         photos,
         city,
         addressSnapshot: address,
-        status: 'ACTIVE',
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
-      showToast('Sale listing published.', 'success');
+      };
+      if (editListing) {
+        await updateDoc(doc(db, 'saleListings', editListing.id), payload);
+      } else {
+        await addDoc(collection(db, 'saleListings'), {
+          ...payload,
+          status: 'ACTIVE',
+          createdAt: serverTimestamp(),
+        });
+      }
+      showToast(editListing ? 'Sale listing updated.' : 'Sale listing published.', 'success');
       close();
     } catch (err) {
       console.error(err);
@@ -336,7 +419,7 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
             <div className="px-5 sm:px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-[#A855F7] text-[10px] font-black uppercase tracking-[0.2em]">Step {step} of 4</p>
-                <h3 className="text-white font-bold text-[18px] mt-1">Create Sale Listing</h3>
+                <h3 className="text-white font-bold text-[18px] mt-1">{editListing ? 'Edit Sale Listing' : 'Create Sale Listing'}</h3>
               </div>
               <button onClick={close} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all">
                 <X size={20} />
@@ -344,13 +427,7 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {!canPublish ? (
-                <div className="min-h-[260px] flex flex-col items-center justify-center text-center">
-                  <Lock size={32} className="text-[#F97316] mb-4" />
-                  <p className="text-white font-bold">Seller activation required</p>
-                  <p className="text-white/45 text-[13px] mt-2 max-w-sm">Verify your profile and pay ₹50 to activate seller account before publishing.</p>
-                </div>
-              ) : step === 1 ? (
+              {step === 1 ? (
                 <div className="space-y-4">
                   <h4 className="text-white font-bold text-[16px]">What are you selling?</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -446,12 +523,12 @@ function SellListingModal({ open, canPublish, onClose }: { open: boolean; canPub
                 {step === 1 ? 'Cancel' : 'Back'}
               </button>
               {step < 4 ? (
-                <button onClick={() => setStep(step + 1)} disabled={!canPublish || !canContinue()} className="px-6 py-3 bg-white/10 text-white font-bold rounded-[18px] hover:bg-white/20 transition-all text-[13px] disabled:opacity-50">
+                <button onClick={() => setStep(step + 1)} disabled={!canContinue()} className="px-6 py-3 bg-white/10 text-white font-bold rounded-[18px] hover:bg-white/20 transition-all text-[13px] disabled:opacity-50">
                   Next
                 </button>
               ) : (
-                <button onClick={publish} disabled={!canPublish || !canContinue() || saving} className="px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] disabled:opacity-50">
-                  {saving ? 'Publishing...' : 'Publish'}
+                <button onClick={publish} disabled={!canContinue() || saving} className="px-6 py-3 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] disabled:opacity-50">
+                  {saving ? 'Saving...' : editListing ? 'Save Changes' : 'Publish'}
                 </button>
               )}
             </div>
