@@ -23,6 +23,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [fetchingItems, setFetchingItems] = useState(true);
   const [fetchingSaleItems, setFetchingSaleItems] = useState(true);
   const [bookingItem, setBookingItem] = useState<any | null>(null);
+  const [selectedRentListing, setSelectedRentListing] = useState<any | null>(null);
   const [selectedSaleListing, setSelectedSaleListing] = useState<any | null>(null);
   const [saleChatListing, setSaleChatListing] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Gear');
@@ -173,6 +174,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
+                onClick={() => setSelectedRentListing(item)}
                 className="cursor-pointer bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden group hover:border-white/20 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all flex flex-col duration-300 shadow-lg relative"
               >
                 <div className="h-48 bg-[#121212] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
@@ -217,7 +219,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedRentListing(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
                       {item.ownerId === user?.uid ? 'Owned' : BETA_LAUNCH_MODE ? 'Preview' : 'Book Now'}
                     </button>
                   </div>
@@ -228,10 +230,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 key={item.id}
                 item={item}
                 currentUserId={user?.uid}
-                onOpen={() => {
-                  if (item.isDemo) showToast(BETA_DEMO_MESSAGE, 'warning');
-                  setSelectedSaleListing(item);
-                }}
+                onOpen={() => setSelectedSaleListing(item)}
                 onChat={() => setSaleChatListing(item)}
               />
             ))}
@@ -259,6 +258,14 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       {bookingItem && (
          <BookingModal item={bookingItem} onClose={() => setBookingItem(null)} />
       )}
+      {selectedRentListing && (
+        <RentListingDetailModal
+          item={selectedRentListing}
+          currentUserId={user?.uid}
+          onClose={() => setSelectedRentListing(null)}
+          onBook={() => handleBook(selectedRentListing)}
+        />
+      )}
       {selectedSaleListing && (
         <SaleListingDetailModal
           item={selectedSaleListing}
@@ -273,6 +280,71 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     </div>
   );
 });
+
+function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item: any; currentUserId?: string; onClose: () => void; onBook: () => void }) {
+  const pickupLocation = typeof item.location === 'object' ? item.location : {};
+  const city = pickupLocation.city || item.city || 'Hyderabad';
+  const area = pickupLocation.area || 'Area pending';
+  const addressText = formatAddress(pickupLocation);
+  const owned = item.ownerId === currentUserId;
+
+  return (
+    <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 18 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative z-10 w-full max-w-[760px] max-h-[92dvh] bg-[#121212] border border-white/10 rounded-[30px] overflow-hidden flex flex-col"
+      >
+        <div className="px-5 sm:px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+          <div>
+            <p className="text-[#2DD4BF] text-[10px] font-black uppercase tracking-[0.2em]">Rental Preview</p>
+            <h3 className="text-white font-bold text-[18px] mt-1">{item.title}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
+            {item.imageUrl && !item.imageUrl.includes('picsum.photos') ? (
+              <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+            ) : (
+              <Camera size={58} className="text-white/10" />
+            )}
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-[#A855F7] text-[11px] font-bold uppercase tracking-wider">
+                {item.category} {item.tier ? `• ${item.tier} tier` : ''}
+              </p>
+              <p className="text-white text-[32px] font-black tracking-tight mt-2">₹{item.pricePerDay}<span className="text-[13px] text-white/40 font-bold"> / day</span></p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+              <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Pickup</p>
+              <p className="text-white/70 text-[13px] leading-relaxed">{city} • {area}</p>
+              {addressText && <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{addressText}</p>}
+              <p className="text-[#2DD4BF] text-[11px] mt-3 font-bold">Pickup only</p>
+            </div>
+            {item.description && (
+              <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Details</p>
+                <p className="text-white/70 text-[13px] leading-relaxed whitespace-pre-wrap">{item.description}</p>
+              </div>
+            )}
+            <button
+              onClick={onBook}
+              disabled={owned}
+              className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
+            >
+              {owned ? 'Your Listing' : BETA_LAUNCH_MODE ? 'Book Preview' : 'Book Now'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: any; currentUserId?: string; onOpen: () => void; onChat: () => void }) {
   const address = item.addressSnapshot || {};

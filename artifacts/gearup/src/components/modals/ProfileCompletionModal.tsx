@@ -1,29 +1,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Phone, AtSign } from 'lucide-react';
+import { User, AtSign } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
-interface Props {
-  onSkip: () => void;
-}
-
-export default function ProfileCompletionModal({ onSkip }: Props) {
+export default function ProfileCompletionModal() {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
-  const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('Hyderabad');
+  const [username, setUsername] = useState(profile?.username || '');
+  const [city, setCity] = useState(profile?.city || 'Hyderabad');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (!username.trim() || !fullName.trim() || !phone.trim()) {
+    if (!username.trim() || !city) {
       showToast('Please fill in all fields.', 'warning');
       return;
     }
@@ -31,9 +25,9 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         username: username.trim(),
-        fullName: fullName.trim(),
-        phone: phone.trim(),
         city,
+        profileSetupCompleted: true,
+        profileSetupCompletedAt: serverTimestamp(),
         role: profile?.role || 'user',
         verificationStatus: profile?.verificationStatus || 'not_started',
         updatedAt: serverTimestamp(),
@@ -71,7 +65,7 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
               <User size={22} className="text-[#A855F7]" />
             </div>
             <h2 className="text-[20px] font-bold text-white tracking-tight mb-1">Complete your profile</h2>
-            <p className="text-[13px] text-white/40 leading-relaxed">Just a few details so others know who they're dealing with.</p>
+            <p className="text-[13px] text-white/40 leading-relaxed">Choose your GearUp username and launch city.</p>
           </div>
 
           <form onSubmit={handleSave} className="space-y-4">
@@ -90,35 +84,6 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
                 />
               </div>
             </div>
-
-            {/* Full Name */}
-            <div>
-              <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Full Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Arjun Sharma"
-                className={inputClass}
-                maxLength={60}
-              />
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Phone Number</label>
-              <div className="relative">
-                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className={`${inputClass} pl-9`}
-                  maxLength={20}
-                />
-              </div>
-              </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">City</label>
@@ -143,13 +108,6 @@ export default function ProfileCompletionModal({ onSkip }: Props) {
                 className="flex-1 h-11 bg-[#A855F7] hover:bg-[#9333EA] text-white font-semibold text-[13px] rounded-[14px] transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
               >
                 {saving ? 'Saving...' : 'Save Profile'}
-              </button>
-              <button
-                type="button"
-                onClick={onSkip}
-                className="px-5 h-11 text-[13px] font-medium text-white/30 hover:text-white/60 transition-colors bg-transparent border-none cursor-pointer"
-              >
-                Skip
               </button>
             </div>
           </form>

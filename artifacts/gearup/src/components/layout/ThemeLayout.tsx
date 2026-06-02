@@ -25,7 +25,6 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   const [activeTab, setActiveTab] = useState<AppTab>('marketplace');
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-  const [profileModalDismissed, setProfileModalDismissed] = useState(false);
   const [addressModalDismissed, setAddressModalDismissed] = useState(false);
   const [selectedCity, setSelectedCity] = useState('Hyderabad');
   const isAdmin = profile?.role === 'admin';
@@ -61,23 +60,24 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, setLocation]);
 
-  // Show profile completion when user is logged in, profile is loaded, and fields are missing
+  // Show profile completion only for new users who have not finished setup.
   const profileHasName = Boolean(profile?.username || profile?.fullName);
-  const profileHasPhone = Boolean(profile?.phone || profile?.phoneVerified);
   const profileHasCity = Boolean(profile?.city);
-  const profileIncomplete =
+  const profileNeedsSetup =
     !loading &&
     user !== null &&
     profile !== null &&
-    (!profileHasName || !profileHasPhone || !profileHasCity);
+    profile?.profileSetupCompleted !== true &&
+    !profileHasName &&
+    !profileHasCity;
 
   const showBetaWelcome = BETA_LAUNCH_MODE && !loading && user !== null && profile !== null && profile?.betaIntroCompleted !== true;
-  const showProfileCompletion = profileIncomplete && !profileModalDismissed && !showBetaWelcome;
+  const showProfileCompletion = profileNeedsSetup && !showBetaWelcome;
   const showAddressPrompt =
     !loading &&
     user !== null &&
     profile !== null &&
-    !profileIncomplete &&
+    !profileNeedsSetup &&
     !showBetaWelcome &&
     (!profile?.addresses || profile.addresses.length === 0) &&
     !addressModalDismissed;
@@ -148,7 +148,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
       />
 
       {showProfileCompletion && (
-        <ProfileCompletionModal onSkip={() => setProfileModalDismissed(true)} />
+        <ProfileCompletionModal />
       )}
       {showBetaWelcome && (
         <BetaWelcomeModal />
