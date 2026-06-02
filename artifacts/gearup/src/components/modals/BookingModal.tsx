@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { recordPrepaidRentalTransactions } from '@/lib/transactions';
 import { mapsUrl } from '@/lib/address';
+import { BETA_BOOKING_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
 const DURATIONS = [
   { days: 1, label: '1 Day', labelShort: '1 Day', discountPercent: 0 },
   { days: 3, label: '3 Days', labelShort: '3 Days', discountPercent: 22 },
@@ -137,6 +138,10 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
   const locationLng = typeof pickupLocation.lng === 'number' ? pickupLocation.lng : null;
   const handleConfirm = async () => {
     if (!user || finalDays <= 0 || !startDate || loading) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast(BETA_BOOKING_MESSAGE, 'warning');
+      return;
+    }
     const razorpayKey = getRazorpayKey();
     console.log('Razorpay key:', razorpayKey);
     if (!razorpayKey) {
@@ -371,7 +376,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                 {locationInstructions && (
                   <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{locationInstructions}</p>
                 )}
-                {locationLat && locationLng && (
+                {!BETA_LAUNCH_MODE && locationLat && locationLng && (
                   <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                     Open in Google Maps
                   </a>
@@ -494,7 +499,7 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                         {locationHouse && <p className="text-white text-[13px] font-semibold">{locationHouse}</p>}
                         <p className="text-white/70 text-[13px] mt-1">{locationArea}, {locationCity}</p>
                         <p className="text-[#A855F7] text-[12px] mt-1">{locationLandmark}</p>
-                        {locationLat && locationLng && (
+                        {!BETA_LAUNCH_MODE && locationLat && locationLng && (
                           <a href={mapsUrl(locationLat, locationLng)} target="_blank" rel="noreferrer" className="inline-flex mt-3 text-[12px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                             Open in Google Maps
                           </a>
@@ -531,10 +536,14 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
              <div className="relative md:absolute mt-auto bottom-0 left-0 right-0 px-4 sm:px-6 py-4 border-t border-[#222] bg-[#121212] z-20 flex flex-col gap-3 pb-6 md:pb-4">
                {step === 2 && (
                  <div className="w-full text-[11px] leading-relaxed">
-                   <p className="text-[#2DD4BF]">Platform protected payment. Owner must respond within 12 hours.</p>
-                   <p className="text-white/40 mt-1">
-                     Razorpay key: <span className={getRazorpayKey() ? 'text-[#2DD4BF]' : 'text-red-400'}>{getRazorpayKey() ? 'Loaded' : 'Missing'}</span>
+                   <p className="text-[#2DD4BF]">
+                     {BETA_LAUNCH_MODE ? 'Beta browsing is open. Rental checkout opens soon.' : 'Platform protected payment. Owner must respond within 12 hours.'}
                    </p>
+                   {!BETA_LAUNCH_MODE && (
+                     <p className="text-white/40 mt-1">
+                       Razorpay key: <span className={getRazorpayKey() ? 'text-[#2DD4BF]' : 'text-red-400'}>{getRazorpayKey() ? 'Loaded' : 'Missing'}</span>
+                     </p>
+                   )}
                  </div>
                )}
                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
@@ -550,10 +559,10 @@ export default function BookingModal({ item, onClose }: { item: any, onClose: ()
                  ) : (
                    <button
                      onClick={handleConfirm}
-                     disabled={finalDays <= 0 || !startDate || loading}
+                     disabled={finalDays <= 0 || !startDate || loading || BETA_LAUNCH_MODE}
                      className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-[#10B981] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center justify-center min-w-0 sm:min-w-[160px] whitespace-nowrap"
                    >
-                     {loading ? <span className="animate-pulse">Processing...</span> : 'Pay & Request Booking'}
+                     {loading ? <span className="animate-pulse">Processing...</span> : BETA_LAUNCH_MODE ? 'Rentals Open Soon' : 'Pay & Request Booking'}
                    </button>
                  )}
                </div>

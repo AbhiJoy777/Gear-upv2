@@ -9,6 +9,7 @@ import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
 import ConfirmModal from '../modals/ConfirmModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import AddressModal from '../modals/AddressModal';
+import { BETA_LISTING_PHONE_MESSAGE, canListDuringBeta } from '@/lib/beta';
 
 const SELL_CATEGORIES = [
   { name: 'Laptops', Icon: Laptop },
@@ -63,7 +64,7 @@ const SellView = memo(() => {
   const [deleteChatTarget, setDeleteChatTarget] = useState<any | null>(null);
   const [chatThread, setChatThread] = useState<any | null>(null);
 
-  const canPublish = !!user;
+  const canPublish = !!user && canListDuringBeta(profile);
 
   useEffect(() => {
     if (!user) return;
@@ -119,6 +120,10 @@ const SellView = memo(() => {
   };
 
   const openCreateModal = () => {
+    if (!canPublish) {
+      showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+      return;
+    }
     setEditingListing(null);
     setModalOpen(true);
   };
@@ -155,7 +160,7 @@ const SellView = memo(() => {
         </div>
         <button
           onClick={openCreateModal}
-          className="w-full md:w-auto px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[22px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-45 disabled:hover:bg-[#A855F7]"
+          className="w-full md:w-auto px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[22px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2"
         >
           <Plus size={16} />
           Create Sale Listing
@@ -296,10 +301,9 @@ function EmptyState({ tab, canPublish, onCreate }: { tab: SellTab; canPublish: b
       {tab === 'Selling' && (
         <button
           onClick={onCreate}
-          disabled={!canPublish}
-          className="mt-5 px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] disabled:opacity-45"
+          className="mt-5 px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px]"
         >
-          Create Sale Listing
+          {canPublish ? 'Create Sale Listing' : 'Verify Phone to List'}
         </button>
       )}
     </div>
@@ -431,6 +435,10 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
 
   const publish = async () => {
     if (!user || !canContinue()) return;
+    if (!canListDuringBeta(profile)) {
+      showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {

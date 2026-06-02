@@ -10,6 +10,7 @@ import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
+import { BETA_LAUNCH_MODE } from '@/lib/beta';
 
 const VERIFICATION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -200,7 +201,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                     </div>
                     <p className="text-white/60 text-[12px] mt-1 leading-relaxed">{address.formattedAddress || [address.houseOrBuilding, address.area, address.city, address.landmark].filter(Boolean).join(' • ')}</p>
                     {address.instructions && <p className="text-white/35 text-[11px] mt-1">{address.instructions}</p>}
-                    {address.lat && address.lng && (
+                    {!BETA_LAUNCH_MODE && address.lat && address.lng && (
                       <a href={mapsUrl(address.lat, address.lng)} target="_blank" rel="noreferrer" className="inline-flex mt-2 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
                         Open in Google Maps
                       </a>

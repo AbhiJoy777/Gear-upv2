@@ -9,12 +9,15 @@ import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import { formatAddress } from '@/lib/address';
+import { BETA_BOOKING_MESSAGE, BETA_DEMO_MESSAGE, BETA_LAUNCH_MODE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS } from '@/lib/beta';
+import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
 
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [saleItems, setSaleItems] = useState<any[]>([]);
   const [fetchingItems, setFetchingItems] = useState(true);
@@ -67,6 +70,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const handleBook = async (item: any) => {
     if (!user) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast(item.isDemo ? BETA_DEMO_MESSAGE : BETA_BOOKING_MESSAGE, 'warning');
+      return;
+    }
     setBookingItem(item);
   };
 
@@ -76,7 +83,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     return 'text-white border-white/20 bg-white/5';
   };
 
-  const filteredItems = items.filter((item) => {
+  const rentBrowseItems = BETA_LAUNCH_MODE ? [...items, ...DEMO_RENT_LISTINGS] : items;
+  const saleBrowseItems = BETA_LAUNCH_MODE ? [...saleItems, ...DEMO_SALE_LISTINGS] : saleItems;
+
+  const filteredItems = rentBrowseItems.filter((item) => {
     const itemCity = item.location?.city || item.city || 'Hyderabad';
     const isAvailable = !item.status || item.status === 'AVAILABLE';
     const cityMatches = itemCity === selectedCity;
@@ -84,7 +94,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     return isAvailable && cityMatches && categoryMatches;
   });
 
-  const filteredSaleItems = saleItems.filter((item) => {
+  const filteredSaleItems = saleBrowseItems.filter((item) => {
     const itemCity = item.addressSnapshot?.city || item.city || 'Hyderabad';
     const cityMatches = itemCity === selectedCity;
     const categoryMatches = selectedCategory === 'All Gear' || item.category === selectedCategory;
@@ -98,7 +108,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   return (
     <div className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10">
       <div className="mb-2">
-        <h2 className="text-4xl sm:text-6xl md:text-8xl font-black mb-8 md:mb-12 tracking-tighter">
+        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-6 md:mb-10 tracking-tighter leading-[0.95]">
           <span className="text-white">Explore the </span>
           <span className="text-[#2DD4BF] italic">Armory.</span>
         </h2>
@@ -208,7 +218,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-                      {item.ownerId === user?.uid ? 'Owned' : 'Book Now'}
+                      {item.ownerId === user?.uid ? 'Owned' : BETA_LAUNCH_MODE ? 'Preview' : 'Book Now'}
                     </button>
                   </div>
                 </div>
@@ -218,7 +228,10 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 key={item.id}
                 item={item}
                 currentUserId={user?.uid}
-                onOpen={() => setSelectedSaleListing(item)}
+                onOpen={() => {
+                  if (item.isDemo) showToast(BETA_DEMO_MESSAGE, 'warning');
+                  setSelectedSaleListing(item);
+                }}
                 onChat={() => setSaleChatListing(item)}
               />
             ))}
@@ -265,7 +278,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
   const address = item.addressSnapshot || {};
   const city = address.city || item.city || 'Hyderabad';
   const area = address.area || 'Area pending';
-  const owned = item.sellerId === currentUserId;
+  const owned = item.sellerId === currentUserId || item.isDemo;
 
   return (
     <motion.div
@@ -303,7 +316,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
             <span className="text-[16px] font-bold text-white tracking-tight shrink-0">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
           </div>
           <button onClick={(e) => { e.stopPropagation(); if (!owned) onChat(); }} disabled={owned} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-            {owned ? 'Owned' : 'Chat'}
+            {item.isDemo ? 'Demo' : owned ? 'Owned' : 'Chat'}
           </button>
         </div>
       </div>
@@ -314,7 +327,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
 function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item: any; currentUserId?: string; onClose: () => void; onChat: () => void }) {
   const address = item.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
-  const owned = item.sellerId === currentUserId;
+  const owned = item.sellerId === currentUserId || item.isDemo;
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
@@ -372,7 +385,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
               className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
             >
               <MessageCircle size={16} />
-              {owned ? 'Your Listing' : 'Chat with Seller'}
+              {item.isDemo ? 'Demo Listing' : owned ? 'Your Listing' : 'Chat with Seller'}
             </button>
           </div>
         </div>
