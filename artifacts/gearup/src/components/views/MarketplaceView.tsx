@@ -13,13 +13,15 @@ import { BETA_LAUNCH_MODE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS } from '@/lib/
 import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
+const XBOX_THUMBNAIL =
+  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 900 600%22%3E%3Cdefs%3E%3CradialGradient id=%22g%22 cx=%2255%25%22 cy=%2230%25%22 r=%2270%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%2316a34a%22 stop-opacity=%22.95%22/%3E%3Cstop offset=%2240%25%22 stop-color=%22%230f172a%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23020617%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22x%22 x1=%220%22 x2=%221%22%3E%3Cstop stop-color=%22%231f2937%22/%3E%3Cstop offset=%221%22 stop-color=%22%23030508%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22900%22 height=%22600%22 fill=%22url(%23g)%22/%3E%3Crect x=%22560%22 y=%22105%22 width=%22118%22 height=%22385%22 rx=%2218%22 fill=%22url(%23x)%22 stroke=%22%2334d399%22 stroke-opacity=%22.35%22 stroke-width=%223%22/%3E%3Ccircle cx=%22619%22 cy=%22158%22 r=%2229%22 fill=%22%23050a07%22 stroke=%22%2322c55e%22 stroke-width=%224%22/%3E%3Cpath d=%22M601 140c21 11 37 28 47 51%22 fill=%22none%22 stroke=%22%2316a34a%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M220 342c28-62 84-96 154-86l71 13 71-13c70-10 126 24 154 86l28 61c13 28-6 61-37 61h-70c-21 0-40-11-51-29l-24-39H374l-24 39c-11 18-30 29-51 29h-70c-31 0-50-33-37-61l28-61z%22 fill=%22%23101419%22 stroke=%22%23e5e7eb%22 stroke-opacity=%22.2%22 stroke-width=%223%22/%3E%3Ccircle cx=%22321%22 cy=%22358%22 r=%2228%22 fill=%22%23111827%22 stroke=%22%234ade80%22 stroke-width=%225%22/%3E%3Cpath d=%22M296 358h50M321 333v50%22 stroke=%22%234ade80%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%22576%22 cy=%22335%22 r=%2211%22 fill=%22%2322c55e%22/%3E%3Ccircle cx=%22610%22 cy=%22360%22 r=%2211%22 fill=%22%2384cc16%22/%3E%3Ccircle cx=%22542%22 cy=%22360%22 r=%2211%22 fill=%22%2316a34a%22/%3E%3Ccircle cx=%22576%22 cy=%22386%22 r=%2211%22 fill=%22%23bbf7d0%22/%3E%3Ctext x=%2272%22 y=%22110%22 fill=%22%23dcfce7%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2252%22 font-weight=%22700%22%3EXbox%3C/text%3E%3Ctext x=%2274%22 y=%22152%22 fill=%22%2386efac%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 letter-spacing=%224%22%3ESERIES X%7CS%3C/text%3E%3C/svg%3E';
 const CATEGORY_VISUALS = {
   laptop: { Icon: Laptop, label: 'Laptop', image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80' },
   desktop: { Icon: Monitor, label: 'Gaming PC', image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=900&q=80' },
   gpu: { Icon: Cpu, label: 'GPU', image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80' },
   console: { Icon: Gamepad2, label: 'Console', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
   playstation: { Icon: Gamepad2, label: 'PlayStation', image: 'https://images.unsplash.com/photo-1607853202273-797f1c22a38e?auto=format&fit=crop&w=900&q=80' },
-  xbox: { Icon: Gamepad2, label: 'Xbox', image: 'https://images.unsplash.com/photo-1605901309584-818e25960a8f?auto=format&fit=crop&w=900&q=80' },
+  xbox: { Icon: Gamepad2, label: 'Xbox', image: XBOX_THUMBNAIL },
   nintendo: { Icon: Gamepad2, label: 'Nintendo', image: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=900&q=80' },
   camera: { Icon: Camera, label: 'Camera', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80' },
   monitor: { Icon: Monitor, label: 'Monitor', image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80' },
@@ -28,7 +30,12 @@ const CATEGORY_VISUALS = {
 };
 
 function getCategoryVisual(item: any) {
-  const text = `${item?.category || ''} ${item?.title || ''}`.toLowerCase();
+  const primaryText = `${item?.title || ''} ${item?.model || ''} ${item?.name || ''}`.toLowerCase();
+  if (primaryText.includes('xbox') || primaryText.includes('series x') || primaryText.includes('series s')) return CATEGORY_VISUALS.xbox;
+  if (primaryText.includes('playstation') || primaryText.includes('ps4') || primaryText.includes('ps5') || /\bps\b/.test(primaryText)) return CATEGORY_VISUALS.playstation;
+  if (primaryText.includes('nintendo') || primaryText.includes('switch')) return CATEGORY_VISUALS.nintendo;
+
+  const text = `${item?.category || ''} ${primaryText}`.toLowerCase();
   if (text.includes('laptop') || text.includes('macbook')) return CATEGORY_VISUALS.laptop;
   if (text.includes('gpu') || text.includes('rtx') || text.includes('gtx') || text.includes('radeon')) return CATEGORY_VISUALS.gpu;
   if (text.includes('desktop') || text.includes('gaming pc') || /\bpc\b/.test(text)) return CATEGORY_VISUALS.desktop;
