@@ -13,7 +13,7 @@ import ListGearModal from '../modals/ListGearModal';
 import ProfileCompletionModal from '../modals/ProfileCompletionModal';
 import AddressModal from '../modals/AddressModal';
 import BetaWelcomeModal from '../modals/BetaWelcomeModal';
-import { BETA_LAUNCH_MODE, BETA_MESSAGE, BETA_LISTING_PHONE_MESSAGE, canListDuringBeta } from '@/lib/beta';
+import { BETA_LAUNCH_MODE, BETA_MESSAGE, canListDuringBeta, getBetaListingGateMessage } from '@/lib/beta';
 import { useToast } from '@/context/ToastContext';
 
 export type AppTab = 'marketplace' | 'dashboard' | 'sell' | 'wallet' | 'profile' | 'admin';
@@ -38,7 +38,7 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     const handleOpen = () => {
       if (!canListDuringBeta(profile)) {
-        showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+        showToast(getBetaListingGateMessage(profile), 'warning');
         return;
       }
       setEditItem(null);

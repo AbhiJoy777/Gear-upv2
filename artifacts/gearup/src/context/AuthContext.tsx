@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { arrayUnion, doc, onSnapshot, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -34,17 +34,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+        const providerIds = firebaseUser.providerData.map((provider) => provider.providerId);
+        const hasGoogle = providerIds.includes('google.com');
+        const hasPhone = providerIds.includes('phone');
+        const hasPassword = providerIds.includes('password');
+        const primaryAuthProvider = hasGoogle ? 'google.com' : hasPhone ? 'phone' : hasPassword ? 'password' : providerIds[0] || 'unknown';
         const base: any = {
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL || null,
           updatedAt: serverTimestamp(),
         };
+        if (firebaseUser.email) {
+          base.email = firebaseUser.email;
+          base.emailVerified = Boolean(firebaseUser.emailVerified || hasGoogle);
+        }
+        if (firebaseUser.phoneNumber) {
+          base.phone = firebaseUser.phoneNumber;
+          base.phoneVerified = true;
+          base.phoneVerifiedAt = serverTimestamp();
+        }
+        if (firebaseUser.photoURL) base.photoURL = firebaseUser.photoURL;
+        if (providerIds.length > 0) base.authProviders = arrayUnion(...providerIds);
+        if (!snap.exists() || !snap.data()?.primaryAuthProvider) base.primaryAuthProvider = primaryAuthProvider;
         if (!snap.exists()) {
           base.createdAt = serverTimestamp();
-          await setDoc(userRef, base);
+          await setDoc(userRef, base, { merge: true });
         } else {
-          await updateDoc(userRef, base);
+          await setDoc(userRef, base, { merge: true });
         }
       } catch (e) {
         console.error('User doc bootstrap error:', e);

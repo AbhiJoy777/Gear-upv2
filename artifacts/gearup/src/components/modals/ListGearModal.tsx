@@ -6,7 +6,7 @@ import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/fi
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
-import { BETA_LAUNCH_MODE, BETA_LISTING_PHONE_MESSAGE, canListDuringBeta } from '@/lib/beta';
+import { BETA_LAUNCH_MODE, canListDuringBeta, getBetaListingGateMessage } from '@/lib/beta';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
 const CATS = [
@@ -364,7 +364,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const submit = async () => {
     if (!user || !isValid()) return;
     if (!canListDuringBeta(profile)) {
-      showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+      showToast(getBetaListingGateMessage(profile), 'warning');
       return;
     }
     setLoad(true);

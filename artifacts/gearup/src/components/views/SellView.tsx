@@ -9,7 +9,7 @@ import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
 import ConfirmModal from '../modals/ConfirmModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import AddressModal from '../modals/AddressModal';
-import { BETA_LISTING_PHONE_MESSAGE, canListDuringBeta } from '@/lib/beta';
+import { canListDuringBeta, getBetaListingGateMessage } from '@/lib/beta';
 
 const SELL_CATEGORIES = [
   { name: 'Laptops', Icon: Laptop },
@@ -121,7 +121,7 @@ const SellView = memo(() => {
 
   const openCreateModal = () => {
     if (!canPublish) {
-      showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+      showToast(getBetaListingGateMessage(profile), 'warning');
       return;
     }
     setEditingListing(null);
@@ -303,7 +303,7 @@ function EmptyState({ tab, canPublish, onCreate }: { tab: SellTab; canPublish: b
           onClick={onCreate}
           className="mt-5 px-5 py-3 bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px]"
         >
-          {canPublish ? 'Create Sale Listing' : 'Verify Phone to List'}
+          {canPublish ? 'Create Sale Listing' : 'Connect Account to List'}
         </button>
       )}
     </div>
@@ -436,7 +436,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
   const publish = async () => {
     if (!user || !canContinue()) return;
     if (!canListDuringBeta(profile)) {
-      showToast(BETA_LISTING_PHONE_MESSAGE, 'warning');
+      showToast(getBetaListingGateMessage(profile), 'warning');
       return;
     }
     setSaving(true);
