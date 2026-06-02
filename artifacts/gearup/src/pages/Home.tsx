@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import LoginForm from '@/components/auth/LoginForm';
-import SignupForm from '@/components/auth/SignupForm';
+import PublicBetaAuth from '@/components/auth/PublicBetaAuth';
 import Logo from '@/components/common/Logo';
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
   if (loading) return null;
 
@@ -19,17 +16,7 @@ export default function Home() {
         </div>
 
         <div className="w-full max-w-[400px] space-y-8">
-          {authMode === 'login' ? <LoginForm /> : <SignupForm />}
-
-          <div className="flex justify-center flex-col items-center gap-4">
-             <button
-                onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                className="text-white/20 hover:text-mint-muted transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2 cursor-pointer"
-              >
-                {authMode === 'login' ? null : <>Existing User?<br/></>}
-                <span className="text-[#A855F7]">{authMode === 'login' ? "Create New Account" : "Log In"}</span>
-              </button>
-          </div>
+          <PublicBetaAuth />
         </div>
       </div>
     );
