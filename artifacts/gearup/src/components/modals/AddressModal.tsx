@@ -144,6 +144,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   const [mapsReady, setMapsReady] = useState(false);
   const [mapsFailed, setMapsFailed] = useState(false);
   const [mapsLoading, setMapsLoading] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -161,13 +162,18 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
 
   const selectedHasPin = typeof form.lat === 'number' && typeof form.lng === 'number';
   const canUseMaps = Boolean(googleMapsKey) && mapsReady && !mapsFailed;
-  const selectedSummary = form.formattedAddress || formatAddress(form) || `${form.city || 'Hyderabad'} pickup address`;
+  const selectedSummary =
+    form.formattedAddress ||
+    (selectedHasPin && !form.houseOrBuilding && !form.area ? 'Location captured. Add house/area details.' : '') ||
+    formatAddress(form) ||
+    `${form.city || 'Hyderabad'} pickup address`;
 
   useEffect(() => {
     if (!open) return;
 
     if (editAddress) {
       setStep('details');
+      setLocationAccuracy(null);
       setSearchQuery(editAddress.formattedAddress || formatAddress(editAddress));
       setForm({
         label: editAddress.label || 'Home',
@@ -184,6 +190,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
     }
 
     setStep('location');
+    setLocationAccuracy(null);
     setSearchQuery('');
     setSuggestions([]);
     setForm({
@@ -200,7 +207,12 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   }, [open, editAddress, profile?.city]);
 
   useEffect(() => {
-    if (!open || !googleMapsKey) return;
+    if (!open) return;
+    if (!googleMapsKey) {
+      setMapsReady(false);
+      setMapsFailed(true);
+      return;
+    }
 
     setMapsLoading(true);
     setMapsFailed(false);
@@ -332,6 +344,8 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        const accuracy = typeof position.coords.accuracy === 'number' ? position.coords.accuracy : null;
+        setLocationAccuracy(accuracy);
         const supported = ensureSupportedPin(lat, lng);
         if (!supported) {
           setLocating(false);
@@ -348,7 +362,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
           area: geocoded?.area || current.area,
         }));
         setSearchQuery(geocoded?.formattedAddress || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-        showToast('Location captured. Add the address details.', 'success');
+        showToast(accuracy && accuracy > 500 ? 'Location may be approximate. Adjust address details manually.' : 'Location captured. Add house/area details.', accuracy && accuracy > 500 ? 'warning' : 'success');
         setStep('details');
         setLocating(false);
       },
@@ -509,12 +523,16 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                     lng={form.lng}
                     fallbackCity={form.city || profile?.city || 'Hyderabad'}
                     summary={selectedSummary}
+                    mapsAvailable={Boolean(googleMapsKey) && !mapsFailed}
                   />
 
                   <div className="rounded-[18px] border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-1">Selected location</p>
                     <p className="text-[13px] font-bold text-white leading-relaxed">{selectedSummary}</p>
                     <p className="text-[12px] text-white/45 mt-1">{selectedHasPin ? `${form.city || 'Supported city'} map pin selected` : 'No map pin selected yet. Manual address works for beta.'}</p>
+                    {locationAccuracy && locationAccuracy > 500 && (
+                      <p className="text-[12px] text-[#F97316] mt-2">Location may be approximate. Adjust address details manually.</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -524,6 +542,7 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                     lng={form.lng}
                     fallbackCity={form.city || profile?.city || 'Hyderabad'}
                     summary={selectedSummary}
+                    mapsAvailable={Boolean(googleMapsKey) && !mapsFailed}
                     compact
                   />
 
@@ -531,6 +550,9 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
                     <div className="min-w-0">
                       <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-1">Selected address</p>
                       <p className="text-[13px] font-bold text-white leading-relaxed">{selectedSummary}</p>
+                      {locationAccuracy && locationAccuracy > 500 && (
+                        <p className="text-[12px] text-[#F97316] mt-2">Location may be approximate. Adjust address details manually.</p>
+                      )}
                     </div>
                     {!editAddress && (
                       <button onClick={() => setStep('location')} className="text-[12px] font-bold text-[#A855F7] hover:text-white shrink-0">
@@ -634,14 +656,28 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   );
 }
 
-function MapPreview({ lat, lng, fallbackCity, summary, compact = false }: { lat: number | null; lng: number | null; fallbackCity: string; summary: string; compact?: boolean }) {
+function MapPreview({
+  lat,
+  lng,
+  fallbackCity,
+  summary,
+  mapsAvailable,
+  compact = false,
+}: {
+  lat: number | null;
+  lng: number | null;
+  fallbackCity: string;
+  summary: string;
+  mapsAvailable: boolean;
+  compact?: boolean;
+}) {
   const city = SERVICE_AREAS.find((area) => area.city === fallbackCity) || DEFAULT_CENTER;
   const previewLat = typeof lat === 'number' ? lat : city.lat;
   const previewLng = typeof lng === 'number' ? lng : city.lng;
 
   return (
     <div className={`${compact ? 'h-[140px]' : 'h-[230px]'} rounded-[22px] overflow-hidden border border-white/10 bg-[#0A0A0A] relative`}>
-      {googleMapsKey ? (
+      {mapsAvailable ? (
         <iframe
           title="Address map preview"
           src={mapPreviewUrl(previewLat, previewLng)}
@@ -649,13 +685,20 @@ function MapPreview({ lat, lng, fallbackCity, summary, compact = false }: { lat:
           loading="lazy"
         />
       ) : (
-        <div className="w-full h-full bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.18),rgba(10,10,10,1)_60%)]" />
-      )}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
-        <div className="w-9 h-9 rounded-full bg-[#A855F7] border-4 border-white/90 shadow-2xl flex items-center justify-center">
-          <MapPin size={16} className="text-white" />
+        <div className="w-full h-full bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.18),rgba(10,10,10,1)_60%)] flex items-center justify-center p-6 text-center">
+          <div>
+            <MapPin size={22} className="text-[#A855F7] mx-auto mb-3" />
+            <p className="text-[13px] font-bold text-white">Map preview unavailable. You can still save address manually.</p>
+          </div>
         </div>
-      </div>
+      )}
+      {mapsAvailable && (
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
+          <div className="w-9 h-9 rounded-full bg-[#A855F7] border-4 border-white/90 shadow-2xl flex items-center justify-center">
+            <MapPin size={16} className="text-white" />
+          </div>
+        </div>
+      )}
       <div className="absolute left-3 right-3 bottom-3 rounded-[16px] bg-black/70 border border-white/10 backdrop-blur-md px-3 py-2">
         <p className="text-[12px] font-bold text-white truncate">{summary}</p>
         <p className="text-[10px] text-white/45">{typeof lat === 'number' && typeof lng === 'number' ? 'Map pin selected' : 'Preview center. Exact pin optional in beta.'}</p>
