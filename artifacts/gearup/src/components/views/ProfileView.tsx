@@ -3,8 +3,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase, Wallet, Trash2 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { db, googleProvider } from '@/lib/firebase';
+import { linkWithPopup } from 'firebase/auth';
+import { arrayUnion, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
@@ -78,6 +79,8 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
 
   const verificationStatus = profile?.verificationStatus || 'not_started';
   const phoneVerified = !!profile?.phoneVerified;
+  const authProviders = Array.isArray(profile?.authProviders) ? profile.authProviders : [];
+  const googleConnected = !!profile?.emailVerified || authProviders.includes('google.com');
   const addresses: GearUpAddress[] = profile?.addresses || [];
   const defaultAddress = getDefaultAddress(addresses);
   const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
@@ -93,6 +96,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const menuItems = [
     { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
     { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
+    { icon: Mail, label: 'Google / Email', subtitle: 'Connect Google account', status: googleConnected ? 'Connected' : 'Connect Google', interactive: !googleConnected, type: 'google' },
     { icon: MapPin, label: 'Addresses', subtitle: 'Manage pickup addresses', status: 'Manage', interactive: true, type: 'addresses' },
     { icon: Wallet, label: 'Wallet', status: 'Open', interactive: true, type: 'wallet' },
     { icon: Mail, label: 'Email Preferences', status: 'Verified' },
@@ -132,6 +136,35 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     } catch (err) {
       console.error(err);
       showToast('Failed to delete address.', 'error');
+    }
+  };
+
+  const handleConnectGoogle = async () => {
+    if (!user) return;
+    try {
+      const result = await linkWithPopup(user, googleProvider);
+      await setDoc(doc(db, 'users', user.uid), {
+        email: result.user.email,
+        emailVerified: Boolean(result.user.emailVerified || result.user.providerData.some((provider) => provider.providerId === 'google.com')),
+        authProviders: arrayUnion('google.com'),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      showToast('Google account connected.', 'success');
+    } catch (err: any) {
+      console.error('Google account link failed:', {
+        code: err?.code,
+        message: err?.message,
+        error: err,
+      });
+      if (err?.code === 'auth/credential-already-in-use' || err?.code === 'auth/account-exists-with-different-credential') {
+        showToast('This Google account is already linked to another GearUp account.', 'error');
+        return;
+      }
+      if (err?.code === 'auth/provider-already-linked') {
+        showToast('Google account is already connected.', 'info');
+        return;
+      }
+      showToast('Could not connect Google account. Please try again.', 'error');
     }
   };
 
@@ -198,10 +231,14 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                 setAddressManagerOpen(true);
                 return;
               }
+              if (item.type === 'google') {
+                if (!googleConnected) handleConnectGoogle();
+                return;
+              }
               if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
             className={`bg-[#121212] p-4 sm:p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between gap-3 group transition-all ${
-              item.type === 'wallet' || item.type === 'addresses' || (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+              item.type === 'wallet' || item.type === 'addresses' || (item.type === 'google' && !googleConnected) || (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
             }`}
           >
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -219,10 +256,12 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
               <span className={`text-[11px] font-semibold tracking-wider ${
                 item.type === 'phone'
                   ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
+                  : item.type === 'google' ? (googleConnected ? 'text-[#2DD4BF]' : 'text-[#F97316]')
                   : item.type === 'wallet' || item.type === 'addresses' ? 'text-[#707070]'
                   : item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
               }`}>{item.status}</span>
               {item.type === 'phone' && !phoneVerified && <ChevronRight size={16} className="text-white/20" />}
+              {item.type === 'google' && !googleConnected && <ChevronRight size={16} className="text-white/20" />}
               {item.type === 'wallet' && <ChevronRight size={16} className="text-white/20" />}
               {item.type === 'addresses' && <ChevronRight size={16} className="text-white/20" />}
               {!item.type && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}

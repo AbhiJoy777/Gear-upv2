@@ -12,7 +12,7 @@ export const BETA_DEMO_MESSAGE =
   'Demo listing for beta preview. Real bookings open soon.';
 
 export const BETA_LISTING_PHONE_MESSAGE =
-  'Phone verification is coming soon. Add your phone number to list during beta.';
+  'Verify your phone number to list gear during beta.';
 
 export const DEFAULT_LAUNCH_INTEREST = {
   wantsToRent: false,
@@ -20,8 +20,24 @@ export const DEFAULT_LAUNCH_INTEREST = {
   wantsToSell: false,
 };
 
+export const hasGoogleOrVerifiedEmail = (profile: any) => {
+  const providers = Array.isArray(profile?.authProviders) ? profile.authProviders : [];
+  return Boolean(profile?.emailVerified || providers.includes('google.com'));
+};
+
+export const hasVerifiedPhone = (profile: any) => Boolean(profile?.phoneVerified);
+
+export const getBetaListingGateMessage = (profile: any) => {
+  const hasEmail = hasGoogleOrVerifiedEmail(profile);
+  const hasPhone = hasVerifiedPhone(profile);
+  if (!hasEmail && !hasPhone) return 'Connect Google and verify your phone number to list gear during beta.';
+  if (!hasEmail) return 'Connect Google to list gear during beta.';
+  if (!hasPhone) return 'Verify your phone number to list gear during beta.';
+  return '';
+};
+
 export const canListDuringBeta = (profile: any) =>
-  !BETA_LAUNCH_MODE || Boolean(profile?.phone || profile?.phoneVerified);
+  !BETA_LAUNCH_MODE || !getBetaListingGateMessage(profile);
 
 export const DEMO_RENT_LISTINGS = [
   {

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Phone, ShieldCheck, Loader2 } from 'lucide-react';
-import { PhoneAuthProvider, RecaptchaVerifier, updatePhoneNumber } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { linkWithCredential, PhoneAuthProvider, RecaptchaVerifier } from 'firebase/auth';
+import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -33,17 +33,17 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please try again later.';
+      return 'Too many attempts. Please wait before trying again.';
     case 'auth/invalid-verification-code':
-      return 'The OTP is incorrect or expired.';
+      return 'Invalid OTP. Please check the code and try again.';
     case 'auth/code-expired':
-      return 'The OTP has expired. Please request a new one.';
+      return 'OTP expired. Please request a new code.';
     case 'auth/billing-not-enabled':
       return 'OTP verification is temporarily unavailable during beta. Please add your phone number in profile.';
     case 'auth/requires-recent-login':
       return 'Please sign in again before verifying your phone.';
     case 'auth/credential-already-in-use':
-      return 'This phone number is already linked to another account.';
+      return 'This phone number is already linked to another GearUp account.';
     default:
       return 'Phone verification failed. Please try again.';
   }
@@ -160,11 +160,17 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
     setVerifying(true);
     try {
       const credential = PhoneAuthProvider.credential(verificationId, otp.trim());
-      await updatePhoneNumber(user, credential);
+      try {
+        await linkWithCredential(user, credential);
+      } catch (err: any) {
+        if (err?.code !== 'auth/provider-already-linked') throw err;
+      }
       await setDoc(doc(db, 'users', user.uid), {
         phone: verificationPhone,
         phoneVerified: true,
         phoneVerifiedAt: serverTimestamp(),
+        authProviders: arrayUnion('phone'),
+        updatedAt: serverTimestamp(),
       }, { merge: true });
       showToast('Phone verified successfully.', 'success');
       onClose();

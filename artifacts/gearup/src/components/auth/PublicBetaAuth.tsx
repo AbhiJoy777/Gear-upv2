@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Phone, ShieldCheck } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, type ConfirmationResult } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { useToast } from '@/context/ToastContext';
 import LoginForm from './LoginForm';
@@ -28,11 +28,13 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please try again later.';
+      return 'Too many attempts. Please wait before trying again.';
     case 'auth/invalid-verification-code':
-      return 'The OTP is incorrect or expired.';
+      return 'Invalid OTP. Please check the code and try again.';
     case 'auth/code-expired':
-      return 'The OTP has expired. Please request a new one.';
+      return 'OTP expired. Please request a new code.';
+    case 'auth/credential-already-in-use':
+      return 'This phone number is already linked to another GearUp account.';
     case 'auth/billing-not-enabled':
       return 'OTP verification is temporarily unavailable during beta. Please try Google login.';
     default:
@@ -157,6 +159,8 @@ export default function PublicBetaAuth() {
         phone: verificationPhone,
         phoneVerified: true,
         phoneVerifiedAt: serverTimestamp(),
+        authProviders: arrayUnion('phone'),
+        primaryAuthProvider: 'phone',
         updatedAt: serverTimestamp(),
       }, { merge: true });
       showToast('Phone login successful.', 'success');
