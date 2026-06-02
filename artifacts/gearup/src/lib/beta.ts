@@ -25,6 +25,7 @@ export const hasGoogleOrVerifiedEmail = (profile: any) => {
 export const hasVerifiedPhone = (profile: any) => Boolean(profile?.phoneVerified);
 
 export const getBetaListingGateMessage = (profile: any) => {
+  if (profile?.role === 'admin') return '';
   const hasEmail = hasGoogleOrVerifiedEmail(profile);
   const hasPhone = hasVerifiedPhone(profile);
   if (!hasEmail && !hasPhone) return 'Connect Google and verify your phone number to list gear during beta.';

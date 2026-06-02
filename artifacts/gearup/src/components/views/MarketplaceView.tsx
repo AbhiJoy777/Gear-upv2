@@ -14,14 +14,14 @@ import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
 const CATEGORY_VISUALS = {
-  laptop: { Icon: Laptop, label: 'Laptop', accent: 'from-[#2DD4BF]/20 to-[#A855F7]/10' },
-  desktop: { Icon: Monitor, label: 'Gaming PC', accent: 'from-[#A855F7]/20 to-[#2DD4BF]/10' },
-  gpu: { Icon: Cpu, label: 'GPU', accent: 'from-[#2DD4BF]/20 to-white/[0.02]' },
-  console: { Icon: Gamepad2, label: 'Console', accent: 'from-[#A855F7]/20 to-white/[0.02]' },
-  camera: { Icon: Camera, label: 'Camera', accent: 'from-[#2DD4BF]/12 to-[#A855F7]/10' },
-  monitor: { Icon: Monitor, label: 'Monitor', accent: 'from-white/[0.08] to-[#2DD4BF]/10' },
-  controller: { Icon: Gamepad2, label: 'Controller', accent: 'from-[#A855F7]/12 to-white/[0.03]' },
-  fallback: { Icon: ShoppingBag, label: 'Tech Gear', accent: 'from-white/[0.06] to-[#A855F7]/8' },
+  laptop: { Icon: Laptop, label: 'Laptop', image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80' },
+  desktop: { Icon: Monitor, label: 'Gaming PC', image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=900&q=80' },
+  gpu: { Icon: Cpu, label: 'GPU', image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80' },
+  console: { Icon: Gamepad2, label: 'Console', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
+  camera: { Icon: Camera, label: 'Camera', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80' },
+  monitor: { Icon: Monitor, label: 'Monitor', image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80' },
+  controller: { Icon: Gamepad2, label: 'Controller', image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80' },
+  fallback: { Icon: ShoppingBag, label: 'Tech Gear', image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80' },
 };
 
 function getCategoryVisual(item: any) {
@@ -41,13 +41,17 @@ function CategoryThumbnail({ item, imageUrl }: { item: any; imageUrl?: string })
     return <img src={imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out relative z-0" />;
   }
 
-  const { Icon, label, accent } = getCategoryVisual(item);
+  const { Icon, label, image } = getCategoryVisual(item);
   return (
-    <div className={`relative z-0 w-full h-full bg-gradient-to-br ${accent} flex flex-col items-center justify-center gap-3`}>
-      <div className="w-20 h-20 rounded-[28px] bg-black/25 border border-white/10 flex items-center justify-center shadow-[0_18px_45px_rgba(0,0,0,0.35)] group-hover:scale-105 transition-transform duration-500">
-        <Icon size={42} className="text-white/70" />
+    <div className="relative z-0 w-full h-full bg-[#0A0A0A] overflow-hidden">
+      <img src={image} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/10" />
+      <div className="absolute left-4 bottom-4 flex items-center gap-2">
+        <span className="w-9 h-9 rounded-[14px] bg-black/45 border border-white/10 backdrop-blur-md flex items-center justify-center">
+          <Icon size={18} className="text-white/80" />
+        </span>
+        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">{label}</span>
       </div>
-      <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35">{label}</span>
     </div>
   );
 }
@@ -114,6 +118,15 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       return;
     }
     setBookingItem(item);
+  };
+
+  const handleSaleChat = (item: any) => {
+    if (!user) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast('Seller chat opens soon during GearUp Beta.', 'warning');
+      return;
+    }
+    setSaleChatListing(item);
   };
 
   const getTierColor = (t: string) => {
@@ -265,7 +278,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 item={item}
                 currentUserId={user?.uid}
                 onOpen={() => setSelectedSaleListing(item)}
-                onChat={() => setSaleChatListing(item)}
+                onChat={() => handleSaleChat(item)}
               />
             ))}
           </AnimatePresence>
@@ -305,7 +318,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           item={selectedSaleListing}
           currentUserId={user?.uid}
           onClose={() => setSelectedSaleListing(null)}
-          onChat={() => setSaleChatListing(selectedSaleListing)}
+          onChat={() => handleSaleChat(selectedSaleListing)}
         />
       )}
       {saleChatListing && (
@@ -435,7 +448,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
             <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">ASKING PRICE</span>
             <span className="text-[16px] font-bold text-white tracking-tight shrink-0">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); if (!owned && !item.isDemo) onChat(); }} disabled={owned || item.isDemo} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
+          <button onClick={(e) => { e.stopPropagation(); if (!owned) onChat(); }} disabled={owned} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
             {owned ? 'Owned' : 'Chat'}
           </button>
         </div>
@@ -501,7 +514,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
             )}
             <button
               onClick={onChat}
-              disabled={owned || item.isDemo}
+              disabled={owned}
               className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
             >
               <MessageCircle size={16} />
