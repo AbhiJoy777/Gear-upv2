@@ -390,7 +390,7 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+          <div className="h-[min(280px,45vh)] md:h-auto md:aspect-[4/3] md:self-start rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
               {activeImage ? (
                 <img src={activeImage} alt={item.title} className="w-full h-full object-cover" />
               ) : (
@@ -546,7 +546,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+          <div className="h-[min(280px,45vh)] md:h-auto md:aspect-[4/3] md:self-start rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
             {activeImage ? <img src={activeImage} alt={item.title} className="w-full h-full object-cover" /> : <CategoryThumbnail item={item} />}
             {hasMultipleImages && (
               <>
