@@ -505,7 +505,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-10 space-y-4">
+    <div className="p-4 pb-28 sm:p-6 md:p-10 space-y-4">
       <div className="flex gap-6 md:gap-8 overflow-x-auto scrollbar-hide border-b border-white/5 pb-0">
         {[
           { key: 'listings', label: 'My Listings' },
@@ -546,7 +546,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             loadingListings ? (
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
             ) : listings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left items-start">
                 {listings.map((item, idx) => {
                   const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['PAID_REQUESTED', 'REQUESTED'].includes(r.status));
                   const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
@@ -561,7 +561,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     transition={{ delay: idx * 0.05 }}
                     className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full min-w-0 select-none"
                   >
-                    <div className="w-full h-44 sm:h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04] shrink-0">
+                    <div className="w-full aspect-[16/10] max-h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04] shrink-0">
                       {item.tier && (
                         <span className={`absolute top-4 right-4 text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-[24px] border-[0.5px] z-10 uppercase ${getTierColor(item.tier)}`}>
                           {item.tier} TIER
@@ -575,7 +575,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     </div>
                     <div className="p-5 flex-1 flex flex-col min-h-0">
                       <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-2 break-words">{item.title}</h3>
-                      <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
+                      <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2 break-words">{item.category}</p>
                       {timelineRental && (
                         <div className="mb-5">
                           <RentalTimelineSummary rental={timelineRental} />
@@ -749,10 +749,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                                 </button>
                               </div>
                             ))}
-                            <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
-                               <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-2 pt-4 border-t border-white/10">
+                               <span className="text-[13px] font-bold text-[#A855F7] tracking-tight whitespace-nowrap">₹{item.pricePerDay} / Day</span>
                                {!lockedRental && (
-                                 <div className="flex items-center gap-3">
+                                 <div className="flex items-center gap-3 flex-wrap">
                                    <button
                                      onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
                                      className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
