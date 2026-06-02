@@ -18,6 +18,9 @@ const CATEGORY_VISUALS = {
   desktop: { Icon: Monitor, label: 'Gaming PC', image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=900&q=80' },
   gpu: { Icon: Cpu, label: 'GPU', image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80' },
   console: { Icon: Gamepad2, label: 'Console', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
+  playstation: { Icon: Gamepad2, label: 'PlayStation', image: 'https://images.unsplash.com/photo-1607853202273-797f1c22a38e?auto=format&fit=crop&w=900&q=80' },
+  xbox: { Icon: Gamepad2, label: 'Xbox', image: 'https://images.unsplash.com/photo-1621255973235-4b7b87e2c0a3?auto=format&fit=crop&w=900&q=80' },
+  nintendo: { Icon: Gamepad2, label: 'Nintendo', image: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=900&q=80' },
   camera: { Icon: Camera, label: 'Camera', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80' },
   monitor: { Icon: Monitor, label: 'Monitor', image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80' },
   controller: { Icon: Gamepad2, label: 'Controller', image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80' },
@@ -27,12 +30,15 @@ const CATEGORY_VISUALS = {
 function getCategoryVisual(item: any) {
   const text = `${item?.category || ''} ${item?.title || ''}`.toLowerCase();
   if (text.includes('laptop') || text.includes('macbook')) return CATEGORY_VISUALS.laptop;
-  if (text.includes('desktop') || text.includes('gaming pc') || text.includes('pc')) return CATEGORY_VISUALS.desktop;
-  if (text.includes('gpu') || text.includes('rtx') || text.includes('radeon')) return CATEGORY_VISUALS.gpu;
-  if (text.includes('console') || text.includes('playstation') || text.includes('ps5') || text.includes('xbox')) return CATEGORY_VISUALS.console;
-  if (text.includes('camera') || text.includes('canon') || text.includes('sony') || text.includes('gopro')) return CATEGORY_VISUALS.camera;
+    if (text.includes('gpu') || text.includes('rtx') || text.includes('gtx') || text.includes('radeon')) return CATEGORY_VISUALS.gpu;
+  if (text.includes('desktop') || text.includes('gaming pc') || /\bpc\b/.test(text)) return CATEGORY_VISUALS.desktop;
+  if (text.includes('playstation') || text.includes('ps4') || text.includes('ps5')) return CATEGORY_VISUALS.playstation;
+  if (text.includes('xbox') || text.includes('series x') || text.includes('series s')) return CATEGORY_VISUALS.xbox;
+  if (text.includes('nintendo') || text.includes('switch')) return CATEGORY_VISUALS.nintendo;
+  if (text.includes('console')) return CATEGORY_VISUALS.console;
+  if (text.includes('camera') || text.includes('dslr') || text.includes('mirrorless') || text.includes('canon') || text.includes('sony') || text.includes('nikon') || text.includes('gopro')) return CATEGORY_VISUALS.camera;
   if (text.includes('monitor')) return CATEGORY_VISUALS.monitor;
-  if (text.includes('controller')) return CATEGORY_VISUALS.controller;
+  if (text.includes('controller') || text.includes('gamepad')) return CATEGORY_VISUALS.controller;
   return CATEGORY_VISUALS.fallback;
 }
 

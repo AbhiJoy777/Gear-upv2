@@ -559,22 +559,22 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full select-none"
+                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full min-w-0 select-none"
                   >
-                    <div className="h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
+                    <div className="w-full h-44 sm:h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04] shrink-0">
                       {item.tier && (
                         <span className={`absolute top-4 right-4 text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-[24px] border-[0.5px] z-10 uppercase ${getTierColor(item.tier)}`}>
                           {item.tier} TIER
                         </span>
                       )}
                       {item.imageUrl && !item.imageUrl.includes('picsum') ? (
-                        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover opacity-80" />
+                        <img src={item.imageUrl} alt={item.title} className="block w-full h-full object-cover opacity-80" />
                       ) : (
                         <Camera size={48} className="text-white/10" />
                       )}
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
-                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{item.title}</h3>
+                    <div className="p-5 flex-1 flex flex-col min-h-0">
+                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-2 break-words">{item.title}</h3>
                       <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
                       {timelineRental && (
                         <div className="mb-5">
