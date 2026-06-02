@@ -645,7 +645,7 @@ function MapPreview({ lat, lng, fallbackCity, summary, compact = false }: { lat:
         <iframe
           title="Address map preview"
           src={mapPreviewUrl(previewLat, previewLng)}
-          className="w-full h-full border-0 opacity-90"
+          className="w-full h-full border-0 opacity-80 [filter:invert(0.88)_hue-rotate(180deg)_saturate(0.75)_brightness(0.82)]"
           loading="lazy"
         />
       ) : (
