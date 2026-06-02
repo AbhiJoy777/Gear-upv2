@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Phone, ShieldCheck, Loader2 } from 'lucide-react';
 import { linkWithCredential, PhoneAuthProvider, RecaptchaVerifier } from 'firebase/auth';
@@ -61,6 +61,19 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [verificationPhone, setVerificationPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
 
   const resetVerifier = () => {
     try {
@@ -192,7 +205,6 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-md"
       />
 

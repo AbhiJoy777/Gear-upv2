@@ -43,6 +43,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     email: '',
     phone: '',
   });
+  const profileModalOpen = editOpen || addressManagerOpen || Boolean(addressToDelete);
 
   useEffect(() => {
     setForm({
@@ -51,6 +52,20 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
       phone: profile?.phone || '',
     });
   }, [profile, user]);
+
+  useEffect(() => {
+    if (!profileModalOpen) return;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [profileModalOpen]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -288,7 +303,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setEditOpen(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
 
@@ -466,7 +480,6 @@ function AddressManagerModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-md"
       />
       <motion.div

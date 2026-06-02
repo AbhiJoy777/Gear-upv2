@@ -56,6 +56,21 @@ function CategoryThumbnail({ item, imageUrl }: { item: any; imageUrl?: string })
   );
 }
 
+function useBodyScrollLock() {
+  useEffect(() => {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
+}
+
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const { user } = useAuth();
@@ -329,6 +344,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 });
 
 function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item: any; currentUserId?: string; onClose: () => void; onBook: () => void }) {
+  useBodyScrollLock();
   const pickupLocation = typeof item.location === 'object' ? item.location : {};
   const city = pickupLocation.city || item.city || 'Hyderabad';
   const area = pickupLocation.area || 'Area pending';
@@ -358,7 +374,7 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -418,19 +434,21 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
               <p className="text-[#2DD4BF] text-[11px] mt-3 font-bold">Pickup only</p>
             </div>
             {description && (
-              <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+              <div className="pt-1">
                 <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
                 <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
               </div>
             )}
-            <button
-              onClick={onBook}
-              disabled={owned}
-              className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
-            >
-              {owned ? 'Your Listing' : 'Book Now'}
-            </button>
           </div>
+        </div>
+        <div className="px-5 sm:px-6 py-4 border-t border-white/5 bg-[#121212] shrink-0">
+          <button
+            onClick={onBook}
+            disabled={owned}
+            className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
+          >
+            {owned ? 'Your Listing' : 'Book Now'}
+          </button>
         </div>
       </motion.div>
     </div>
@@ -488,6 +506,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
 }
 
 function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item: any; currentUserId?: string; onClose: () => void; onChat: () => void }) {
+  useBodyScrollLock();
   const address = item.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
   const owned = item.sellerId === currentUserId;
@@ -511,7 +530,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -559,10 +578,6 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
               <p className="text-white text-[32px] font-black tracking-tight mt-2">₹{Number(item.price || 0).toLocaleString('en-IN')}</p>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
-              <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
-              <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
-            </div>
-            <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
               <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Seller</p>
               <p className="text-white text-[13px] font-bold">{item.sellerName || 'GearUp Seller'}</p>
               <p className="text-white/45 text-[12px] mt-1">{item.city}</p>
@@ -573,15 +588,23 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
                 <p className="text-white/65 text-[12px] leading-relaxed">{addressText}</p>
               </div>
             )}
-            <button
-              onClick={onChat}
-              disabled={owned}
-              className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
-            >
-              <MessageCircle size={16} />
-              {owned ? 'Your Listing' : 'Chat with Seller'}
-            </button>
+            {description && (
+              <div className="pt-1">
+                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
+                <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
+              </div>
+            )}
           </div>
+        </div>
+        <div className="px-5 sm:px-6 py-4 border-t border-white/5 bg-[#121212] shrink-0">
+          <button
+            onClick={onChat}
+            disabled={owned}
+            className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
+          >
+            <MessageCircle size={16} />
+            {owned ? 'Your Listing' : 'Chat with Seller'}
+          </button>
         </div>
       </motion.div>
     </div>

@@ -206,6 +206,20 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
 
   useEffect(() => {
     if (!open) return;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
 
     if (editAddress) {
       setStep('details');
@@ -485,7 +499,6 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
             className="absolute inset-0 bg-black/80 backdrop-blur-md"
           />
           <motion.div
