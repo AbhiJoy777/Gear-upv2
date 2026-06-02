@@ -364,12 +364,45 @@ function SaleListingCard({ listing, activeTab, onEdit, onSold, onDelete }: { lis
   );
 }
 
+const MAX_SALE_IMAGE_DIMENSION = 1200;
+const SALE_IMAGE_QUALITY = 0.7;
+const MAX_SALE_FIRESTORE_IMAGE_LENGTH = 900_000;
+
 function readSaleImageAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, MAX_SALE_IMAGE_DIMENSION / image.width, MAX_SALE_IMAGE_DIMENSION / image.height);
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('image-compression-failed');
+        context.drawImage(image, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', SALE_IMAGE_QUALITY);
+        URL.revokeObjectURL(objectUrl);
+        if (dataUrl.length > MAX_SALE_FIRESTORE_IMAGE_LENGTH) {
+          reject(new Error('image-too-large'));
+          return;
+        }
+        resolve(dataUrl);
+      } catch (err) {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      }
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('image-load-failed'));
+    };
+
+    image.src = objectUrl;
   });
 }
 
@@ -451,6 +484,10 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
       setPhotos((current) => [...current, ...dataUrls].slice(0, 3));
     } catch (err) {
       console.error('Sale image read failed:', err);
+      if (err instanceof Error && err.message === 'image-too-large') {
+        showToast('Image is too large. Please choose a smaller photo.', 'error');
+        return;
+      }
       showToast('Could not load selected image.', 'error');
     }
   };
