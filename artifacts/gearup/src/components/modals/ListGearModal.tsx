@@ -210,6 +210,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [vram, setVram] = useState('');
   
   const [imgs, setImgs] = useState<string[]>([]);
+  const [description, setDescription] = useState('');
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [otherCpu, setOtherCpu] = useState('');
   const [numControllers, setNumControllers] = useState('');
@@ -418,6 +419,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
+    if (step === 6) return description.trim().length >= 20;
     return true;
   };
 
@@ -489,6 +491,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         title, category: c, pricePerDay: base,
         tier, imageUrl: imgs[0] || '',
         images: imgs,
+        description: description.trim(),
         specs: specData,
         score: totalScore,
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
@@ -503,7 +506,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       } else {
         await addDoc(collection(db, 'listings'), {
           ...payload, status: 'AVAILABLE', ownerId: user.uid,
-          description: 'Premium Gear',
 
           createdAt: serverTimestamp()
         });
@@ -529,6 +531,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea('');
     setLandmark('');
     setPickupInstructions('');
+    setDescription('');
     setLat(null);
     setLng(null);
     setLocationSource('manual');
@@ -543,6 +546,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     const specs = editItem.specs || {};
     setC(editItem.category || '');
     setImgs((editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : [])).slice(0, 3));
+    setDescription(editItem.description || '');
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
     setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
     setHouseOrBuilding(existingLocation.houseOrBuilding || '');
@@ -959,6 +963,25 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <p className={`text-[13px] font-bold tracking-wider uppercase ${tier === 'High' ? 'text-[#2DD4BF]' : tier === 'Mid' ? 'text-[#A855F7]' : 'text-white/70'}`}>
                      {tier} TIER ASSET
                    </p>
+                </div>
+
+                <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-[11px] font-bold text-white/45 uppercase tracking-wider">Gear Description</label>
+                    <span className={`text-[10px] font-bold ${description.trim().length >= 20 ? 'text-[#2DD4BF]' : 'text-white/30'}`}>
+                      {description.trim().length}/20
+                    </span>
+                  </div>
+                  <textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={4}
+                    placeholder="Mention condition, accessories included, age, and anything the borrower should know."
+                    className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none leading-relaxed"
+                  />
+                  {description.trim().length < 20 && (
+                    <p className="text-[12px] text-[#F59E0B] font-medium">Please add a short description of your gear.</p>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">

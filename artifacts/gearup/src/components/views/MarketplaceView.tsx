@@ -4,7 +4,7 @@ import React, { useEffect, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
 import { collection, query, limit, onSnapshot, where } from 'firebase/firestore';
-import { Camera, Cpu, Gamepad2, Laptop, Loader2, MapPin, MessageCircle, Monitor, PlusCircle, ShoppingBag, X } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Cpu, Gamepad2, Laptop, Loader2, MapPin, MessageCircle, Monitor, PlusCircle, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 import SaleChatModal from '../modals/SaleChatModal';
@@ -334,11 +334,27 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
   const area = pickupLocation.area || 'Area pending';
   const addressText = formatAddress(pickupLocation);
   const owned = item.ownerId === currentUserId;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const detailImages = Array.isArray(item.images) && item.images.length > 0
     ? item.images
     : item.imageUrl && !item.imageUrl.includes('picsum.photos')
       ? [item.imageUrl]
       : [];
+  const activeImage = detailImages[activeImageIndex] || detailImages[0];
+  const hasMultipleImages = detailImages.length > 1;
+  const description = (item.description || '').trim();
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [item.id]);
+
+  const showPreviousImage = () => {
+    setActiveImageIndex((current) => (current === 0 ? detailImages.length - 1 : current - 1));
+  };
+
+  const showNextImage = () => {
+    setActiveImageIndex((current) => (current + 1) % detailImages.length);
+  };
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
@@ -358,20 +374,34 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="space-y-3">
-            <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-              {detailImages[0] ? (
-                <img src={detailImages[0]} alt={item.title} className="w-full h-full object-cover" />
+          <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+              {activeImage ? (
+                <img src={activeImage} alt={item.title} className="w-full h-full object-cover" />
               ) : (
                 <CategoryThumbnail item={item} />
               )}
-            </div>
-            {detailImages.length > 1 && (
-              <div className="grid grid-cols-3 gap-2">
-                {detailImages.slice(1, 3).map((photo: string) => (
-                  <img key={photo} src={photo} alt={item.title} className="aspect-square object-cover rounded-[14px] border border-white/10" />
-                ))}
-              </div>
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={20} />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-[11px] font-bold">
+                  {activeImageIndex + 1} / {detailImages.length}
+                </div>
+              </>
             )}
           </div>
           <div className="space-y-4">
@@ -387,10 +417,10 @@ function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item
               {addressText && <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{addressText}</p>}
               <p className="text-[#2DD4BF] text-[11px] mt-3 font-bold">Pickup only</p>
             </div>
-            {item.description && (
+            {description && (
               <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
-                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Details</p>
-                <p className="text-white/70 text-[13px] leading-relaxed whitespace-pre-wrap">{item.description}</p>
+                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
+                <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
               </div>
             )}
             <button
