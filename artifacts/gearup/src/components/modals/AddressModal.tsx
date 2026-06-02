@@ -42,7 +42,12 @@ type PlaceSuggestion = {
   };
 };
 
-const googleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const viteGoogleMapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const runtimeGoogleMapsKey = typeof window !== 'undefined'
+  ? (window.__GEARUP_CONFIG__ as { googleMapsKey?: string } | undefined)?.googleMapsKey
+  : undefined;
+const googleMapsKey = viteGoogleMapsKey || runtimeGoogleMapsKey || '';
+const googleMapsKeySource = viteGoogleMapsKey ? 'vite-env' : runtimeGoogleMapsKey ? 'runtime' : 'none';
 let googleMapsPromise: Promise<void> | null = null;
 
 const SERVICE_AREAS = [
@@ -55,15 +60,38 @@ const DEFAULT_CENTER = SERVICE_AREAS[0];
 const OUT_OF_RANGE_MESSAGE = 'This area is currently outside GearUp service range.';
 
 const loadGoogleMaps = () => {
-  if (!googleMapsKey) return Promise.reject(new Error('GOOGLE_MAPS_KEY_MISSING'));
-  if (window.google?.maps?.places) return Promise.resolve();
+  console.log('GearUp Maps diagnostics', {
+    hasMapsEnvKey: Boolean(viteGoogleMapsKey),
+    hasRuntimeGoogleMapsKey: Boolean(runtimeGoogleMapsKey),
+    selectedMapsKeySource: googleMapsKeySource,
+    hasWindowGoogleMaps: Boolean(window.google?.maps),
+  });
+
+  if (!googleMapsKey) {
+    console.log('GearUp Maps script load failure', 'GOOGLE_MAPS_KEY_MISSING');
+    return Promise.reject(new Error('GOOGLE_MAPS_KEY_MISSING'));
+  }
+  if (window.google?.maps?.places) {
+    console.log('GearUp Maps script load success', {
+      hasWindowGoogleMaps: Boolean(window.google?.maps),
+    });
+    return Promise.resolve();
+  }
   if (googleMapsPromise) return googleMapsPromise;
 
   googleMapsPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>('script[data-gearup-google-maps="true"]');
     if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('GOOGLE_MAPS_LOAD_FAILED')), { once: true });
+      existing.addEventListener('load', () => {
+        console.log('GearUp Maps script load success', {
+          hasWindowGoogleMaps: Boolean(window.google?.maps),
+        });
+        resolve();
+      }, { once: true });
+      existing.addEventListener('error', (event) => {
+        console.log('GearUp Maps script load failure', event);
+        reject(new Error('GOOGLE_MAPS_LOAD_FAILED'));
+      }, { once: true });
       return;
     }
 
@@ -72,8 +100,16 @@ const loadGoogleMaps = () => {
     script.async = true;
     script.defer = true;
     script.dataset.gearupGoogleMaps = 'true';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('GOOGLE_MAPS_LOAD_FAILED'));
+    script.onload = () => {
+      console.log('GearUp Maps script load success', {
+        hasWindowGoogleMaps: Boolean(window.google?.maps),
+      });
+      resolve();
+    };
+    script.onerror = (event) => {
+      console.log('GearUp Maps script load failure', event);
+      reject(new Error('GOOGLE_MAPS_LOAD_FAILED'));
+    };
     document.head.appendChild(script);
   });
 
@@ -209,6 +245,12 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
   useEffect(() => {
     if (!open) return;
     if (!googleMapsKey) {
+      console.log('GearUp Maps unavailable', {
+        hasMapsEnvKey: Boolean(viteGoogleMapsKey),
+        hasRuntimeGoogleMapsKey: Boolean(runtimeGoogleMapsKey),
+        selectedMapsKeySource: googleMapsKeySource,
+        hasWindowGoogleMaps: Boolean(window.google?.maps),
+      });
       setMapsReady(false);
       setMapsFailed(true);
       return;
@@ -221,8 +263,12 @@ export default function AddressModal({ open, onClose, editAddress }: AddressModa
         setMapsReady(true);
         const serviceHost = document.createElement('div');
         placesServiceRef.current = new window.google.maps.places.PlacesService(serviceHost);
+        console.log('GearUp Maps ready', {
+          hasWindowGoogleMaps: Boolean(window.google?.maps),
+        });
       })
-      .catch(() => {
+      .catch((err) => {
+        console.log('GearUp Maps failed in AddressModal', err);
         setMapsReady(false);
         setMapsFailed(true);
       })
