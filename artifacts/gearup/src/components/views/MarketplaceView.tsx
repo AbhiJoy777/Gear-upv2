@@ -19,7 +19,7 @@ const CATEGORY_VISUALS = {
   gpu: { Icon: Cpu, label: 'GPU', image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80' },
   console: { Icon: Gamepad2, label: 'Console', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
   playstation: { Icon: Gamepad2, label: 'PlayStation', image: 'https://images.unsplash.com/photo-1607853202273-797f1c22a38e?auto=format&fit=crop&w=900&q=80' },
-  xbox: { Icon: Gamepad2, label: 'Xbox', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
+  xbox: { Icon: Gamepad2, label: 'Xbox', image: 'https://images.unsplash.com/photo-1605901309584-818e25960a8f?auto=format&fit=crop&w=900&q=80' },
   nintendo: { Icon: Gamepad2, label: 'Nintendo', image: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=900&q=80' },
   camera: { Icon: Camera, label: 'Camera', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80' },
   monitor: { Icon: Monitor, label: 'Monitor', image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80' },
@@ -50,7 +50,16 @@ function CategoryThumbnail({ item, imageUrl }: { item: any; imageUrl?: string })
   const { Icon, label, image } = getCategoryVisual(item);
   return (
     <div className="relative z-0 w-full h-full bg-[#0A0A0A] overflow-hidden">
-      <img src={image} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+      <img
+        src={image}
+        alt={label}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+        onError={(event) => {
+          if (event.currentTarget.src !== CATEGORY_VISUALS.console.image) {
+            event.currentTarget.src = CATEGORY_VISUALS.console.image;
+          }
+        }}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/10" />
       <div className="absolute left-4 bottom-4 flex items-center gap-2">
         <span className="w-9 h-9 rounded-[14px] bg-black/45 border border-white/10 backdrop-blur-md flex items-center justify-center">
