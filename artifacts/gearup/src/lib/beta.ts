@@ -8,9 +8,6 @@ export const BETA_DISABLED_MESSAGE = 'Rentals and transactions open soon.';
 export const BETA_BOOKING_MESSAGE =
   'Rental bookings are opening soon in GearUp Beta. You can explore listings and list your gear now.';
 
-export const BETA_DEMO_MESSAGE =
-  'Demo listing for beta preview. Real bookings open soon.';
-
 export const BETA_LISTING_PHONE_MESSAGE =
   'Verify your phone number to list gear during beta.';
 

@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Camera, CheckCircle2, Cpu, Gamepad2, ImagePlus, Laptop, MessageCircle, Monitor, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { addDoc, arrayUnion, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
@@ -364,6 +364,15 @@ function SaleListingCard({ listing, activeTab, onEdit, onSold, onDelete }: { lis
   );
 }
 
+function readSaleImageAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function SellListingModal({ open, editListing, onClose }: { open: boolean; editListing?: SaleListing | null; onClose: () => void }) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -371,6 +380,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
   const [saving, setSaving] = useState(false);
   const [category, setCategory] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -389,7 +399,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
     if (editListing) {
       setStep(1);
       setCategory(editListing.category || '');
-      setPhotos(editListing.photos || []);
+      setPhotos((editListing.photos || []).slice(0, 3));
       setTitle(editListing.title || '');
       setDescription(editListing.description || '');
       setPrice(String(editListing.price || ''));
@@ -423,6 +433,30 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
   const close = () => {
     onClose();
     reset();
+  };
+
+  const handlePhotoFiles = async (files: FileList | null) => {
+    const remainingSlots = 3 - photos.length;
+    const selectedFiles = Array.from(files || [])
+      .filter((file) => file.type.startsWith('image/'))
+      .slice(0, Math.max(0, remainingSlots));
+
+    if (!selectedFiles.length) {
+      showToast(remainingSlots <= 0 ? 'You can add up to 3 images.' : 'Choose image files only.', 'warning');
+      return;
+    }
+
+    try {
+      const dataUrls = await Promise.all(selectedFiles.map(readSaleImageAsDataUrl));
+      setPhotos((current) => [...current, ...dataUrls].slice(0, 3));
+    } catch (err) {
+      console.error('Sale image read failed:', err);
+      showToast('Could not load selected image.', 'error');
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const canContinue = () => {
@@ -519,23 +553,54 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
                   <ImagePlus size={34} className="text-[#A855F7] mx-auto" />
                   <div>
                     <h4 className="text-white font-bold text-[16px]">Add photos</h4>
-                    <p className="text-white/45 text-[13px] mt-1">Add up to 4 clear photos of the gear.</p>
+                    <p className="text-white/45 text-[13px] mt-1">Add up to 3 clear photos of the gear.</p>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[0, 1, 2, 3].map((index) => (
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      handlePhotoFiles(event.target.files);
+                      event.currentTarget.value = '';
+                    }}
+                  />
+                  <div className="grid grid-cols-3 gap-3">
+                    {[0, 1, 2].map((index) => (
                       <button
                         key={index}
-                        onClick={() => {
-                          const next = [...photos];
-                          next[index] = `https://picsum.photos/seed/sell-${Date.now()}-${index}/600/600`;
-                          setPhotos(next.filter(Boolean));
-                        }}
-                        className="aspect-square rounded-[18px] bg-[#0A0A0A] border border-dashed border-white/10 hover:border-[#A855F7]/50 overflow-hidden flex items-center justify-center"
+                        type="button"
+                        onClick={() => !photos[index] && photoInputRef.current?.click()}
+                        className="aspect-square rounded-[18px] bg-[#0A0A0A] border border-dashed border-white/10 hover:border-[#A855F7]/50 overflow-hidden flex items-center justify-center relative"
                       >
-                        {photos[index] ? <img src={photos[index]} alt="Sale preview" className="w-full h-full object-cover" /> : <Plus size={22} className="text-white/30" />}
+                        {photos[index] ? (
+                          <>
+                            <img src={photos[index]} alt="Sale preview" className="w-full h-full object-cover" />
+                            <span
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                removePhoto(index);
+                              }}
+                              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 border border-white/10 text-white flex items-center justify-center"
+                            >
+                              <X size={14} />
+                            </span>
+                          </>
+                        ) : (
+                          <Plus size={22} className="text-white/30" />
+                        )}
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photos.length >= 3}
+                    className="px-5 py-3 rounded-[16px] bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-40 text-[13px] font-bold transition-all"
+                  >
+                    {photos.length >= 3 ? 'Image limit reached' : 'Choose Images'}
+                  </button>
                 </div>
               ) : step === 3 ? (
                 <div className="space-y-4">

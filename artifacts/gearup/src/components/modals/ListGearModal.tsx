@@ -151,6 +151,15 @@ function detectGpuPlatform(model: string): string {
   return 'Nvidia';
 }
 
+function readImageAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ListGearModal({ isOpen, onClose, editItem, selectedCity }: any) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -168,6 +177,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [vram, setVram] = useState('');
   
   const [imgs, setImgs] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [otherCpu, setOtherCpu] = useState('');
   const [numControllers, setNumControllers] = useState('');
 
@@ -230,6 +240,30 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const handleImageFiles = async (files: FileList | null) => {
+    const remainingSlots = 3 - imgs.length;
+    const selectedFiles = Array.from(files || [])
+      .filter((file) => file.type.startsWith('image/'))
+      .slice(0, Math.max(0, remainingSlots));
+
+    if (!selectedFiles.length) {
+      showToast(remainingSlots <= 0 ? 'You can add up to 3 images.' : 'Choose image files only.', 'warning');
+      return;
+    }
+
+    try {
+      const dataUrls = await Promise.all(selectedFiles.map(readImageAsDataUrl));
+      setImgs((current) => [...current, ...dataUrls].slice(0, 3));
+    } catch (err) {
+      console.error('Gear image read failed:', err);
+      showToast('Could not load selected image.', 'error');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImgs((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const title = useMemo(() => {
@@ -471,7 +505,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     if (!isOpen || !editItem) return;
     const specs = editItem.specs || {};
     setC(editItem.category || '');
-    setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
+    setImgs((editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : [])).slice(0, 3));
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
     setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
     setHouseOrBuilding(existingLocation.houseOrBuilding || '');
@@ -725,21 +759,52 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <h3 className="text-white font-bold text-[18px]">Upload Gear Photos</h3>
                    <p className="text-white/50 text-[13px]">Add up to 3 high-quality images of your gear.</p>
                 </div>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    handleImageFiles(event.target.files);
+                    event.currentTarget.value = '';
+                  }}
+                />
                 <div className="grid grid-cols-3 gap-4 w-full mt-6">
                   {[0, 1, 2].map((i) => (
-                    <button key={i} type="button" onClick={() => {
-                        const n = [...imgs];
-                        n[i] = `https://picsum.photos/seed/${Math.random()}/500/500`;
-                        setImgs(n);
-                      }} className="aspect-square bg-black/20 border border-dashed border-white/10 hover:border-[#A855F7]/50 rounded-[16px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden">
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => !imgs[i] && imageInputRef.current?.click()}
+                      className="aspect-square bg-black/20 border border-dashed border-white/10 hover:border-[#A855F7]/50 rounded-[16px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
+                    >
                       {imgs[i] ? (
-                        <img src={imgs[i]} alt="Preview" className="w-full h-full object-cover" />
+                        <>
+                          <img src={imgs[i]} alt="Preview" className="w-full h-full object-cover" />
+                          <span
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              removeImage(i);
+                            }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 border border-white/10 text-white flex items-center justify-center"
+                          >
+                            <X size={14} />
+                          </span>
+                        </>
                       ) : (
                         <Plus className="text-white/30 group-hover:text-[#A855F7] transition-colors" size={24} />
                       )}
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imgs.length >= 3}
+                  className="px-5 py-3 rounded-[16px] bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-40 text-[13px] font-bold transition-all"
+                >
+                  {imgs.length >= 3 ? 'Image limit reached' : 'Choose Images'}
+                </button>
               </div>
             )}
 
