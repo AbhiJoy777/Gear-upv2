@@ -491,6 +491,23 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
   const address = item.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
   const owned = item.sellerId === currentUserId;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const photos = Array.isArray(item.photos) ? item.photos : [];
+  const activeImage = photos[activeImageIndex] || photos[0];
+  const hasMultipleImages = photos.length > 1;
+  const description = (item.description || '').trim();
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [item.id]);
+
+  const showPreviousImage = () => {
+    setActiveImageIndex((current) => (current === 0 ? photos.length - 1 : current - 1));
+  };
+
+  const showNextImage = () => {
+    setActiveImageIndex((current) => (current + 1) % photos.length);
+  };
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
@@ -510,16 +527,30 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="space-y-3">
-            <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-              {item.photos?.[0] ? <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" /> : <CategoryThumbnail item={item} />}
-            </div>
-            {item.photos?.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {item.photos.slice(1, 5).map((photo: string) => (
-                  <img key={photo} src={photo} alt={item.title} className="aspect-square object-cover rounded-[14px] border border-white/10" />
-                ))}
-              </div>
+          <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+            {activeImage ? <img src={activeImage} alt={item.title} className="w-full h-full object-cover" /> : <CategoryThumbnail item={item} />}
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={20} />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-[11px] font-bold">
+                  {activeImageIndex + 1} / {photos.length}
+                </div>
+              </>
             )}
           </div>
           <div className="space-y-4">
@@ -529,7 +560,7 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
               <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
-              <p className="text-white/70 text-[13px] leading-relaxed whitespace-pre-wrap">{item.description}</p>
+              <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
               <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Seller</p>

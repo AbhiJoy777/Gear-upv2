@@ -499,7 +499,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
   const canContinue = () => {
     if (step === 1) return !!category;
     if (step === 2) return photos.length > 0;
-    if (step === 3) return !!title.trim() && !!description.trim() && Number(price) > 0 && !!condition;
+    if (step === 3) return !!title.trim() && description.trim().length >= 20 && Number(price) > 0 && !!condition;
     if (step === 4) return !!city && !!address && address.city === city;
     return false;
   };
@@ -644,6 +644,7 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
                   <Field label="Title" value={title} onChange={setTitle} placeholder="RTX 4060 gaming laptop" />
                   <div>
                     <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-wider mb-2">Description</label>
+                    <div className="relative">
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -651,6 +652,13 @@ function SellListingModal({ open, editListing, onClose }: { open: boolean; editL
                       placeholder="Condition, age, accessories, reason for selling"
                       className="w-full bg-[#0A0A0A] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none"
                     />
+                      <span className={`absolute right-3 bottom-3 text-[10px] font-bold ${description.trim().length >= 20 ? 'text-[#2DD4BF]' : 'text-white/30'}`}>
+                        {description.trim().length}/20
+                      </span>
+                    </div>
+                    {description.trim().length < 20 && (
+                      <p className="text-[12px] text-[#F59E0B] font-medium mt-2">Please add a short description of your gear.</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Field label="Asking Price" value={price} onChange={(value) => setPrice(value.replace(/\D/g, ''))} placeholder="45000" />
