@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Phone, ShieldCheck } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, type ConfirmationResult } from 'firebase/auth';
@@ -66,6 +66,16 @@ export default function PublicBetaAuth() {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      setResendSeconds((seconds) => Math.max(seconds - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   const getVerifier = async () => {
     const container = document.getElementById(BETA_RECAPTCHA_CONTAINER_ID);
@@ -132,6 +142,7 @@ export default function PublicBetaAuth() {
       }
       setConfirmation(result);
       setVerificationPhone(e164Phone);
+      setResendSeconds(60);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
       if (import.meta.env.DEV) {
@@ -250,11 +261,11 @@ export default function PublicBetaAuth() {
               <button
                 type="button"
                 onClick={handleSendOtp}
-                disabled={sendingOtp || verifyingOtp}
+                disabled={sendingOtp || verifyingOtp || resendSeconds > 0}
                 className="w-full py-3.5 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {sendingOtp ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                {confirmation ? 'Resend OTP' : 'Send OTP'}
+                {resendSeconds > 0 ? `Resend OTP in ${resendSeconds}s` : confirmation ? 'Resend OTP' : 'Send OTP'}
               </button>
 
               {confirmation && (

@@ -63,6 +63,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [verificationPhone, setVerificationPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
 
   useEffect(() => {
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -76,6 +77,15 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       document.body.style.paddingRight = previousPaddingRight;
     };
   }, []);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      setResendSeconds((seconds) => Math.max(seconds - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   const resetVerifier = () => {
     try {
@@ -152,6 +162,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       }
       setVerificationId(id);
       setVerificationPhone(e164Phone);
+      setResendSeconds(60);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
       if (import.meta.env.DEV) {
@@ -257,11 +268,11 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
 
           <button
             onClick={handleSendOtp}
-            disabled={sending || verifying}
+            disabled={sending || verifying || resendSeconds > 0}
             className="w-full py-3.5 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {sending ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-            {verificationId ? 'Resend OTP' : 'Send OTP'}
+            {resendSeconds > 0 ? `Resend OTP in ${resendSeconds}s` : verificationId ? 'Resend OTP' : 'Send OTP'}
           </button>
 
           {verificationId && (
