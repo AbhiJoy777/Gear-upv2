@@ -11,20 +11,6 @@ import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
 
-const VERIFICATION_LABELS: Record<string, string> = {
-  not_started: 'Not started',
-  pending: 'Pending',
-  verified: 'Verified',
-  rejected: 'Rejected',
-};
-
-const VERIFICATION_STYLES: Record<string, string> = {
-  not_started: 'text-white/50 border-white/10 bg-white/5',
-  pending: 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10',
-  verified: 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10',
-  rejected: 'text-red-400 border-red-500/20 bg-red-500/10',
-};
-
 const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const { user, profile } = useAuth();
   const { logout } = useAuthActions();
@@ -87,7 +73,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     }
   };
 
-  const verificationStatus = profile?.verificationStatus || 'not_started';
   const phoneVerified = !!profile?.phoneVerified;
   const authProviders = Array.isArray(profile?.authProviders) ? profile.authProviders : [];
   const googleConnected = !!profile?.emailVerified || authProviders.includes('google.com');
@@ -196,9 +181,9 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
             <Phone size={13} />
             {phoneVerified ? 'Phone Verified' : 'Phone Not Verified'}
           </div>
-          <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border text-[11px] font-bold uppercase tracking-wider ${VERIFICATION_STYLES[verificationStatus] || VERIFICATION_STYLES.not_started}`}>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border border-white/10 bg-white/5 text-white/45 text-[11px] font-bold uppercase tracking-wider">
             <Shield size={13} />
-            {VERIFICATION_LABELS[verificationStatus] || 'Not started'}
+            Beta soon
           </div>
         </div>
 

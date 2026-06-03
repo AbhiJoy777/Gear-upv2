@@ -27,6 +27,10 @@ function userDisplayName(item: any) {
   return item.username || item.fullName || item.name || item.email || item.phone || 'Unnamed user';
 }
 
+function ownerDisplayName(item: any) {
+  return item.username || item.fullName || item.name || item.email || 'Unknown user';
+}
+
 function hasGoogleConnected(item: any) {
   const providers = Array.isArray(item.authProviders) ? item.authProviders : [];
   return Boolean(item.emailVerified || providers.includes('google.com'));
@@ -74,6 +78,11 @@ const AdminView = memo(() => {
     () => selectedUser ? saleListings.filter((item) => item.sellerId === selectedUser.id) : [],
     [saleListings, selectedUser],
   );
+  const usersById = useMemo(() => {
+    const next = new Map<string, any>();
+    usersList.forEach((item) => next.set(item.id, item));
+    return next;
+  }, [usersList]);
 
   const updateReportStatus = async (reportId: string, status: 'reviewing' | 'resolved' | 'rejected') => {
     if (!user) return;
@@ -174,6 +183,7 @@ const AdminView = memo(() => {
           emptyText="No rent listings yet."
           items={rentListings}
           kind="rent"
+          usersById={usersById}
         />
       )}
 
@@ -183,6 +193,7 @@ const AdminView = memo(() => {
           emptyText="No sale listings yet."
           items={saleListings}
           kind="sale"
+          usersById={usersById}
         />
       )}
 
@@ -244,6 +255,7 @@ const AdminView = memo(() => {
             setActiveTab={setUserDetailTab}
             rentListings={selectedUserRentListings}
             saleListings={selectedUserSaleListings}
+            usersById={usersById}
             onClose={() => setSelectedUser(null)}
           />
         )}
@@ -281,7 +293,7 @@ function EmptyPanel({ text }: { text: string }) {
   );
 }
 
-function ListingSection({ title, emptyText, items, kind }: { title: string; emptyText: string; items: any[]; kind: 'rent' | 'sale' }) {
+function ListingSection({ title, emptyText, items, kind, usersById }: { title: string; emptyText: string; items: any[]; kind: 'rent' | 'sale'; usersById: Map<string, any> }) {
   return (
     <section className="space-y-4">
       <SectionTitle title={title} />
@@ -290,7 +302,7 @@ function ListingSection({ title, emptyText, items, kind }: { title: string; empt
           <EmptyPanel text={emptyText} />
         ) : (
           items.map((item) => (
-            <ListingRow key={item.id} item={item} kind={kind} />
+            <ListingRow key={item.id} item={item} kind={kind} usersById={usersById} />
           ))
         )}
       </div>
@@ -298,10 +310,16 @@ function ListingSection({ title, emptyText, items, kind }: { title: string; empt
   );
 }
 
-function ListingRow({ item, kind }: { item: any; kind: 'rent' | 'sale' }) {
-  const owner = kind === 'sale'
-    ? item.sellerEmail || item.sellerName || item.sellerId
-    : item.ownerEmail || item.ownerName || item.ownerId || item.userId;
+function ListingRow({ item, kind, usersById }: { item: any; kind: 'rent' | 'sale'; usersById: Map<string, any> }) {
+  const ownerId = kind === 'sale' ? item.sellerId : (item.ownerId || item.userId);
+  const ownerProfile = ownerId ? usersById.get(ownerId) : null;
+  const owner = ownerProfile
+    ? ownerDisplayName(ownerProfile)
+    : ownerId
+      ? 'Unknown user'
+      : kind === 'sale'
+      ? (item.sellerEmail || item.sellerName || 'Unknown user')
+      : (item.ownerEmail || item.ownerName || 'Unknown user');
   const price = kind === 'sale'
     ? `Rs ${item.price || 0}`
     : `Rs ${item.pricePerDay || 0} / day`;
@@ -313,7 +331,10 @@ function ListingRow({ item, kind }: { item: any; kind: 'rent' | 'sale' }) {
         <p className="text-[#707070] text-[12px] mt-1 break-words">
           {item.category || 'Gear'} - {item.city || item.location?.city || item.addressSnapshot?.city || 'City not set'} - {item.status || 'ACTIVE'}
         </p>
-        <p className="text-white/35 text-[11px] mt-1 break-all">Owner: {owner || 'Unknown'}</p>
+        <p className="text-white/35 text-[11px] mt-1 break-all">Owner: {owner}</p>
+        {ownerProfile && ownerProfile.email && owner !== ownerProfile.email && (
+          <p className="text-white/25 text-[10px] mt-0.5 break-all">{ownerProfile.email}</p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <span className="text-[12px] font-bold text-[#A855F7]">{price}</span>
@@ -331,6 +352,7 @@ function UserDetailModal({
   setActiveTab,
   rentListings,
   saleListings,
+  usersById,
   onClose,
 }: {
   user: any;
@@ -338,6 +360,7 @@ function UserDetailModal({
   setActiveTab: (tab: UserDetailTab) => void;
   rentListings: any[];
   saleListings: any[];
+  usersById: Map<string, any>;
   onClose: () => void;
 }) {
   const detailTabs: Array<{ key: UserDetailTab; label: string }> = [
@@ -402,13 +425,13 @@ function UserDetailModal({
 
           {activeTab === 'rentListings' && (
             <div className="grid gap-3">
-              {rentListings.length === 0 ? <EmptyPanel text="No rent listings for this user." /> : rentListings.map((item) => <ListingRow key={item.id} item={item} kind="rent" />)}
+              {rentListings.length === 0 ? <EmptyPanel text="No rent listings for this user." /> : rentListings.map((item) => <ListingRow key={item.id} item={item} kind="rent" usersById={usersById} />)}
             </div>
           )}
 
           {activeTab === 'saleListings' && (
             <div className="grid gap-3">
-              {saleListings.length === 0 ? <EmptyPanel text="No sale listings for this user." /> : saleListings.map((item) => <ListingRow key={item.id} item={item} kind="sale" />)}
+              {saleListings.length === 0 ? <EmptyPanel text="No sale listings for this user." /> : saleListings.map((item) => <ListingRow key={item.id} item={item} kind="sale" usersById={usersById} />)}
             </div>
           )}
         </div>
