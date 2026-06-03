@@ -19,6 +19,41 @@ import { BETA_DISABLED_MESSAGE, BETA_LAUNCH_MODE } from '@/lib/beta';
 
 type Tab = 'listings' | 'rentals' | 'chats' | 'history';
 
+const DASHBOARD_LISTING_THUMBNAILS = {
+  laptop: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80',
+  desktop: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=900&q=80',
+  gpu: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80',
+  console: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80',
+  playstation: 'https://images.unsplash.com/photo-1607853202273-797f1c22a38e?auto=format&fit=crop&w=900&q=80',
+  xbox: 'https://images.unsplash.com/photo-1605901309584-818e25960a8f?auto=format&fit=crop&w=900&q=80',
+  nintendo: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=900&q=80',
+  camera: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
+  monitor: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80',
+  controller: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80',
+  fallback: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80',
+};
+
+function getDashboardListingThumbnail(item: any) {
+  const uploaded = Array.isArray(item?.images) && item.images.length > 0
+    ? item.images[0]
+    : item?.imageUrl;
+
+  if (uploaded && !String(uploaded).includes('picsum')) return uploaded;
+
+  const text = `${item?.category || ''} ${item?.title || ''}`.toLowerCase();
+  if (text.includes('laptop') || text.includes('macbook')) return DASHBOARD_LISTING_THUMBNAILS.laptop;
+  if (text.includes('gpu') || text.includes('rtx') || text.includes('gtx') || text.includes('radeon')) return DASHBOARD_LISTING_THUMBNAILS.gpu;
+  if (text.includes('desktop') || text.includes('gaming pc') || /\bpc\b/.test(text)) return DASHBOARD_LISTING_THUMBNAILS.desktop;
+  if (text.includes('playstation') || text.includes('ps4') || text.includes('ps5')) return DASHBOARD_LISTING_THUMBNAILS.playstation;
+  if (text.includes('xbox') || text.includes('series x') || text.includes('series s')) return DASHBOARD_LISTING_THUMBNAILS.xbox;
+  if (text.includes('nintendo') || text.includes('switch')) return DASHBOARD_LISTING_THUMBNAILS.nintendo;
+  if (text.includes('console')) return DASHBOARD_LISTING_THUMBNAILS.console;
+  if (text.includes('camera') || text.includes('dslr') || text.includes('mirrorless') || text.includes('canon') || text.includes('sony') || text.includes('nikon') || text.includes('gopro')) return DASHBOARD_LISTING_THUMBNAILS.camera;
+  if (text.includes('monitor')) return DASHBOARD_LISTING_THUMBNAILS.monitor;
+  if (text.includes('controller') || text.includes('gamepad')) return DASHBOARD_LISTING_THUMBNAILS.controller;
+  return DASHBOARD_LISTING_THUMBNAILS.fallback;
+}
+
 const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) => void }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -505,7 +540,7 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-10 space-y-4">
+    <div className="p-4 pb-28 sm:p-6 md:p-10 space-y-4">
       <div className="flex gap-6 md:gap-8 overflow-x-auto scrollbar-hide border-b border-white/5 pb-0">
         {[
           { key: 'listings', label: 'My Listings' },
@@ -546,12 +581,10 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
             loadingListings ? (
               <div className="flex justify-center items-center py-20"><Loader2 className="w-8 h-8 text-[#A855F7] animate-spin" /></div>
             ) : listings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full text-left items-start">
                 {listings.map((item, idx) => {
-                  const pendingRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['PAID_REQUESTED', 'REQUESTED'].includes(r.status));
-                  const activeRental = visibleOwnerRentals.find(r => r.gearId === item.id && ['ACTIVE_RENTAL', 'RETURN_DUE'].includes(r.status));
                   const lockedRental = visibleOwnerRentals.find(r => r.gearId === item.id && LOCKED_RENTAL_STATUSES.includes(r.status));
-                  const timelineRental = lockedRental || activeRental;
+                  const thumbnail = getDashboardListingThumbnail(item);
                   
                   return (
                   <motion.div
@@ -559,213 +592,41 @@ const DashboardView = memo(({ setActiveView }: { setActiveView?: (view: string) 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full select-none"
+                    className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden flex flex-col w-full min-w-0 select-none"
                   >
-                    <div className="h-48 bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
+                    <div className="w-full h-[180px] bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04] shrink-0">
                       {item.tier && (
                         <span className={`absolute top-4 right-4 text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-[24px] border-[0.5px] z-10 uppercase ${getTierColor(item.tier)}`}>
                           {item.tier} TIER
                         </span>
                       )}
-                      {item.imageUrl && !item.imageUrl.includes('picsum') ? (
-                        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover opacity-80" />
-                      ) : (
-                        <Camera size={48} className="text-white/10" />
-                      )}
+                      <img
+                        src={thumbnail}
+                        alt={item.title}
+                        className="block w-full h-full object-cover opacity-85"
+                        onError={(event) => {
+                          event.currentTarget.src = DASHBOARD_LISTING_THUMBNAILS.fallback;
+                        }}
+                      />
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
-                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-1">{item.title}</h3>
-                      <p className="text-[#707070] text-[12px] mt-1 mb-4 uppercase border-b border-white/5 pb-2">{item.category}</p>
-                      {timelineRental && (
-                        <div className="mb-5">
-                          <RentalTimelineSummary rental={timelineRental} />
-                        </div>
-                      )}
-                      
-                      {activeRental && activeRental.actualStartTime && (
-                        <div className={`mb-6 p-4 rounded-[16px] border space-y-3 ${
-                          activeRental.status === 'RETURN_DUE'
-                            ? 'bg-red-500/10 border-red-500/20'
-                            : 'bg-[#2DD4BF]/10 border-[#2DD4BF]/20'
-                        }`}>
-                          <p className={`text-[10px] uppercase font-bold tracking-wider ${
-                            activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'
-                          }`}>
-                            {activeRental.status === 'RETURN_DUE' ? 'Return Due' : 'Rental Active'}
-                          </p>
-                          {locationLabel(activeRental) && (
-                            <div className="space-y-2">
-                              <p className="text-[11px] text-white/45 flex items-start gap-1.5 leading-relaxed">
-                                <MapPin size={12} className="text-[#A855F7]" /> Return to owner address: {locationLabel(activeRental)}
-                              </p>
-                              {!BETA_LAUNCH_MODE && rentalMapsUrl(activeRental) && (
-                                <a href={rentalMapsUrl(activeRental)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
-                                  Open in Google Maps
-                                </a>
-                              )}
-                            </div>
-                          )}
-                          {!BETA_LAUNCH_MODE && rentalMapsUrl(activeRental) && (
+                    <div className="p-5 flex-1 flex flex-col min-h-0">
+                      <h3 className="font-semibold text-[15px] text-white tracking-tight line-clamp-2 break-words">{item.title}</h3>
+                      <p className="text-[#707070] text-[12px] mt-1 uppercase tracking-wider break-words">{item.category}</p>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-auto pt-5">
+                        <span className="text-[13px] font-bold text-[#A855F7] tracking-tight whitespace-nowrap">₹{item.pricePerDay} / Day</span>
+                        {!lockedRental && (
+                          <div className="flex items-center gap-3 flex-wrap">
                             <button
-                              onClick={(e) => { e.stopPropagation(); openRentalMaps(activeRental); }}
-                              className="w-full bg-[#F97316] text-white font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-[#FB923C] transition-all"
-                            >
-                              <Navigation size={13} /> {activeRental.status === 'RETURN_DUE' ? 'Track Return' : 'Track Borrower'}
-                            </button>
-                          )}
-                          {activeRental.returnProofRecorded && (
-                            <div className="rounded-[12px] border border-[#2DD4BF]/20 bg-[#2DD4BF]/10 p-3">
-                              <p className="text-[10px] text-[#2DD4BF] font-bold uppercase tracking-wider">Return Proof Recorded</p>
-                            </div>
-                          )}
-                          <div className="flex flex-wrap items-center gap-2 text-white font-mono text-sm">
-                            <Box size={14} className={activeRental.status === 'RETURN_DUE' ? 'text-red-400' : 'text-[#2DD4BF]'} />
-                            <span>
-                              {(() => {
-                                const end = getRentalEndDate(activeRental);
-                                if (!end) return 'Timer unavailable';
-                                const diff = end.getTime() - Date.now();
-
-                                if (activeRental.status === 'RETURN_DUE' || diff <= 0) {
-                                  const lateDays = getLateDays(activeRental);
-                                  const extra = getExtraAmountDue(activeRental);
-                                  return lateDays > 0 ? `Late by ${lateDays}d - Due Rs ${extra}` : 'Return due now';
-                                }
-
-                                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                return `Expires in: ${days}d ${hours}h`;
-                              })()}
-                            </span>
+                              onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
+                              className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                            >Edit</button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
+                              className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
+                            >Delete</button>
                           </div>
-
-                          {activeRental.status === 'ACTIVE_RENTAL' && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); moveToReturnDue(activeRental); }}
-                              className="w-full bg-white/5 text-white/70 font-bold py-2 rounded-[10px] text-[11px] flex items-center justify-center gap-2 hover:bg-white/10 hover:text-white transition-all border border-white/10"
-                            >
-                              <AlertTriangle size={13} /> Expire for testing
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {pendingRental ? (
-                         <div className="mt-auto pt-4 space-y-3">
-                           <p className="text-[12px] text-white/70">
-                             Requested for <strong className="text-white">{pendingRental.durationDays} Days</strong> (₹{pendingRental.totalPrice})
-                           </p>
-                           <p className="text-[11px] text-[#2DD4BF] leading-relaxed">
-                             {hasOwnerResponseDeadlinePassed(pendingRental) ? 'Refund request available.' : 'Payment secured. Owner must respond within 12 hours.'}
-                           </p>
-                           <div className="flex gap-2">
-                              <button onClick={(e) => handleAccept(e, pendingRental.id, item.id)} className="flex-1 bg-[#2DD4BF] text-black font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-[#14b8a6] transition-all">
-                                <Check size={14} /> Accept
-                              </button>
-                              <button onClick={(e) => handleDecline(e, pendingRental, item.id)} className="flex-1 bg-white/5 text-white/70 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all border border-white/10">
-                                <X size={14} /> Decline
-                              </button>
-                           </div>
-                         </div>
-                       ) : (
-                         <div className="flex flex-col gap-3 mt-auto pt-5">
-                            {visibleOwnerRentals.filter(r => r.gearId === item.id && ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)).map(r => (
-                              <div key={r.id} className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
-                                <div className="py-2 border-b border-white/5 mb-1">
-                                  <p className="text-[11px] text-white/40 font-bold uppercase tracking-wider text-center">Waiting for Handover</p>
-                                  {locationLabel(r) && (
-                                    <div className="text-center mt-1">
-                                      <p className="text-[11px] text-white/45 break-words">Pickup at owner address: {locationLabel(r)}</p>
-                                      {!BETA_LAUNCH_MODE && rentalMapsUrl(r) && (
-                                        <a href={rentalMapsUrl(r)} target="_blank" rel="noreferrer" className="inline-flex mt-1 text-[11px] text-[#2DD4BF] font-bold hover:text-[#5EEAD4]">
-                                          Open in Google Maps
-                                        </a>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {CANCELLABLE_RENTAL_STATUSES.includes(r.status) && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setCancelTarget({ rental: r, role: 'owner' }); }}
-                                    className="w-full bg-red-500/10 text-red-400 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-red-500/20 hover:bg-red-500/20 cursor-pointer relative z-10"
-                                  >
-                                    <Ban size={14} /> Cancel Renting
-                                  </button>
-                                )}
-
-                                {r.status === 'ACCEPTED' ? (
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); openHandshake(r, 'owner'); }}
-                                    className="w-full bg-[#A855F7] hover:bg-[#B366FF] text-white font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)] cursor-pointer relative z-10"
-                                  >
-                                    <ShieldCheck size={14} /> Record Proof of Life
-                                  </button>
-                                ) : (
-                                  <div className="w-full bg-white/5 text-[#2DD4BF] font-bold py-2.5 rounded-[12px] text-[11px] flex flex-row items-center justify-center gap-2 select-none border border-white/5">
-                                    <Check size={14} className="text-[#2DD4BF]" /> Verified & Ready
-                                  </div>
-                                )}
-                                
-                                <button 
-                                  onClick={(e) => { e.stopPropagation(); openRentalMaps(r); }}
-                                  className={`w-full font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all cursor-pointer relative z-10 ${
-                                    ['ACCEPTED', 'PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
-                                      ? 'bg-[#F97316] hover:bg-[#FB923C] text-white' 
-                                      : 'bg-white/5 text-white/10 opacity-50 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <Navigation size={14} /> Track Borrower
-                                </button>
-                                {canChat(r.status) && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setChatRental(r); }}
-                                    className="w-full bg-white/5 text-white/80 font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer relative z-10"
-                                  >
-                                    <MessageCircle size={14} /> Chat
-                                  </button>
-                                )}
-
-
-                                <button 
-                                  onClick={async (e) => { 
-                                    e.stopPropagation(); 
-                                    try {
-                                      await updateDoc(doc(db, 'rentals', r.id), {
-                                        returnMethod: 'BORROWER_DROPOFF',
-                                        updatedAt: serverTimestamp(),
-                                      });
-                                      openHandshake(r, 'owner', 'qr_handover');
-                                    } catch (err) { console.error(err); }
-                                  }}
-                                  disabled={r.status === 'ACCEPTED'}
-                                  className={`w-full font-bold py-2.5 rounded-[12px] text-[12px] flex flex-row items-center justify-center gap-2 transition-all border cursor-pointer relative z-10 ${
-                                    ['PROOF_RECORDED', 'LOGISTICS_PENDING', 'PAYMENT_PENDING'].includes(r.status)
-                                      ? 'border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30'
-                                      : 'border-white/5 text-white/10 opacity-50 cursor-not-allowed'
-                                  }`}
-                                >
-                                  <Check size={14} /> Confirm Handover
-                                </button>
-                              </div>
-                            ))}
-                            <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/10">
-                               <span className="text-[13px] font-bold text-[#A855F7] tracking-tight">₹{item.pricePerDay} / Day</span>
-                               {!lockedRental && (
-                                 <div className="flex items-center gap-3">
-                                   <button
-                                     onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-edit-modal', { detail: { item } })); }}
-                                     className="text-[12px] text-white/50 tracking-wide font-medium hover:text-white transition-colors bg-transparent border-none cursor-pointer"
-                                   >Edit</button>
-                                   <button
-                                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
-                                     className="text-[12px] text-rose-500/70 tracking-wide font-medium hover:text-rose-400 transition-colors bg-transparent border-none cursor-pointer"
-                                   >Delete</button>
-                                 </div>
-                               )}
-                            </div>
-                         </div>
-                       )}
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )})}

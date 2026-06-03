@@ -151,6 +151,48 @@ function detectGpuPlatform(model: string): string {
   return 'Nvidia';
 }
 
+const MAX_IMAGE_DIMENSION = 1200;
+const IMAGE_QUALITY = 0.7;
+const MAX_FIRESTORE_IMAGE_LENGTH = 900_000;
+
+function readImageAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, MAX_IMAGE_DIMENSION / image.width, MAX_IMAGE_DIMENSION / image.height);
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('image-compression-failed');
+        context.drawImage(image, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', IMAGE_QUALITY);
+        URL.revokeObjectURL(objectUrl);
+        if (dataUrl.length > MAX_FIRESTORE_IMAGE_LENGTH) {
+          reject(new Error('image-too-large'));
+          return;
+        }
+        resolve(dataUrl);
+      } catch (err) {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      }
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('image-load-failed'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
 export default function ListGearModal({ isOpen, onClose, editItem, selectedCity }: any) {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
@@ -168,6 +210,8 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [vram, setVram] = useState('');
   
   const [imgs, setImgs] = useState<string[]>([]);
+  const [description, setDescription] = useState('');
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [otherCpu, setOtherCpu] = useState('');
   const [numControllers, setNumControllers] = useState('');
 
@@ -230,6 +274,34 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const handleImageFiles = async (files: FileList | null) => {
+    const remainingSlots = 3 - imgs.length;
+    const selectedFiles = Array.from(files || [])
+      .filter((file) => file.type.startsWith('image/'))
+      .slice(0, Math.max(0, remainingSlots));
+
+    if (!selectedFiles.length) {
+      showToast(remainingSlots <= 0 ? 'You can add up to 3 images.' : 'Choose image files only.', 'warning');
+      return;
+    }
+
+    try {
+      const dataUrls = await Promise.all(selectedFiles.map(readImageAsDataUrl));
+      setImgs((current) => [...current, ...dataUrls].slice(0, 3));
+    } catch (err) {
+      console.error('Gear image read failed:', err);
+      if (err instanceof Error && err.message === 'image-too-large') {
+        showToast('Image is too large. Please choose a smaller photo.', 'error');
+        return;
+      }
+      showToast('Could not load selected image.', 'error');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImgs((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const title = useMemo(() => {
@@ -347,6 +419,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
+    if (step === 6) return description.trim().length >= 20;
     return true;
   };
 
@@ -418,6 +491,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
         title, category: c, pricePerDay: base,
         tier, imageUrl: imgs[0] || '',
         images: imgs,
+        description: description.trim(),
         specs: specData,
         score: totalScore,
         isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
@@ -432,7 +506,6 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       } else {
         await addDoc(collection(db, 'listings'), {
           ...payload, status: 'AVAILABLE', ownerId: user.uid,
-          description: 'Premium Gear',
 
           createdAt: serverTimestamp()
         });
@@ -458,6 +531,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setArea('');
     setLandmark('');
     setPickupInstructions('');
+    setDescription('');
     setLat(null);
     setLng(null);
     setLocationSource('manual');
@@ -471,7 +545,8 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     if (!isOpen || !editItem) return;
     const specs = editItem.specs || {};
     setC(editItem.category || '');
-    setImgs(editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : []));
+    setImgs((editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : [])).slice(0, 3));
+    setDescription(editItem.description || '');
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
     setCity(editItem.city || existingLocation.city || (typeof editItem.location === 'string' ? editItem.location : '') || 'Hyderabad');
     setHouseOrBuilding(existingLocation.houseOrBuilding || '');
@@ -725,21 +800,52 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <h3 className="text-white font-bold text-[18px]">Upload Gear Photos</h3>
                    <p className="text-white/50 text-[13px]">Add up to 3 high-quality images of your gear.</p>
                 </div>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    handleImageFiles(event.target.files);
+                    event.currentTarget.value = '';
+                  }}
+                />
                 <div className="grid grid-cols-3 gap-4 w-full mt-6">
                   {[0, 1, 2].map((i) => (
-                    <button key={i} type="button" onClick={() => {
-                        const n = [...imgs];
-                        n[i] = `https://picsum.photos/seed/${Math.random()}/500/500`;
-                        setImgs(n);
-                      }} className="aspect-square bg-black/20 border border-dashed border-white/10 hover:border-[#A855F7]/50 rounded-[16px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden">
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => !imgs[i] && imageInputRef.current?.click()}
+                      className="aspect-square bg-black/20 border border-dashed border-white/10 hover:border-[#A855F7]/50 rounded-[16px] flex items-center justify-center transition-all cursor-pointer group relative overflow-hidden"
+                    >
                       {imgs[i] ? (
-                        <img src={imgs[i]} alt="Preview" className="w-full h-full object-cover" />
+                        <>
+                          <img src={imgs[i]} alt="Preview" className="w-full h-full object-cover" />
+                          <span
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              removeImage(i);
+                            }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 border border-white/10 text-white flex items-center justify-center"
+                          >
+                            <X size={14} />
+                          </span>
+                        </>
                       ) : (
                         <Plus className="text-white/30 group-hover:text-[#A855F7] transition-colors" size={24} />
                       )}
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imgs.length >= 3}
+                  className="px-5 py-3 rounded-[16px] bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-40 text-[13px] font-bold transition-all"
+                >
+                  {imgs.length >= 3 ? 'Image limit reached' : 'Choose Images'}
+                </button>
               </div>
             )}
 
@@ -857,6 +963,25 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <p className={`text-[13px] font-bold tracking-wider uppercase ${tier === 'High' ? 'text-[#2DD4BF]' : tier === 'Mid' ? 'text-[#A855F7]' : 'text-white/70'}`}>
                      {tier} TIER ASSET
                    </p>
+                </div>
+
+                <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-[11px] font-bold text-white/45 uppercase tracking-wider">Gear Description</label>
+                    <span className={`text-[10px] font-bold ${description.trim().length >= 20 ? 'text-[#2DD4BF]' : 'text-white/30'}`}>
+                      {description.trim().length}/20
+                    </span>
+                  </div>
+                  <textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={4}
+                    placeholder="Mention condition, accessories included, age, and anything the borrower should know."
+                    className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] p-4 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25 resize-none leading-relaxed"
+                  />
+                  {description.trim().length < 20 && (
+                    <p className="text-[12px] text-[#F59E0B] font-medium">Please add a short description of your gear.</p>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">

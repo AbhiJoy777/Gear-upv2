@@ -5,7 +5,6 @@ import { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, type Confirm
 import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { useToast } from '@/context/ToastContext';
-import LoginForm from './LoginForm';
 
 const BETA_RECAPTCHA_CONTAINER_ID = 'beta-phone-recaptcha-container';
 
@@ -57,7 +56,6 @@ const isRemovedRecaptchaError = (err: any) =>
 
 export default function PublicBetaAuth() {
   const { showToast } = useToast();
-  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [mobileNumber, setMobileNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -176,20 +174,6 @@ export default function PublicBetaAuth() {
     }
   };
 
-  if (adminLoginOpen) {
-    return (
-      <div className="w-full max-w-[400px] space-y-4">
-        <LoginForm title="Admin Login" />
-        <button
-          onClick={() => setAdminLoginOpen(false)}
-          className="w-full text-white/30 hover:text-white transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2"
-        >
-          Back to Beta Login
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-[420px] w-full py-10 sm:py-12 px-6 sm:px-9 bg-[#121212] rounded-[32px] border border-white/5 mx-auto shadow-[0_0_80px_rgba(0,0,0,0.35)]">
       <div className="text-center mb-8">
@@ -294,13 +278,6 @@ export default function PublicBetaAuth() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <button
-        onClick={() => setAdminLoginOpen(true)}
-        className="w-full mt-7 text-white/25 hover:text-[#A855F7] transition-colors text-[10px] font-black uppercase tracking-[0.2em] py-2"
-      >
-        Admin login
-      </button>
     </div>
   );
 }

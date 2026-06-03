@@ -4,15 +4,94 @@ import React, { useEffect, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
 import { collection, query, limit, onSnapshot, where } from 'firebase/firestore';
-import { Camera, PlusCircle, Loader2, MapPin, MessageCircle, ShoppingBag, X } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Cpu, Gamepad2, Laptop, Loader2, MapPin, MessageCircle, Monitor, PlusCircle, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import BookingModal from '../modals/BookingModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import { formatAddress } from '@/lib/address';
-import { BETA_BOOKING_MESSAGE, BETA_DEMO_MESSAGE, BETA_LAUNCH_MODE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS } from '@/lib/beta';
+import { BETA_LAUNCH_MODE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS } from '@/lib/beta';
 import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
+const XBOX_THUMBNAIL =
+  'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 900 600%22%3E%3Cdefs%3E%3CradialGradient id=%22g%22 cx=%2255%25%22 cy=%2230%25%22 r=%2270%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%2316a34a%22 stop-opacity=%22.95%22/%3E%3Cstop offset=%2240%25%22 stop-color=%22%230f172a%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23020617%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22x%22 x1=%220%22 x2=%221%22%3E%3Cstop stop-color=%22%231f2937%22/%3E%3Cstop offset=%221%22 stop-color=%22%23030508%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22900%22 height=%22600%22 fill=%22url(%23g)%22/%3E%3Crect x=%22560%22 y=%22105%22 width=%22118%22 height=%22385%22 rx=%2218%22 fill=%22url(%23x)%22 stroke=%22%2334d399%22 stroke-opacity=%22.35%22 stroke-width=%223%22/%3E%3Ccircle cx=%22619%22 cy=%22158%22 r=%2229%22 fill=%22%23050a07%22 stroke=%22%2322c55e%22 stroke-width=%224%22/%3E%3Cpath d=%22M601 140c21 11 37 28 47 51%22 fill=%22none%22 stroke=%22%2316a34a%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M220 342c28-62 84-96 154-86l71 13 71-13c70-10 126 24 154 86l28 61c13 28-6 61-37 61h-70c-21 0-40-11-51-29l-24-39H374l-24 39c-11 18-30 29-51 29h-70c-31 0-50-33-37-61l28-61z%22 fill=%22%23101419%22 stroke=%22%23e5e7eb%22 stroke-opacity=%22.2%22 stroke-width=%223%22/%3E%3Ccircle cx=%22321%22 cy=%22358%22 r=%2228%22 fill=%22%23111827%22 stroke=%22%234ade80%22 stroke-width=%225%22/%3E%3Cpath d=%22M296 358h50M321 333v50%22 stroke=%22%234ade80%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%22576%22 cy=%22335%22 r=%2211%22 fill=%22%2322c55e%22/%3E%3Ccircle cx=%22610%22 cy=%22360%22 r=%2211%22 fill=%22%2384cc16%22/%3E%3Ccircle cx=%22542%22 cy=%22360%22 r=%2211%22 fill=%22%2316a34a%22/%3E%3Ccircle cx=%22576%22 cy=%22386%22 r=%2211%22 fill=%22%23bbf7d0%22/%3E%3Ctext x=%2272%22 y=%22110%22 fill=%22%23dcfce7%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2252%22 font-weight=%22700%22%3EXbox%3C/text%3E%3Ctext x=%2274%22 y=%22152%22 fill=%22%2386efac%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 letter-spacing=%224%22%3ESERIES X%7CS%3C/text%3E%3C/svg%3E';
+const CATEGORY_VISUALS = {
+  laptop: { Icon: Laptop, label: 'Laptop', image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80' },
+  desktop: { Icon: Monitor, label: 'Gaming PC', image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=900&q=80' },
+  gpu: { Icon: Cpu, label: 'GPU', image: 'https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=900&q=80' },
+  console: { Icon: Gamepad2, label: 'Console', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=900&q=80' },
+  playstation: { Icon: Gamepad2, label: 'PlayStation', image: 'https://images.unsplash.com/photo-1607853202273-797f1c22a38e?auto=format&fit=crop&w=900&q=80' },
+  xbox: { Icon: Gamepad2, label: 'Xbox', image: XBOX_THUMBNAIL },
+  nintendo: { Icon: Gamepad2, label: 'Nintendo', image: 'https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=900&q=80' },
+  camera: { Icon: Camera, label: 'Camera', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80' },
+  monitor: { Icon: Monitor, label: 'Monitor', image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80' },
+  controller: { Icon: Gamepad2, label: 'Controller', image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=900&q=80' },
+  fallback: { Icon: ShoppingBag, label: 'Tech Gear', image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80' },
+};
+
+function getCategoryVisual(item: any) {
+  const primaryText = `${item?.title || ''} ${item?.model || ''} ${item?.name || ''}`.toLowerCase();
+  if (primaryText.includes('xbox') || primaryText.includes('series x') || primaryText.includes('series s')) return CATEGORY_VISUALS.xbox;
+  if (primaryText.includes('playstation') || primaryText.includes('ps4') || primaryText.includes('ps5') || /\bps\b/.test(primaryText)) return CATEGORY_VISUALS.playstation;
+  if (primaryText.includes('nintendo') || primaryText.includes('switch')) return CATEGORY_VISUALS.nintendo;
+
+  const text = `${item?.category || ''} ${primaryText}`.toLowerCase();
+  if (text.includes('laptop') || text.includes('macbook')) return CATEGORY_VISUALS.laptop;
+  if (text.includes('gpu') || text.includes('rtx') || text.includes('gtx') || text.includes('radeon')) return CATEGORY_VISUALS.gpu;
+  if (text.includes('desktop') || text.includes('gaming pc') || /\bpc\b/.test(text)) return CATEGORY_VISUALS.desktop;
+  if (text.includes('playstation') || text.includes('ps4') || text.includes('ps5')) return CATEGORY_VISUALS.playstation;
+  if (text.includes('xbox') || text.includes('series x') || text.includes('series s')) return CATEGORY_VISUALS.xbox;
+  if (text.includes('nintendo') || text.includes('switch')) return CATEGORY_VISUALS.nintendo;
+  if (text.includes('console')) return CATEGORY_VISUALS.console;
+  if (text.includes('camera') || text.includes('dslr') || text.includes('mirrorless') || text.includes('canon') || text.includes('sony') || text.includes('nikon') || text.includes('gopro')) return CATEGORY_VISUALS.camera;
+  if (text.includes('monitor')) return CATEGORY_VISUALS.monitor;
+  if (text.includes('controller') || text.includes('gamepad')) return CATEGORY_VISUALS.controller;
+  return CATEGORY_VISUALS.fallback;
+}
+
+function CategoryThumbnail({ item, imageUrl }: { item: any; imageUrl?: string }) {
+  if (imageUrl) {
+    return <img src={imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out relative z-0" />;
+  }
+
+  const { Icon, label, image } = getCategoryVisual(item);
+  return (
+    <div className="relative z-0 w-full h-full bg-[#0A0A0A] overflow-hidden">
+      <img
+        src={image}
+        alt={label}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+        onError={(event) => {
+          if (event.currentTarget.src !== CATEGORY_VISUALS.console.image) {
+            event.currentTarget.src = CATEGORY_VISUALS.console.image;
+          }
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-black/10" />
+      <div className="absolute left-4 bottom-4 flex items-center gap-2">
+        <span className="w-9 h-9 rounded-[14px] bg-black/45 border border-white/10 backdrop-blur-md flex items-center justify-center">
+          <Icon size={18} className="text-white/80" />
+        </span>
+        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function useBodyScrollLock() {
+  useEffect(() => {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, []);
+}
 
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
@@ -23,6 +102,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [fetchingItems, setFetchingItems] = useState(true);
   const [fetchingSaleItems, setFetchingSaleItems] = useState(true);
   const [bookingItem, setBookingItem] = useState<any | null>(null);
+  const [selectedRentListing, setSelectedRentListing] = useState<any | null>(null);
   const [selectedSaleListing, setSelectedSaleListing] = useState<any | null>(null);
   const [saleChatListing, setSaleChatListing] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Gear');
@@ -71,10 +151,19 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const handleBook = async (item: any) => {
     if (!user) return;
     if (BETA_LAUNCH_MODE) {
-      showToast(item.isDemo ? BETA_DEMO_MESSAGE : BETA_BOOKING_MESSAGE, 'warning');
+      showToast('Bookings open soon during GearUp Beta.', 'warning');
       return;
     }
     setBookingItem(item);
+  };
+
+  const handleSaleChat = (item: any) => {
+    if (!user) return;
+    if (BETA_LAUNCH_MODE) {
+      showToast('Seller chat opens soon during GearUp Beta.', 'warning');
+      return;
+    }
+    setSaleChatListing(item);
   };
 
   const getTierColor = (t: string) => {
@@ -173,6 +262,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 1 }}
+                onClick={() => setSelectedRentListing(item)}
                 className="cursor-pointer bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[24px] overflow-hidden group hover:border-white/20 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all flex flex-col duration-300 shadow-lg relative"
               >
                 <div className="h-48 bg-[#121212] relative overflow-hidden flex items-center justify-center border-b-[0.5px] border-white/[0.04]">
@@ -188,11 +278,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       {item.status || 'AVAILABLE'}
                      </span>
                   )}
-                  {item.imageUrl && !item.imageUrl.includes('picsum.photos') ? (
-                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out relative z-0" />
-                  ) : (
-                    <Camera size={64} className="text-white-[0.02] group-hover:scale-110 group-hover:text-white/10 transition-all duration-700 relative z-0" opacity={0.1} />
-                  )}
+                  <CategoryThumbnail item={item} />
                 </div>
                 <div className="p-5 flex flex-1 flex-col z-10 bg-[#121212] relative">
                   <div className="flex flex-col mb-2">
@@ -217,7 +303,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                       <span className="text-[10px] font-medium text-[#707070] tracking-wide block mb-0.5">PER DAY</span>
                       <span className="text-[15px] font-bold text-white tracking-tight shrink-0">₹{item.pricePerDay}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleBook(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
+                    <button onClick={(e) => { e.stopPropagation(); setSelectedRentListing(item); }} disabled={bookingItem?.id === item.id || item.ownerId === user?.uid} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
                       {item.ownerId === user?.uid ? 'Owned' : BETA_LAUNCH_MODE ? 'Preview' : 'Book Now'}
                     </button>
                   </div>
@@ -228,11 +314,8 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
                 key={item.id}
                 item={item}
                 currentUserId={user?.uid}
-                onOpen={() => {
-                  if (item.isDemo) showToast(BETA_DEMO_MESSAGE, 'warning');
-                  setSelectedSaleListing(item);
-                }}
-                onChat={() => setSaleChatListing(item)}
+                onOpen={() => setSelectedSaleListing(item)}
+                onChat={() => handleSaleChat(item)}
               />
             ))}
           </AnimatePresence>
@@ -259,12 +342,20 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       {bookingItem && (
          <BookingModal item={bookingItem} onClose={() => setBookingItem(null)} />
       )}
+      {selectedRentListing && (
+        <RentListingDetailModal
+          item={selectedRentListing}
+          currentUserId={user?.uid}
+          onClose={() => setSelectedRentListing(null)}
+          onBook={() => handleBook(selectedRentListing)}
+        />
+      )}
       {selectedSaleListing && (
         <SaleListingDetailModal
           item={selectedSaleListing}
           currentUserId={user?.uid}
           onClose={() => setSelectedSaleListing(null)}
-          onChat={() => setSaleChatListing(selectedSaleListing)}
+          onChat={() => handleSaleChat(selectedSaleListing)}
         />
       )}
       {saleChatListing && (
@@ -274,11 +365,123 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   );
 });
 
+function RentListingDetailModal({ item, currentUserId, onClose, onBook }: { item: any; currentUserId?: string; onClose: () => void; onBook: () => void }) {
+  useBodyScrollLock();
+  const pickupLocation = typeof item.location === 'object' ? item.location : {};
+  const city = pickupLocation.city || item.city || 'Hyderabad';
+  const area = pickupLocation.area || 'Area pending';
+  const addressText = formatAddress(pickupLocation);
+  const owned = item.ownerId === currentUserId;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const detailImages = Array.isArray(item.images) && item.images.length > 0
+    ? item.images
+    : item.imageUrl && !item.imageUrl.includes('picsum.photos')
+      ? [item.imageUrl]
+      : [];
+  const activeImage = detailImages[activeImageIndex] || detailImages[0];
+  const hasMultipleImages = detailImages.length > 1;
+  const description = (item.description || '').trim();
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [item.id]);
+
+  const showPreviousImage = () => {
+    setActiveImageIndex((current) => (current === 0 ? detailImages.length - 1 : current - 1));
+  };
+
+  const showNextImage = () => {
+    setActiveImageIndex((current) => (current + 1) % detailImages.length);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 18 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative z-10 w-full max-w-[760px] max-h-[92dvh] bg-[#121212] border border-white/10 rounded-[30px] overflow-hidden flex flex-col"
+      >
+        <div className="px-5 sm:px-6 py-5 border-b border-white/5 flex items-center justify-between shrink-0">
+          <div>
+            <p className="text-[#2DD4BF] text-[10px] font-black uppercase tracking-[0.2em]">Rental Preview</p>
+            <h3 className="text-white font-bold text-[18px] mt-1">{item.title}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="h-[min(280px,45vh)] md:h-auto md:aspect-[4/3] md:self-start rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+              {activeImage ? (
+                <img src={activeImage} alt={item.title} className="w-full h-full object-cover" />
+              ) : (
+                <CategoryThumbnail item={item} />
+              )}
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={20} />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-[11px] font-bold">
+                  {activeImageIndex + 1} / {detailImages.length}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-[#A855F7] text-[11px] font-bold uppercase tracking-wider">
+                {item.category} {item.tier ? `• ${item.tier} tier` : ''}
+              </p>
+              <p className="text-white text-[32px] font-black tracking-tight mt-2">₹{item.pricePerDay}<span className="text-[13px] text-white/40 font-bold"> / day</span></p>
+            </div>
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
+              <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Pickup</p>
+              <p className="text-white/70 text-[13px] leading-relaxed">{city} • {area}</p>
+              {addressText && <p className="text-white/45 text-[12px] mt-2 leading-relaxed">{addressText}</p>}
+              <p className="text-[#2DD4BF] text-[11px] mt-3 font-bold">Pickup only</p>
+            </div>
+            {description && (
+              <div className="pt-1">
+                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
+                <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="px-5 sm:px-6 py-4 border-t border-white/5 bg-[#121212] shrink-0">
+          <button
+            onClick={onBook}
+            disabled={owned}
+            className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
+          >
+            {owned ? 'Your Listing' : 'Book Now'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: any; currentUserId?: string; onOpen: () => void; onChat: () => void }) {
   const address = item.addressSnapshot || {};
   const city = address.city || item.city || 'Hyderabad';
   const area = address.area || 'Area pending';
-  const owned = item.sellerId === currentUserId || item.isDemo;
+  const owned = item.sellerId === currentUserId;
 
   return (
     <motion.div
@@ -294,7 +497,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
         {item.photos?.[0] ? (
           <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
         ) : (
-          <ShoppingBag size={56} className="text-white/10" />
+          <CategoryThumbnail item={item} />
         )}
         <span className="absolute top-4 right-4 bg-[#2DD4BF]/10 text-[#2DD4BF] text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-[24px] border-[0.5px] border-[#2DD4BF]/20 z-10 uppercase">
           For Sale
@@ -316,7 +519,7 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
             <span className="text-[16px] font-bold text-white tracking-tight shrink-0">₹{Number(item.price || 0).toLocaleString('en-IN')}</span>
           </div>
           <button onClick={(e) => { e.stopPropagation(); if (!owned) onChat(); }} disabled={owned} className="cursor-pointer px-4 py-2 bg-white/[0.02] border-[0.5px] border-white/[0.04] text-white rounded-[24px] hover:bg-white/10 active:scale-95 transition-all text-[12px] font-semibold disabled:opacity-50">
-            {item.isDemo ? 'Demo' : owned ? 'Owned' : 'Chat'}
+            {owned ? 'Owned' : 'Chat'}
           </button>
         </div>
       </div>
@@ -325,13 +528,31 @@ function SaleMarketplaceCard({ item, currentUserId, onOpen, onChat }: { item: an
 }
 
 function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item: any; currentUserId?: string; onClose: () => void; onChat: () => void }) {
+  useBodyScrollLock();
   const address = item.addressSnapshot || {};
   const addressText = address.formattedAddress || formatAddress(address);
-  const owned = item.sellerId === currentUserId || item.isDemo;
+  const owned = item.sellerId === currentUserId;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const photos = Array.isArray(item.photos) ? item.photos : [];
+  const activeImage = photos[activeImageIndex] || photos[0];
+  const hasMultipleImages = photos.length > 1;
+  const description = (item.description || '').trim();
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [item.id]);
+
+  const showPreviousImage = () => {
+    setActiveImageIndex((current) => (current === 0 ? photos.length - 1 : current - 1));
+  };
+
+  const showNextImage = () => {
+    setActiveImageIndex((current) => (current + 1) % photos.length);
+  };
 
   return (
     <div className="fixed inset-0 z-[230] flex items-center justify-center p-3 sm:p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 18 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -347,26 +568,36 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 md:grid-cols-[1fr_0.85fr] gap-5" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <div className="space-y-3">
-            <div className="aspect-[4/3] rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-              {item.photos?.[0] ? <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" /> : <ShoppingBag size={52} className="text-white/10" />}
-            </div>
-            {item.photos?.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {item.photos.slice(1, 5).map((photo: string) => (
-                  <img key={photo} src={photo} alt={item.title} className="aspect-square object-cover rounded-[14px] border border-white/10" />
-                ))}
-              </div>
+          <div className="h-[min(280px,45vh)] md:h-auto md:aspect-[4/3] md:self-start rounded-[24px] overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center relative">
+            {activeImage ? <img src={activeImage} alt={item.title} className="w-full h-full object-cover" /> : <CategoryThumbnail item={item} />}
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 border border-white/10 text-white flex items-center justify-center hover:bg-black/80 transition-all"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={20} />
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 text-white/70 text-[11px] font-bold">
+                  {activeImageIndex + 1} / {photos.length}
+                </div>
+              </>
             )}
           </div>
           <div className="space-y-4">
             <div>
               <p className="text-[#2DD4BF] text-[11px] font-bold uppercase tracking-wider">{item.category} • {item.condition}</p>
               <p className="text-white text-[32px] font-black tracking-tight mt-2">₹{Number(item.price || 0).toLocaleString('en-IN')}</p>
-            </div>
-            <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
-              <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
-              <p className="text-white/70 text-[13px] leading-relaxed whitespace-pre-wrap">{item.description}</p>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 rounded-[20px] p-4">
               <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Seller</p>
@@ -379,15 +610,23 @@ function SaleListingDetailModal({ item, currentUserId, onClose, onChat }: { item
                 <p className="text-white/65 text-[12px] leading-relaxed">{addressText}</p>
               </div>
             )}
-            <button
-              onClick={onChat}
-              disabled={owned}
-              className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
-            >
-              <MessageCircle size={16} />
-              {item.isDemo ? 'Demo Listing' : owned ? 'Your Listing' : 'Chat with Seller'}
-            </button>
+            {description && (
+              <div className="pt-1">
+                <p className="text-[11px] text-white/35 font-bold uppercase tracking-wider mb-2">Description</p>
+                <p className="text-white/75 text-[13px] leading-relaxed whitespace-pre-wrap">{description}</p>
+              </div>
+            )}
           </div>
+        </div>
+        <div className="px-5 sm:px-6 py-4 border-t border-white/5 bg-[#121212] shrink-0">
+          <button
+            onClick={onChat}
+            disabled={owned}
+            className="w-full bg-[#A855F7] text-white font-bold rounded-[20px] hover:bg-[#9333EA] transition-all text-[13px] py-3.5 flex items-center justify-center gap-2 disabled:opacity-45"
+          >
+            <MessageCircle size={16} />
+            {owned ? 'Your Listing' : 'Chat with Seller'}
+          </button>
         </div>
       </motion.div>
     </div>

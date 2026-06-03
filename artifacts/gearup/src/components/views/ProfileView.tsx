@@ -43,6 +43,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     email: '',
     phone: '',
   });
+  const profileModalOpen = editOpen || addressManagerOpen || Boolean(addressToDelete);
 
   useEffect(() => {
     setForm({
@@ -52,6 +53,20 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     });
   }, [profile, user]);
 
+  useEffect(() => {
+    if (!profileModalOpen) return;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [profileModalOpen]);
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -60,9 +75,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
       await setDoc(doc(db, 'users', user.uid), {
         name: form.name,
         username: form.name,
-        email: form.email,
-        phone: form.phone,
-        phoneVerified: form.phone === profile?.phone ? !!profile?.phoneVerified : false,
         role: profile?.role || 'user',
         verificationStatus: profile?.verificationStatus || 'not_started',
       }, { merge: true });
@@ -99,7 +111,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     { icon: Mail, label: 'Google / Email', subtitle: 'Connect Google account', status: googleConnected ? 'Connected' : 'Connect Google', interactive: !googleConnected, type: 'google' },
     { icon: MapPin, label: 'Addresses', subtitle: 'Manage pickup addresses', status: 'Manage', interactive: true, type: 'addresses' },
     { icon: Wallet, label: 'Wallet', status: 'Open', interactive: true, type: 'wallet' },
-    { icon: Mail, label: 'Email Preferences', status: 'Verified' },
   ];
 
   const setDefaultAddress = async (addressId: string) => {
@@ -292,7 +303,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setEditOpen(false)}
               className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
 
@@ -330,8 +340,9 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                   </label>
                   <input
                     value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full bg-[#0A0A0A] border border-white/10 rounded-[16px] px-4 py-3.5 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors"
+                    disabled
+                    readOnly
+                    className="w-full bg-[#0A0A0A]/60 border border-white/5 rounded-[16px] px-4 py-3.5 text-white/35 text-[13px] outline-none cursor-not-allowed"
                   />
                 </div>
 
@@ -341,10 +352,14 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                   </label>
                   <input
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="w-full bg-[#0A0A0A] border border-white/10 rounded-[16px] px-4 py-3.5 text-white text-[13px] outline-none focus:border-[#A855F7] transition-colors"
+                    disabled
+                    readOnly
+                    className="w-full bg-[#0A0A0A]/60 border border-white/5 rounded-[16px] px-4 py-3.5 text-white/35 text-[13px] outline-none cursor-not-allowed"
                   />
                 </div>
+                <p className="text-[12px] leading-relaxed text-white/40">
+                  Email and phone are linked to your verified login methods.
+                </p>
               </div>
 
               <div className="px-6 py-5 border-t border-white/5 flex flex-col-reverse sm:flex-row justify-end gap-3">
@@ -465,7 +480,6 @@ function AddressManagerModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-md"
       />
       <motion.div
