@@ -33,7 +33,7 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait before trying again.';
+      return 'Too many OTP attempts. Please wait before trying again.';
     case 'auth/invalid-verification-code':
       return 'Invalid OTP. Please check the code and try again.';
     case 'auth/code-expired':
@@ -42,8 +42,10 @@ const getPhoneAuthErrorMessage = (err: any) => {
       return 'OTP verification is temporarily unavailable during beta. Please add your phone number in profile.';
     case 'auth/requires-recent-login':
       return 'Please sign in again before verifying your phone.';
+    case 'auth/account-exists-with-different-credential':
+      return 'This phone number is already linked to another GearUp account. Use the account that originally registered this number, or use a different number.';
     case 'auth/credential-already-in-use':
-      return 'This phone number is already linked to another GearUp account.';
+      return 'This phone number is already linked to another GearUp account. Use the account that originally registered this number, or use a different number.';
     default:
       return 'Phone verification failed. Please try again.';
   }
@@ -61,6 +63,7 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
   const [verificationPhone, setVerificationPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
 
   useEffect(() => {
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -74,6 +77,15 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       document.body.style.paddingRight = previousPaddingRight;
     };
   }, []);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setTimeout(() => {
+      setResendSeconds((seconds) => Math.max(seconds - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
 
   const resetVerifier = () => {
     try {
@@ -150,13 +162,16 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       }
       setVerificationId(id);
       setVerificationPhone(e164Phone);
+      setResendSeconds(60);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
-      console.error('Phone OTP send failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone OTP send failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
       setVerificationPhone('');
     } finally {
@@ -188,11 +203,13 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       showToast('Phone verified successfully.', 'success');
       onClose();
     } catch (err: any) {
-      console.error('Phone OTP verification failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone OTP verification failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
     } finally {
       setVerifying(false);
@@ -251,11 +268,11 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
 
           <button
             onClick={handleSendOtp}
-            disabled={sending || verifying}
+            disabled={sending || verifying || resendSeconds > 0}
             className="w-full py-3.5 bg-[#A855F7] text-white font-bold rounded-[18px] hover:bg-[#9333EA] transition-all text-[13px] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {sending ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-            {verificationId ? 'Resend OTP' : 'Send OTP'}
+            {resendSeconds > 0 ? `Resend OTP in ${resendSeconds}s` : verificationId ? 'Resend OTP' : 'Send OTP'}
           </button>
 
           {verificationId && (
