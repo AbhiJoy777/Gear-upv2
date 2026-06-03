@@ -33,9 +33,9 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/code-expired':
       return 'OTP expired. Please request a new code.';
     case 'auth/account-exists-with-different-credential':
-      return 'This phone number is already linked to another GearUp account. Please use that account or contact support.';
+      return 'This phone number is already linked to another GearUp account. Use the account that originally registered this number, or use a different number.';
     case 'auth/credential-already-in-use':
-      return 'This phone number is already linked to another GearUp account.';
+      return 'This phone number is already linked to another GearUp account. Use the account that originally registered this number, or use a different number.';
     case 'auth/billing-not-enabled':
       return 'OTP verification is temporarily unavailable during beta. Please try Google login.';
     default:
