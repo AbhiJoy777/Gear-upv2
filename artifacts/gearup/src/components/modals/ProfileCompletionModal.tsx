@@ -41,8 +41,6 @@ export default function ProfileCompletionModal() {
         city,
         profileSetupCompleted: true,
         profileSetupCompletedAt: serverTimestamp(),
-        role: profile?.role || 'user',
-        verificationStatus: profile?.verificationStatus || 'not_started',
         updatedAt: serverTimestamp(),
       });
       showToast('Profile saved!', 'success');

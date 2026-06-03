@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldCheck, Send } from 'lucide-react';
-import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -55,11 +55,6 @@ export default function VerificationRequestModal({ onClose }: { onClose: () => v
         status: 'pending',
         createdAt: serverTimestamp(),
       });
-
-      await setDoc(doc(db, 'users', user.uid), {
-        role: profile?.role || 'user',
-        verificationStatus: 'pending',
-      }, { merge: true });
 
       showToast('Verification request submitted.', 'success');
       onClose();

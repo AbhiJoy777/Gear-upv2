@@ -59,8 +59,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
       await setDoc(doc(db, 'users', user.uid), {
         name: form.name,
         username: form.name,
-        role: profile?.role || 'user',
-        verificationStatus: profile?.verificationStatus || 'not_started',
       }, { merge: true });
 
       showToast('Profile updated successfully.', 'success');
