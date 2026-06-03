@@ -27,11 +27,13 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait before trying again.';
+      return 'Too many OTP attempts. Please wait before trying again.';
     case 'auth/invalid-verification-code':
       return 'Invalid OTP. Please check the code and try again.';
     case 'auth/code-expired':
       return 'OTP expired. Please request a new code.';
+    case 'auth/account-exists-with-different-credential':
+      return 'This phone number is already linked to another GearUp account. Please use that account or contact support.';
     case 'auth/credential-already-in-use':
       return 'This phone number is already linked to another GearUp account.';
     case 'auth/billing-not-enabled':
@@ -132,11 +134,13 @@ export default function PublicBetaAuth() {
       setVerificationPhone(e164Phone);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
-      console.error('Phone beta OTP send failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone beta OTP send failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
     } finally {
       setSendingOtp(false);
@@ -163,11 +167,13 @@ export default function PublicBetaAuth() {
       }, { merge: true });
       showToast('Phone login successful.', 'success');
     } catch (err: any) {
-      console.error('Phone beta OTP verification failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone beta OTP verification failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
     } finally {
       setVerifyingOtp(false);

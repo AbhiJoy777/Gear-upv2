@@ -33,7 +33,7 @@ const getPhoneAuthErrorMessage = (err: any) => {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized for Firebase phone login.';
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait before trying again.';
+      return 'Too many OTP attempts. Please wait before trying again.';
     case 'auth/invalid-verification-code':
       return 'Invalid OTP. Please check the code and try again.';
     case 'auth/code-expired':
@@ -42,6 +42,8 @@ const getPhoneAuthErrorMessage = (err: any) => {
       return 'OTP verification is temporarily unavailable during beta. Please add your phone number in profile.';
     case 'auth/requires-recent-login':
       return 'Please sign in again before verifying your phone.';
+    case 'auth/account-exists-with-different-credential':
+      return 'This phone number is already linked to another GearUp account. Please use that account or contact support.';
     case 'auth/credential-already-in-use':
       return 'This phone number is already linked to another GearUp account.';
     default:
@@ -152,11 +154,13 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       setVerificationPhone(e164Phone);
       showToast('OTP sent successfully.', 'success');
     } catch (err: any) {
-      console.error('Phone OTP send failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone OTP send failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
       setVerificationPhone('');
     } finally {
@@ -188,11 +192,13 @@ export default function PhoneVerificationModal({ onClose }: { onClose: () => voi
       showToast('Phone verified successfully.', 'success');
       onClose();
     } catch (err: any) {
-      console.error('Phone OTP verification failed:', {
-        code: err?.code,
-        message: err?.message,
-        error: err,
-      });
+      if (import.meta.env.DEV) {
+        console.error('Phone OTP verification failed:', {
+          code: err?.code,
+          message: err?.message,
+          error: err,
+        });
+      }
       showToast(getPhoneAuthErrorMessage(err), 'error');
     } finally {
       setVerifying(false);
