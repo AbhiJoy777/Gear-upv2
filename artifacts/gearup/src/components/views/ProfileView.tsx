@@ -7,31 +7,15 @@ import { db, googleProvider } from '@/lib/firebase';
 import { linkWithPopup } from 'firebase/auth';
 import { arrayUnion, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
-import VerificationRequestModal from '../modals/VerificationRequestModal';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
-
-const VERIFICATION_LABELS: Record<string, string> = {
-  not_started: 'Not started',
-  pending: 'Pending',
-  verified: 'Verified',
-  rejected: 'Rejected',
-};
-
-const VERIFICATION_STYLES: Record<string, string> = {
-  not_started: 'text-white/50 border-white/10 bg-white/5',
-  pending: 'text-[#F97316] border-[#F97316]/20 bg-[#F97316]/10',
-  verified: 'text-[#2DD4BF] border-[#2DD4BF]/20 bg-[#2DD4BF]/10',
-  rejected: 'text-red-400 border-red-500/20 bg-red-500/10',
-};
 
 const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const { user, profile } = useAuth();
   const { logout } = useAuthActions();
   const { showToast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
-  const [verificationOpen, setVerificationOpen] = useState(false);
   const [phoneVerificationOpen, setPhoneVerificationOpen] = useState(false);
   const [addressManagerOpen, setAddressManagerOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
@@ -89,24 +73,14 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
     }
   };
 
-  const verificationStatus = profile?.verificationStatus || 'not_started';
   const phoneVerified = !!profile?.phoneVerified;
   const authProviders = Array.isArray(profile?.authProviders) ? profile.authProviders : [];
   const googleConnected = !!profile?.emailVerified || authProviders.includes('google.com');
   const addresses: GearUpAddress[] = profile?.addresses || [];
   const defaultAddress = getDefaultAddress(addresses);
-  const canRequestVerification = verificationStatus === 'not_started' || verificationStatus === 'rejected';
-  const verificationAction =
-    verificationStatus === 'not_started'
-      ? 'Start Verification'
-      : verificationStatus === 'pending'
-        ? 'Verification Pending'
-        : verificationStatus === 'verified'
-          ? 'Verified'
-          : 'Retry Verification';
 
   const menuItems = [
-    { icon: Shield, label: 'Identity Verification', status: verificationAction, interactive: true },
+    { icon: Shield, label: 'Identity Verification', subtitle: 'Identity verification opens after beta.', status: 'Beta soon', interactive: false, disabled: true },
     { icon: Phone, label: 'Phone Verification', status: phoneVerified ? 'Phone Verified' : 'Verify Phone', interactive: !phoneVerified, type: 'phone' },
     { icon: Mail, label: 'Google / Email', subtitle: 'Connect Google account', status: googleConnected ? 'Connected' : 'Connect Google', interactive: !googleConnected, type: 'google' },
     { icon: MapPin, label: 'Addresses', subtitle: 'Manage pickup addresses', status: 'Manage', interactive: true, type: 'addresses' },
@@ -207,9 +181,9 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
             <Phone size={13} />
             {phoneVerified ? 'Phone Verified' : 'Phone Not Verified'}
           </div>
-          <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border text-[11px] font-bold uppercase tracking-wider ${VERIFICATION_STYLES[verificationStatus] || VERIFICATION_STYLES.not_started}`}>
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-[24px] border border-white/10 bg-white/5 text-white/45 text-[11px] font-bold uppercase tracking-wider">
             <Shield size={13} />
-            {VERIFICATION_LABELS[verificationStatus] || 'Not started'}
+            Beta soon
           </div>
         </div>
 
@@ -246,11 +220,10 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                 if (!googleConnected) handleConnectGoogle();
                 return;
               }
-              if (item.interactive && canRequestVerification) setVerificationOpen(true);
             }}
             className={`bg-[#121212] p-4 sm:p-5 rounded-[24px] border-[0.5px] border-white/[0.04] flex items-center justify-between gap-3 group transition-all ${
-              item.type === 'wallet' || item.type === 'addresses' || (item.type === 'google' && !googleConnected) || (item.type === 'phone' && !phoneVerified) || (item.interactive && canRequestVerification) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
-            }`}
+              item.type === 'wallet' || item.type === 'addresses' || (item.type === 'google' && !googleConnected) || (item.type === 'phone' && !phoneVerified) ? 'cursor-pointer hover:border-[#A855F7]/30' : ''
+            } ${item.disabled ? 'opacity-55 grayscale cursor-not-allowed' : ''}`}
           >
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div className="p-2.5 bg-black/40 rounded-lg text-white/50 group-hover:text-[#A855F7] transition-colors shrink-0">
@@ -269,13 +242,12 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
                   ? (phoneVerified ? 'text-[#2DD4BF]' : 'text-[#F97316]')
                   : item.type === 'google' ? (googleConnected ? 'text-[#2DD4BF]' : 'text-[#F97316]')
                   : item.type === 'wallet' || item.type === 'addresses' ? 'text-[#707070]'
-                  : item.interactive ? (VERIFICATION_STYLES[verificationStatus]?.split(' ')[0] || 'text-[#707070]') : 'text-[#707070]'
+                  : 'text-[#707070]'
               }`}>{item.status}</span>
               {item.type === 'phone' && !phoneVerified && <ChevronRight size={16} className="text-white/20" />}
               {item.type === 'google' && !googleConnected && <ChevronRight size={16} className="text-white/20" />}
               {item.type === 'wallet' && <ChevronRight size={16} className="text-white/20" />}
               {item.type === 'addresses' && <ChevronRight size={16} className="text-white/20" />}
-              {!item.type && item.interactive && canRequestVerification && <ChevronRight size={16} className="text-white/20" />}
             </div>
           </motion.div>
         ))}
@@ -383,11 +355,6 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {verificationOpen && (
-          <VerificationRequestModal onClose={() => setVerificationOpen(false)} />
-        )}
-      </AnimatePresence>
       <AnimatePresence>
         {phoneVerificationOpen && (
           <PhoneVerificationModal onClose={() => setPhoneVerificationOpen(false)} />
