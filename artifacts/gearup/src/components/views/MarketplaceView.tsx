@@ -258,7 +258,6 @@ function MobileSearchInput({
   containerRef,
   onChange,
   onFocus,
-  onBlur,
   onClear,
   onSubmit,
   onSelectSuggestion,
@@ -273,7 +272,6 @@ function MobileSearchInput({
   containerRef: React.RefObject<HTMLDivElement | null>;
   onChange: (value: string) => void;
   onFocus: () => void;
-  onBlur: () => void;
   onClear: () => void;
   onSubmit: () => void;
   onSelectSuggestion: (title: string) => void;
@@ -286,7 +284,6 @@ function MobileSearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onFocus={onFocus}
-        onBlur={onBlur}
         onKeyDown={(event) => {
           if (event.key === 'Enter') onSubmit();
         }}
@@ -328,7 +325,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [searchSource, setSearchSource] = useState<'mobile' | 'desktop' | null>(null);
-  const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
   const [page, setPage] = useState(1);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
@@ -597,10 +593,35 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   return (
     <div
-      className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10 pb-28 md:pb-10"
+      className="p-4 pt-24 sm:p-6 sm:pt-24 md:p-10 md:pt-10 space-y-8 md:space-y-10 pb-28 md:pb-10"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      <div className="md:hidden fixed top-16 left-0 right-0 z-40 px-4 py-3 bg-[#080808]/96 backdrop-blur-xl border-b border-white/[0.06] shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
+        <MobileSearchInput
+          value={searchQuery}
+          marketMode={marketMode}
+          selectedCity={selectedCity}
+          suggestions={suggestions}
+          suggestionsOpen={suggestionsOpen && searchSource === 'mobile'}
+          searchActive={searchActive}
+          inputRef={mobileSearchInputRef}
+          containerRef={mobileSearchRef}
+          onChange={handleMobileSearchChange}
+          onFocus={() => {
+            setSearchSource('mobile');
+            setSuggestionsOpen(searchQuery.trim().length >= 2);
+          }}
+          onClear={() => {
+            setSearchQuery('');
+            closeSuggestions();
+            mobileSearchInputRef.current?.focus();
+          }}
+          onSubmit={() => handleSearchSubmit(mobileSearchInputRef.current)}
+          onSelectSuggestion={(title) => handleSuggestionSelect(title, mobileSearchInputRef.current)}
+        />
+      </div>
+
       <div className="mb-2">
         <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-5 md:mb-10 tracking-tighter leading-[0.95]">
           <span className="text-white">Explore the </span>
@@ -619,43 +640,12 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
         </div>
 
-      <div
-        className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
-      >
-        <div className="space-y-3">
-          <MobileSearchInput
-            value={searchQuery}
-            marketMode={marketMode}
-            selectedCity={selectedCity}
-            suggestions={suggestions}
-            suggestionsOpen={suggestionsOpen && searchSource === 'mobile'}
-            searchActive={searchActive}
-            inputRef={mobileSearchInputRef}
-            containerRef={mobileSearchRef}
-            onChange={handleMobileSearchChange}
-            onFocus={() => {
-              setMobileSearchFocused(true);
-              setSearchSource('mobile');
-              setSuggestionsOpen(searchQuery.trim().length >= 2);
-            }}
-            onBlur={() => setMobileSearchFocused(false)}
-            onClear={() => {
-              setSearchQuery('');
-              closeSuggestions();
-              mobileSearchInputRef.current?.focus();
-            }}
-            onSubmit={() => handleSearchSubmit(mobileSearchInputRef.current)}
-            onSelectSuggestion={(title) => handleSuggestionSelect(title, mobileSearchInputRef.current)}
-          />
-        </div>
-
         <CategoryTabs
           marketMode={marketMode}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
-          className="mt-4"
+          className="md:hidden"
         />
-      </div>
       </div>
 
       {isDesktopList && suggestionsOpen && searchSource === 'desktop' && searchActive && desktopSuggestionBox && (
