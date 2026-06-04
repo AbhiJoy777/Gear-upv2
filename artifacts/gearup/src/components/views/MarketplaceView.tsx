@@ -142,40 +142,85 @@ function pageCount(total: number) {
 function FeaturedBannerCarousel() {
   const [activeBanner, setActiveBanner] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const isInteractingRef = useRef(false);
+  const resumeTimerRef = useRef<number | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setActiveBanner((current) => (current + 1) % FEATURED_BANNERS.length);
+      if (isInteractingRef.current) return;
+
+      setActiveBanner((current) => {
+        const next = (current + 1) % FEATURED_BANNERS.length;
+        const scroller = scrollerRef.current;
+        if (scroller) {
+          scroller.scrollTo({ left: scroller.clientWidth * next, behavior: 'smooth' });
+        }
+        return next;
+      });
     }, 3600);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
+      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+    };
   }, []);
 
-  useEffect(() => {
+  const pauseCarousel = () => {
+    isInteractingRef.current = true;
+    if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
+  };
+
+  const resumeCarouselSoon = () => {
+    if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = window.setTimeout(() => {
+      isInteractingRef.current = false;
+    }, 1400);
+  };
+
+  const scrollToBanner = (index: number) => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    scroller.scrollTo({ left: scroller.clientWidth * activeBanner, behavior: 'smooth' });
-  }, [activeBanner]);
+    pauseCarousel();
+    scroller.scrollTo({ left: scroller.clientWidth * index, behavior: 'smooth' });
+    setActiveBanner(index);
+    resumeCarouselSoon();
+  };
 
   return (
     <div
       data-marketplace-hero-carousel
       className="md:hidden -mx-4 overflow-hidden"
-      onTouchStart={(event) => event.stopPropagation()}
+      onTouchStart={(event) => {
+        event.stopPropagation();
+        pauseCarousel();
+      }}
       onTouchMove={(event) => event.stopPropagation()}
-      onTouchEnd={(event) => event.stopPropagation()}
+      onTouchEnd={(event) => {
+        event.stopPropagation();
+        resumeCarouselSoon();
+      }}
     >
       <div
         ref={scrollerRef}
         className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
         onScroll={(event) => {
+          const scrollLeft = event.currentTarget.scrollLeft;
           const width = event.currentTarget.clientWidth || 1;
-          setActiveBanner(Math.round(event.currentTarget.scrollLeft / width));
+          if (scrollFrameRef.current !== null) return;
+          scrollFrameRef.current = window.requestAnimationFrame(() => {
+            setActiveBanner((current) => {
+              const next = Math.round(scrollLeft / width);
+              return next === current ? current : next;
+            });
+            scrollFrameRef.current = null;
+          });
         }}
       >
         {FEATURED_BANNERS.map((banner) => (
           <div key={banner.title} className="min-w-full snap-center">
-            <div className={`relative h-[210px] overflow-hidden border-y border-white/[0.06] bg-gradient-to-br ${banner.accent}`}>
+            <div className={`relative h-[210px] overflow-hidden border-b border-white/[0.06] bg-gradient-to-br ${banner.accent}`}>
               <img
                 src={banner.image}
                 alt={banner.title}
@@ -196,7 +241,7 @@ function FeaturedBannerCarousel() {
           <button
             key={banner.title}
             type="button"
-            onClick={() => setActiveBanner(index)}
+            onClick={() => scrollToBanner(index)}
             className={`h-1.5 rounded-full transition-all ${activeBanner === index ? 'w-5 bg-[#2DD4BF]' : 'w-1.5 bg-white/20'}`}
             aria-label={`Show banner ${index + 1}`}
           />
@@ -672,7 +717,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
     swipeStartRef.current = null;
 
-    if (horizontal < 70 || horizontal < vertical * 1.35) return;
+    if (horizontal < 95 || horizontal < vertical * 1.8 || vertical > 80) return;
 
     if (deltaX < 0 && marketMode === 'rent') {
       handleModeChange('buy');
@@ -690,7 +735,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="md:hidden fixed top-16 left-0 right-0 z-40 px-4 py-2 bg-[#080808]/96 backdrop-blur-xl border-b border-white/[0.06] shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
+      <div className="md:hidden fixed top-16 left-0 right-0 z-40 px-4 py-2 bg-[#080808]/96 backdrop-blur-xl">
         <MobileSearchInput
           value={searchQuery}
           marketMode={marketMode}
