@@ -331,7 +331,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
   const [mobileControlsVisible, setMobileControlsVisible] = useState(true);
-  const [mobileControlsTop, setMobileControlsTop] = useState(128);
   const [page, setPage] = useState(1);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
@@ -479,21 +478,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     requestAnimationFrame(() => input?.blur());
   };
 
-  const updateMobileControlsTop = () => {
-    if (isDesktopList) return;
-    const header = document.querySelector('header') as HTMLElement | null;
-    const headerBottom = header?.getBoundingClientRect().bottom || 0;
-    const possibleBanner = header?.nextElementSibling as HTMLElement | null;
-    const bannerRect = possibleBanner?.getBoundingClientRect();
-    const bannerBottom =
-      bannerRect && bannerRect.bottom > headerBottom && bannerRect.top < window.innerHeight
-        ? bannerRect.bottom
-        : headerBottom;
-
-    const nextTop = Math.max(76, Math.round(bannerBottom + 10));
-    setMobileControlsTop((current) => (current === nextTop ? current : nextTop));
-  };
-
   useEffect(() => {
     setSearchQuery('');
     closeSuggestions();
@@ -561,17 +545,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   }, [searchQuery]);
 
   useEffect(() => {
-    updateMobileControlsTop();
-    window.addEventListener('resize', updateMobileControlsTop);
-    window.addEventListener('scroll', updateMobileControlsTop, true);
-
-    return () => {
-      window.removeEventListener('resize', updateMobileControlsTop);
-      window.removeEventListener('scroll', updateMobileControlsTop, true);
-    };
-  }, [isDesktopList]);
-
-  useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       const targetElement = event.target as Element | null;
@@ -616,7 +589,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
     const handleScroll = () => {
       if (isDesktopList) return;
-      updateMobileControlsTop();
 
       if (mobileSearchFocused || document.activeElement === mobileSearchInputRef.current || suggestionsOpen) {
         keepVisible();
@@ -626,7 +598,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       const nextScrollTop = getScrollTop();
       const delta = nextScrollTop - lastScrollTopRef.current;
 
-      if (nextScrollTop < 36 || delta < -4) {
+      if (nextScrollTop < 36) {
         setMobileControlsVisible(true);
       } else if (Math.abs(delta) > 2) {
         setMobileControlsVisible(false);
@@ -639,7 +611,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     const handleNearTopTouch = (event: TouchEvent) => {
       if (isDesktopList) return;
       const y = event.touches[0]?.clientY || 0;
-      if (y <= mobileControlsTop + 180) {
+      if (y <= 220) {
         setMobileControlsVisible(true);
       }
     };
@@ -657,7 +629,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
         window.clearTimeout(scrollStopTimerRef.current);
       }
     };
-  }, [isDesktopList, mobileControlsTop, mobileSearchFocused, suggestionsOpen]);
+  }, [isDesktopList, mobileSearchFocused, suggestionsOpen]);
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (isDesktopList) return;
@@ -713,15 +685,14 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
           />
-        </div>
+      </div>
 
       <div
-        className={`md:hidden fixed left-3 right-3 z-40 rounded-[26px] border border-white/[0.06] bg-[#0A0A0A]/92 px-3 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-300 ease-out ${
+        className={`md:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 py-1 transition-[opacity,transform] duration-300 ease-out ${
           mobileControlsVisible || suggestionsOpen || mobileSearchFocused
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 -translate-y-3 pointer-events-none'
         }`}
-        style={{ top: mobileControlsTop }}
       >
         <div className="space-y-3">
           <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
