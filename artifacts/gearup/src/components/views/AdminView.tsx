@@ -17,10 +17,21 @@ const tabLabels: Record<AdminTab, string> = {
   reports: 'Reports',
 };
 
+const PAGE_SIZE = 25;
+
 function formatDate(value: any) {
   const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return 'Not recorded';
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function pageCount(total: number) {
+  return Math.max(1, Math.ceil(total / PAGE_SIZE));
+}
+
+function pageItems<T>(items: T[], page: number) {
+  const start = (page - 1) * PAGE_SIZE;
+  return items.slice(start, start + PAGE_SIZE);
 }
 
 function userDisplayName(item: any) {
@@ -46,6 +57,8 @@ const AdminView = memo(() => {
   const [reports, setReports] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userDetailTab, setUserDetailTab] = useState<UserDetailTab>('profile');
+  const [usersPage, setUsersPage] = useState(1);
+  const [reportsPage, setReportsPage] = useState(1);
 
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -70,6 +83,8 @@ const AdminView = memo(() => {
   }, []);
 
   const openReports = reports.filter((item) => ['open', 'reviewing'].includes(item.status || 'open'));
+  const visibleUsers = useMemo(() => pageItems(usersList, usersPage), [usersList, usersPage]);
+  const visibleReports = useMemo(() => pageItems(openReports, reportsPage), [openReports, reportsPage]);
   const selectedUserRentListings = useMemo(
     () => selectedUser ? rentListings.filter((item) => item.ownerId === selectedUser.id || item.userId === selectedUser.id) : [],
     [rentListings, selectedUser],
@@ -83,6 +98,14 @@ const AdminView = memo(() => {
     usersList.forEach((item) => next.set(item.id, item));
     return next;
   }, [usersList]);
+
+  useEffect(() => {
+    setUsersPage((page) => Math.min(page, pageCount(usersList.length)));
+  }, [usersList.length]);
+
+  useEffect(() => {
+    setReportsPage((page) => Math.min(page, pageCount(openReports.length)));
+  }, [openReports.length]);
 
   const updateReportStatus = async (reportId: string, status: 'reviewing' | 'resolved' | 'rejected') => {
     if (!user) return;
@@ -151,29 +174,34 @@ const AdminView = memo(() => {
         <section className="space-y-4">
           <SectionTitle title="Users" subtitle="Click a user to inspect profile and owned listings." />
           <div className="grid gap-3">
-            {usersList.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => { setSelectedUser(item); setUserDetailTab('profile'); }}
-                className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 text-left flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-[#A855F7]/30 transition-all"
-              >
-                <div className="min-w-0">
-                  <p className="text-white font-semibold text-[14px] break-words">{userDisplayName(item)}</p>
-                  <div className="mt-2 grid gap-1 text-[12px] text-[#707070]">
-                    <span className="break-all">Email: {item.email || 'Not connected'}</span>
-                    <span>Phone: {item.phone || 'Not added'}</span>
-                    <span>City: {item.city || 'Not set'}</span>
-                    <span>Joined: {formatDate(item.createdAt || item.betaJoinedAt)}</span>
+            {usersList.length === 0 ? (
+              <EmptyPanel text="No users yet." />
+            ) : (
+              visibleUsers.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setSelectedUser(item); setUserDetailTab('profile'); }}
+                  className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 text-left flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-[#A855F7]/30 transition-all"
+                >
+                  <div className="min-w-0">
+                    <p className="text-white font-semibold text-[14px] break-words">{userDisplayName(item)}</p>
+                    <div className="mt-2 grid gap-1 text-[12px] text-[#707070]">
+                      <span className="break-all">Email: {item.email || 'Not connected'}</span>
+                      <span>Phone: {item.phone || 'Not added'}</span>
+                      <span>City: {item.city || 'Not set'}</span>
+                      <span>Joined: {formatDate(item.createdAt || item.betaJoinedAt)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge active={hasGoogleConnected(item)} label="Google connected" />
-                  <StatusBadge active={Boolean(item.phoneVerified)} label="Phone verified" />
-                  <ChevronRight size={16} className="text-white/25" />
-                </div>
-              </button>
-            ))}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge active={hasGoogleConnected(item)} label="Google connected" />
+                    <StatusBadge active={Boolean(item.phoneVerified)} label="Phone verified" />
+                    <ChevronRight size={16} className="text-white/25" />
+                  </div>
+                </button>
+              ))
+            )}
           </div>
+          <PaginationControls page={usersPage} total={usersList.length} onPageChange={setUsersPage} />
         </section>
       )}
 
@@ -204,7 +232,7 @@ const AdminView = memo(() => {
             {openReports.length === 0 ? (
               <EmptyPanel text="No open reports." />
             ) : (
-              openReports.map((report) => (
+              visibleReports.map((report) => (
                 <div key={report.id} className="bg-[#121212] border-[0.5px] border-white/[0.04] rounded-[18px] p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                   <div className="space-y-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -244,6 +272,7 @@ const AdminView = memo(() => {
               ))
             )}
           </div>
+          <PaginationControls page={reportsPage} total={openReports.length} onPageChange={setReportsPage} />
         </section>
       )}
 
@@ -293,7 +322,43 @@ function EmptyPanel({ text }: { text: string }) {
   );
 }
 
+function PaginationControls({ page, total, onPageChange }: { page: number; total: number; onPageChange: (page: number) => void }) {
+  const totalPages = pageCount(total);
+  if (total <= PAGE_SIZE) return null;
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      <p className="text-[#707070] text-[12px]">
+        Page {page} of {totalPages} - {total} total
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="px-4 py-2 rounded-full bg-white/5 text-white/60 hover:text-white hover:bg-white/10 text-[12px] font-bold transition-all disabled:opacity-35 disabled:hover:bg-white/5 disabled:hover:text-white/60"
+        >
+          Previous
+        </button>
+        <button
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="px-4 py-2 rounded-full bg-white/5 text-white/60 hover:text-white hover:bg-white/10 text-[12px] font-bold transition-all disabled:opacity-35 disabled:hover:bg-white/5 disabled:hover:text-white/60"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ListingSection({ title, emptyText, items, kind, usersById }: { title: string; emptyText: string; items: any[]; kind: 'rent' | 'sale'; usersById: Map<string, any> }) {
+  const [page, setPage] = useState(1);
+  const visibleItems = useMemo(() => pageItems(items, page), [items, page]);
+
+  useEffect(() => {
+    setPage((currentPage) => Math.min(currentPage, pageCount(items.length)));
+  }, [items.length]);
+
   return (
     <section className="space-y-4">
       <SectionTitle title={title} />
@@ -301,11 +366,12 @@ function ListingSection({ title, emptyText, items, kind, usersById }: { title: s
         {items.length === 0 ? (
           <EmptyPanel text={emptyText} />
         ) : (
-          items.map((item) => (
+          visibleItems.map((item) => (
             <ListingRow key={item.id} item={item} kind={kind} usersById={usersById} />
           ))
         )}
       </div>
+      <PaginationControls page={page} total={items.length} onPageChange={setPage} />
     </section>
   );
 }
