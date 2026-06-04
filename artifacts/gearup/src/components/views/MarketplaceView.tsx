@@ -324,10 +324,13 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [searchSource, setSearchSource] = useState<'mobile' | 'desktop' | null>(null);
   const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [mobileControlsVisible, setMobileControlsVisible] = useState(true);
   const [page, setPage] = useState(1);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const lastScrollTopRef = useRef(0);
+  const scrollStopTimerRef = useRef<number | null>(null);
   const isDesktopList = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
@@ -553,6 +556,45 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const scroller = document.querySelector('main');
+    if (!scroller) return;
+
+    const showControlsAfterScrollStops = () => {
+      if (scrollStopTimerRef.current) {
+        window.clearTimeout(scrollStopTimerRef.current);
+      }
+      scrollStopTimerRef.current = window.setTimeout(() => {
+        setMobileControlsVisible(true);
+      }, 260);
+    };
+
+    const handleScroll = () => {
+      if (isDesktopList) return;
+      const nextScrollTop = scroller.scrollTop;
+      const delta = nextScrollTop - lastScrollTopRef.current;
+
+      if (nextScrollTop < 24 || delta < -6 || suggestionsOpen) {
+        setMobileControlsVisible(true);
+      } else if (delta > 8) {
+        setMobileControlsVisible(false);
+      }
+
+      lastScrollTopRef.current = nextScrollTop;
+      showControlsAfterScrollStops();
+    };
+
+    lastScrollTopRef.current = scroller.scrollTop;
+    scroller.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      scroller.removeEventListener('scroll', handleScroll);
+      if (scrollStopTimerRef.current) {
+        window.clearTimeout(scrollStopTimerRef.current);
+      }
+    };
+  }, [isDesktopList, suggestionsOpen]);
+
 
   return (
     <div className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10 pb-28 md:pb-10">
@@ -572,7 +614,13 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
         </div>
       </div>
 
-      <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+      <div
+        className={`md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)] transition-[max-height,opacity,transform,padding] duration-300 ease-out ${
+          mobileControlsVisible
+            ? 'max-h-[260px] py-3 opacity-100 translate-y-0 overflow-visible'
+            : 'max-h-0 py-0 opacity-0 -translate-y-3 overflow-hidden pointer-events-none border-transparent'
+        }`}
+      >
         <div className="space-y-3">
           <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" />
           <MobileSearchInput
