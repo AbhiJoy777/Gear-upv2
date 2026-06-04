@@ -1,6 +1,6 @@
 
 
-import React, { useEffect, useMemo, useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '@/lib/firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
@@ -13,6 +13,7 @@ import { BETA_LAUNCH_MODE, BETA_MESSAGE, DEMO_RENT_LISTINGS, DEMO_SALE_LISTINGS 
 import { useToast } from '@/context/ToastContext';
 
 const CATEGORIES = ['Laptops', 'Desktops', 'GPUs', 'Consoles', 'Monitors', 'Controllers'];
+const BUY_CATEGORIES = ['Laptops', 'GPUs', 'Consoles', 'Gaming PCs', 'Monitors', 'Cameras', 'Camera Gear', 'Accessories', 'Other Tech Gear'];
 const PAGE_SIZE = 20;
 const XBOX_THUMBNAIL =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 900 600%22%3E%3Cdefs%3E%3CradialGradient id=%22g%22 cx=%2255%25%22 cy=%2230%25%22 r=%2270%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%2316a34a%22 stop-opacity=%22.95%22/%3E%3Cstop offset=%2240%25%22 stop-color=%22%230f172a%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23020617%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22x%22 x1=%220%22 x2=%221%22%3E%3Cstop stop-color=%22%231f2937%22/%3E%3Cstop offset=%221%22 stop-color=%22%23030508%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22900%22 height=%22600%22 fill=%22url(%23g)%22/%3E%3Crect x=%22560%22 y=%22105%22 width=%22118%22 height=%22385%22 rx=%2218%22 fill=%22url(%23x)%22 stroke=%22%2334d399%22 stroke-opacity=%22.35%22 stroke-width=%223%22/%3E%3Ccircle cx=%22619%22 cy=%22158%22 r=%2229%22 fill=%22%23050a07%22 stroke=%22%2322c55e%22 stroke-width=%224%22/%3E%3Cpath d=%22M601 140c21 11 37 28 47 51%22 fill=%22none%22 stroke=%22%2316a34a%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M220 342c28-62 84-96 154-86l71 13 71-13c70-10 126 24 154 86l28 61c13 28-6 61-37 61h-70c-21 0-40-11-51-29l-24-39H374l-24 39c-11 18-30 29-51 29h-70c-31 0-50-33-37-61l28-61z%22 fill=%22%23101419%22 stroke=%22%23e5e7eb%22 stroke-opacity=%22.2%22 stroke-width=%223%22/%3E%3Ccircle cx=%22321%22 cy=%22358%22 r=%2228%22 fill=%22%23111827%22 stroke=%22%234ade80%22 stroke-width=%225%22/%3E%3Cpath d=%22M296 358h50M321 333v50%22 stroke=%22%234ade80%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%22576%22 cy=%22335%22 r=%2211%22 fill=%22%2322c55e%22/%3E%3Ccircle cx=%22610%22 cy=%22360%22 r=%2211%22 fill=%22%2384cc16%22/%3E%3Ccircle cx=%22542%22 cy=%22360%22 r=%2211%22 fill=%22%2316a34a%22/%3E%3Ccircle cx=%22576%22 cy=%22386%22 r=%2211%22 fill=%22%23bbf7d0%22/%3E%3Ctext x=%2272%22 y=%22110%22 fill=%22%23dcfce7%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2252%22 font-weight=%22700%22%3EXbox%3C/text%3E%3Ctext x=%2274%22 y=%22152%22 fill=%22%2386efac%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 letter-spacing=%224%22%3ESERIES X%7CS%3C/text%3E%3C/svg%3E';
@@ -137,6 +138,174 @@ function itemArea(item: any, mode: 'rent' | 'buy') {
   return location.area || 'Area pending';
 }
 
+type MarketMode = 'rent' | 'buy';
+
+type SearchSuggestion = {
+  id: string;
+  title: string;
+  category: string;
+  city: string;
+};
+
+function ModeSwitch({
+  marketMode,
+  onModeChange,
+  className = '',
+}: {
+  marketMode: MarketMode;
+  onModeChange: (mode: MarketMode) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`inline-grid grid-cols-2 p-1 bg-[#121212] border border-white/[0.05] rounded-[24px] ${className}`}>
+      {(['rent', 'buy'] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onModeChange(mode)}
+          className={`px-6 py-2.5 rounded-[20px] text-[12px] font-bold uppercase tracking-wider transition-all ${
+            marketMode === mode ? 'bg-white text-black' : 'text-white/45 hover:text-white'
+          }`}
+        >
+          {mode === 'rent' ? 'Rent' : 'Buy'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CategoryTabs({
+  marketMode,
+  selectedCategory,
+  onCategoryChange,
+  className = '',
+}: {
+  marketMode: MarketMode;
+  selectedCategory: string;
+  onCategoryChange: (category: string) => void;
+  className?: string;
+}) {
+  const categories = ['All Gear', ...(marketMode === 'rent' ? CATEGORIES : BUY_CATEGORIES)];
+
+  return (
+    <div className={`flex gap-6 md:gap-8 overflow-x-auto pb-0 scrollbar-hide border-b border-white/5 relative ${className}`}>
+      {categories.map((cat) => (
+        <button
+          key={cat}
+          onClick={() => onCategoryChange(cat)}
+          className={`cursor-pointer pb-4 text-[13px] font-medium transition-colors duration-300 shrink-0 relative group hover:text-white ${
+            selectedCategory === cat
+              ? 'text-white'
+              : 'text-[#707070]'
+          }`}
+        >
+          <span className="relative z-10">{cat}</span>
+          {selectedCategory === cat && (
+            <motion.div
+              layoutId="marketplace-category-indicator"
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#A855F7] z-20"
+            />
+          )}
+          {selectedCategory !== cat && (
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300 z-10" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SuggestionList({
+  suggestions,
+  onSelect,
+}: {
+  suggestions: SearchSuggestion[];
+  onSelect: (title: string) => void;
+}) {
+  return (
+    <div
+      data-marketplace-search-suggestions
+      className="bg-[#121212] border border-white/10 rounded-[20px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+    >
+      {suggestions.length > 0 ? (
+        suggestions.map((suggestion) => (
+          <button
+            key={suggestion.id}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onSelect(suggestion.title)}
+            className="w-full text-left px-4 py-3 hover:bg-white/5 transition-all border-b border-white/[0.04] last:border-b-0"
+          >
+            <p className="text-white text-[13px] font-bold line-clamp-1">{suggestion.title}</p>
+            <p className="text-white/40 text-[11px] mt-1">{suggestion.category} - {suggestion.city}</p>
+          </button>
+        ))
+      ) : (
+        <div className="px-4 py-3 text-white/40 text-[12px]">No suggestions found.</div>
+      )}
+    </div>
+  );
+}
+
+function MobileSearchInput({
+  value,
+  marketMode,
+  selectedCity,
+  suggestions,
+  suggestionsOpen,
+  searchActive,
+  inputRef,
+  containerRef,
+  onChange,
+  onFocus,
+  onClear,
+  onSubmit,
+  onSelectSuggestion,
+}: {
+  value: string;
+  marketMode: MarketMode;
+  selectedCity: string;
+  suggestions: SearchSuggestion[];
+  suggestionsOpen: boolean;
+  searchActive: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  onClear: () => void;
+  onSubmit: () => void;
+  onSelectSuggestion: (title: string) => void;
+}) {
+  return (
+    <div ref={containerRef} className="relative">
+      <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none" />
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onSubmit();
+        }}
+        placeholder={`Search ${marketMode === 'rent' ? 'rentals' : 'sale listings'} in ${selectedCity}`}
+        className="w-full h-12 bg-[#121212] border border-white/[0.06] rounded-[20px] pl-11 pr-11 text-white text-[13px] outline-none focus:border-[#A855F7]/60 transition-all placeholder:text-white/25"
+      />
+      {value && (
+        <button
+          onClick={onClear}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/5 text-white/45 hover:text-white hover:bg-white/10 flex items-center justify-center"
+          aria-label="Clear search"
+        >
+          <X size={14} />
+        </button>
+      )}
+      {suggestionsOpen && searchActive && (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40">
+          <SuggestionList suggestions={suggestions} onSelect={onSelectSuggestion} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   const { user } = useAuth();
@@ -150,10 +319,15 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [selectedSaleListing, setSelectedSaleListing] = useState<any | null>(null);
   const [saleChatListing, setSaleChatListing] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Gear');
-  const [marketMode, setMarketMode] = useState<'rent' | 'buy'>('rent');
+  const [marketMode, setMarketMode] = useState<MarketMode>('rent');
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [searchSource, setSearchSource] = useState<'mobile' | 'desktop' | null>(null);
+  const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
   const [page, setPage] = useState(1);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const isDesktopList = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
@@ -256,15 +430,53 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     }))
     : [];
 
+  const closeSuggestions = () => {
+    setSuggestionsOpen(false);
+    setSearchSource(null);
+  };
+
+  const handleModeChange = (mode: MarketMode) => {
+    setMarketMode(mode);
+    setSelectedCategory('All Gear');
+  };
+
+  const updateDesktopSuggestionBox = () => {
+    const input = desktopSearchInputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    setDesktopSuggestionBox({
+      left: rect.left,
+      top: rect.bottom + 8,
+      width: rect.width,
+    });
+  };
+
+  const handleMobileSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setSearchSource('mobile');
+    setSuggestionsOpen(value.trim().length >= 2);
+  };
+
+  const handleSearchSubmit = (input?: HTMLInputElement | null) => {
+    closeSuggestions();
+    input?.blur();
+  };
+
+  const handleSuggestionSelect = (title: string, input?: HTMLInputElement | null) => {
+    setSearchQuery(title);
+    closeSuggestions();
+    requestAnimationFrame(() => input?.blur());
+  };
+
   useEffect(() => {
     setSearchQuery('');
-    setSuggestionsOpen(false);
+    closeSuggestions();
     setPage(1);
   }, [marketMode]);
 
   useEffect(() => {
     setPage(1);
-    setSuggestionsOpen(false);
+    closeSuggestions();
   }, [selectedCategory, selectedCity]);
 
   useEffect(() => {
@@ -275,17 +487,92 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     setPage((currentPage) => Math.min(currentPage, totalPages));
   }, [totalPages]);
 
+  useEffect(() => {
+    const headerSearch = document.querySelector('header input[type="text"]') as HTMLInputElement | null;
+    desktopSearchInputRef.current = headerSearch;
+    if (!headerSearch) return;
+
+    const handleInput = () => {
+      const value = headerSearch.value;
+      setSearchQuery(value);
+      setSearchSource('desktop');
+      setSuggestionsOpen(value.trim().length >= 2);
+      updateDesktopSuggestionBox();
+    };
+
+    const handleFocus = () => {
+      setSearchSource('desktop');
+      setSuggestionsOpen(headerSearch.value.trim().length >= 2);
+      updateDesktopSuggestionBox();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        handleSearchSubmit(headerSearch);
+      }
+    };
+
+    headerSearch.value = searchQuery;
+    headerSearch.addEventListener('input', handleInput);
+    headerSearch.addEventListener('focus', handleFocus);
+    headerSearch.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', updateDesktopSuggestionBox);
+    window.addEventListener('scroll', updateDesktopSuggestionBox, true);
+
+    return () => {
+      headerSearch.removeEventListener('input', handleInput);
+      headerSearch.removeEventListener('focus', handleFocus);
+      headerSearch.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updateDesktopSuggestionBox);
+      window.removeEventListener('scroll', updateDesktopSuggestionBox, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (desktopSearchInputRef.current && desktopSearchInputRef.current.value !== searchQuery) {
+      desktopSearchInputRef.current.value = searchQuery;
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      const targetElement = event.target as Element | null;
+      if (mobileSearchRef.current?.contains(target)) return;
+      if (desktopSearchInputRef.current?.contains(target)) return;
+      if (targetElement?.closest('[data-marketplace-search-suggestions]')) return;
+      closeSuggestions();
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, []);
+
 
   return (
-    <div className="p-4 sm:p-6 md:p-10 space-y-6 md:space-y-8 pb-28 md:pb-10">
-      <div>
-        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-5 md:mb-8 tracking-tighter leading-[0.95]">
+    <div className="p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10 pb-28 md:pb-10">
+      <div className="mb-2">
+        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-5 md:mb-10 tracking-tighter leading-[0.95]">
           <span className="text-white">Explore the </span>
           <span className="text-[#2DD4BF] italic">Armory.</span>
         </h2>
+
+        <div className="hidden md:block">
+          <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="mb-6" />
+          <CategoryTabs
+            marketMode={marketMode}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+        </div>
       </div>
 
-      <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 md:-mx-10 px-4 sm:px-6 md:px-10 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+      <div className="md:hidden sticky top-16 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
         {BETA_LAUNCH_MODE && (
           <div className="mb-3 rounded-[18px] border border-[#A855F7]/20 bg-[#A855F7]/10 px-4 py-3">
             <p className="text-[12px] sm:text-[13px] text-white/80 font-medium leading-relaxed">
@@ -295,98 +582,55 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="inline-grid grid-cols-2 p-1 bg-[#121212] border border-white/[0.05] rounded-[24px] w-full sm:w-fit">
-            {(['rent', 'buy'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => {
-                  setMarketMode(mode);
-                  setSelectedCategory('All Gear');
-                }}
-                className={`px-6 py-2.5 rounded-[20px] text-[12px] font-bold uppercase tracking-wider transition-all ${
-                  marketMode === mode ? 'bg-white text-black' : 'text-white/45 hover:text-white'
-                }`}
-              >
-                {mode === 'rent' ? 'Rent' : 'Buy'}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none" />
-            <input
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setSuggestionsOpen(event.target.value.trim().length >= 2);
-              }}
-              onFocus={() => setSuggestionsOpen(searchQuery.trim().length >= 2)}
-              placeholder={`Search ${marketMode === 'rent' ? 'rentals' : 'sale listings'} in ${selectedCity}`}
-              className="w-full h-12 bg-[#121212] border border-white/[0.06] rounded-[20px] pl-11 pr-11 text-white text-[13px] outline-none focus:border-[#A855F7]/60 transition-all placeholder:text-white/25"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSuggestionsOpen(false);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/5 text-white/45 hover:text-white hover:bg-white/10 flex items-center justify-center"
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
-            {suggestionsOpen && searchActive && (
-              <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 bg-[#121212] border border-white/10 rounded-[20px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
-                {suggestions.length > 0 ? (
-                  suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion.id}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setSearchQuery(suggestion.title);
-                        setSuggestionsOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-white/5 transition-all border-b border-white/[0.04] last:border-b-0"
-                    >
-                      <p className="text-white text-[13px] font-bold line-clamp-1">{suggestion.title}</p>
-                      <p className="text-white/40 text-[11px] mt-1">{suggestion.category} - {suggestion.city}</p>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-3 text-white/40 text-[12px]">No suggestions found.</div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="space-y-3">
+          <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" />
+          <MobileSearchInput
+            value={searchQuery}
+            marketMode={marketMode}
+            selectedCity={selectedCity}
+            suggestions={suggestions}
+            suggestionsOpen={suggestionsOpen && searchSource === 'mobile'}
+            searchActive={searchActive}
+            inputRef={mobileSearchInputRef}
+            containerRef={mobileSearchRef}
+            onChange={handleMobileSearchChange}
+            onFocus={() => {
+              setSearchSource('mobile');
+              setSuggestionsOpen(searchQuery.trim().length >= 2);
+            }}
+            onClear={() => {
+              setSearchQuery('');
+              closeSuggestions();
+              mobileSearchInputRef.current?.focus();
+            }}
+            onSubmit={() => handleSearchSubmit(mobileSearchInputRef.current)}
+            onSelectSuggestion={(title) => handleSuggestionSelect(title, mobileSearchInputRef.current)}
+          />
         </div>
 
-        <div className="flex gap-6 md:gap-8 overflow-x-auto mt-4 pb-0 scrollbar-hide border-b border-white/5 relative">
-          {['All Gear', ...(marketMode === 'rent' ? CATEGORIES : ['Laptops', 'GPUs', 'Consoles', 'Gaming PCs', 'Monitors', 'Cameras', 'Camera Gear', 'Accessories', 'Other Tech Gear'])].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`cursor-pointer pb-4 text-[13px] font-medium transition-colors duration-300 shrink-0 relative group hover:text-white ${
-                selectedCategory === cat
-                  ? 'text-white'
-                  : 'text-[#707070]'
-              }`}
-            >
-              <span className="relative z-10">{cat}</span>
-              {selectedCategory === cat && (
-                <motion.div
-                  layoutId="marketplace-category-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#A855F7] z-20"
-                />
-              )}
-              {selectedCategory !== cat && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300 z-10" />
-              )}
-            </button>
-          ))}
+        <CategoryTabs
+          marketMode={marketMode}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          className="mt-4"
+        />
       </div>
-      </div>
+
+      {isDesktopList && suggestionsOpen && searchSource === 'desktop' && searchActive && desktopSuggestionBox && (
+        <div
+          className="fixed z-[80]"
+          style={{
+            left: desktopSuggestionBox.left,
+            top: desktopSuggestionBox.top,
+            width: desktopSuggestionBox.width,
+          }}
+        >
+          <SuggestionList
+            suggestions={suggestions}
+            onSelect={(title) => handleSuggestionSelect(title, desktopSearchInputRef.current)}
+          />
+        </div>
+      )}
 
       {fetching ? (
         <div className="h-[40vh] flex items-center justify-center">
