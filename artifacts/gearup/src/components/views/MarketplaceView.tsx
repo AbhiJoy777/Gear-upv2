@@ -330,14 +330,11 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [searchSource, setSearchSource] = useState<'mobile' | 'desktop' | null>(null);
   const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
-  const [mobileControlsVisible, setMobileControlsVisible] = useState(true);
   const [page, setPage] = useState(1);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lastScrollTopRef = useRef(0);
-  const scrollStopTimerRef = useRef<number | null>(null);
   const isDesktopList = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
@@ -563,74 +560,6 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     };
   }, []);
 
-  useEffect(() => {
-    const scroller = document.querySelector('main');
-
-    const getScrollTop = () => {
-      const mainScroll = scroller?.scrollTop || 0;
-      return mainScroll || window.scrollY || document.documentElement.scrollTop || 0;
-    };
-
-    const keepVisible = () => {
-      setMobileControlsVisible(true);
-      if (scrollStopTimerRef.current) {
-        window.clearTimeout(scrollStopTimerRef.current);
-      }
-    };
-
-    const showAfterScrollStop = () => {
-      if (scrollStopTimerRef.current) {
-        window.clearTimeout(scrollStopTimerRef.current);
-      }
-      scrollStopTimerRef.current = window.setTimeout(() => {
-        setMobileControlsVisible(true);
-      }, 300);
-    };
-
-    const handleScroll = () => {
-      if (isDesktopList) return;
-
-      if (mobileSearchFocused || document.activeElement === mobileSearchInputRef.current || suggestionsOpen) {
-        keepVisible();
-        return;
-      }
-
-      const nextScrollTop = getScrollTop();
-      const delta = nextScrollTop - lastScrollTopRef.current;
-
-      if (nextScrollTop < 36) {
-        setMobileControlsVisible(true);
-      } else if (Math.abs(delta) > 2) {
-        setMobileControlsVisible(false);
-        showAfterScrollStop();
-      }
-
-      lastScrollTopRef.current = nextScrollTop;
-    };
-
-    const handleNearTopTouch = (event: TouchEvent) => {
-      if (isDesktopList) return;
-      const y = event.touches[0]?.clientY || 0;
-      if (y <= 220) {
-        setMobileControlsVisible(true);
-      }
-    };
-
-    lastScrollTopRef.current = getScrollTop();
-    scroller?.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    document.addEventListener('touchstart', handleNearTopTouch, { passive: true });
-
-    return () => {
-      scroller?.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleScroll);
-      document.removeEventListener('touchstart', handleNearTopTouch);
-      if (scrollStopTimerRef.current) {
-        window.clearTimeout(scrollStopTimerRef.current);
-      }
-    };
-  }, [isDesktopList, mobileSearchFocused, suggestionsOpen]);
-
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (isDesktopList) return;
     const target = event.target as Element | null;
@@ -686,16 +615,14 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
             onCategoryChange={setSelectedCategory}
           />
       </div>
+        <div className="md:hidden mb-5">
+          <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
+        </div>
 
       <div
-        className={`md:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 py-1 transition-[opacity,transform] duration-300 ease-out ${
-          mobileControlsVisible || suggestionsOpen || mobileSearchFocused
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 -translate-y-3 pointer-events-none'
-        }`}
+        className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
       >
         <div className="space-y-3">
-          <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
           <MobileSearchInput
             value={searchQuery}
             marketMode={marketMode}
