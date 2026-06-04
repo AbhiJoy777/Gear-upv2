@@ -95,10 +95,10 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="h-dvh min-h-screen overflow-hidden bg-[#0A0A0A] flex flex-col text-white font-sans">
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col text-white font-sans">
       <Header selectedCity={selectedCity} onCityChange={setSelectedCity} />
       {BETA_LAUNCH_MODE && (
-        <div className="shrink-0 px-4 sm:px-6 py-3 bg-[#A855F7]/10 border-b border-[#A855F7]/20 text-center">
+        <div className="px-4 sm:px-6 py-3 bg-[#A855F7]/10 border-b border-[#A855F7]/20 text-center">
           <p className="text-[12px] sm:text-[13px] text-white/80 font-medium leading-relaxed">
             <span className="text-[#2DD4BF] font-bold">GearUp Beta is live.</span>{' '}
             {BETA_MESSAGE.replace('GearUp Beta is live. ', '')}
@@ -106,9 +106,9 @@ export function ThemeLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
-        <main className="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-0">
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
           <div className="min-h-full">
             {pathname === '/' ? (
               <div className="relative">

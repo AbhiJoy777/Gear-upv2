@@ -613,7 +613,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
         </div>
       </div>
 
-      <div className="md:hidden sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+      <div className="md:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
         <div className="space-y-3">
           <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
           <MobileSearchInput
