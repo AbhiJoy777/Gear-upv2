@@ -20,21 +20,25 @@ const FEATURED_BANNERS = [
     title: 'Rent High-End Gaming PCs',
     subtitle: 'RTX 4070 • RTX 4080 • RTX 4090',
     accent: 'from-[#2DD4BF]/25 via-[#0F766E]/10 to-[#A855F7]/20',
+    image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=1100&q=80',
   },
   {
     title: 'Earn From Idle Gear',
     subtitle: 'List your laptop, PC, or console',
     accent: 'from-[#A855F7]/25 via-[#7C3AED]/10 to-[#2DD4BF]/15',
+    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1100&q=80',
   },
   {
     title: 'Hyderabad Tech Rentals',
     subtitle: 'Browse local verified listings',
     accent: 'from-[#06B6D4]/20 via-[#111827]/10 to-[#A855F7]/20',
+    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1100&q=80',
   },
   {
     title: 'Student Friendly Pricing',
     subtitle: 'Gaming, AI, Editing, Projects',
     accent: 'from-[#F59E0B]/20 via-[#A855F7]/10 to-[#2DD4BF]/15',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1100&q=80',
   },
 ];
 const XBOX_THUMBNAIL =
@@ -154,7 +158,7 @@ function FeaturedBannerCarousel() {
   }, [activeBanner]);
 
   return (
-    <div className="md:hidden -mx-1 overflow-hidden">
+    <div className="md:hidden -mx-4 overflow-hidden">
       <div
         ref={scrollerRef}
         className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
@@ -164,19 +168,24 @@ function FeaturedBannerCarousel() {
         }}
       >
         {FEATURED_BANNERS.map((banner) => (
-          <div key={banner.title} className="min-w-full snap-center px-1">
-            <div className={`relative overflow-hidden rounded-[22px] border border-white/[0.06] bg-gradient-to-br ${banner.accent} p-4 shadow-[0_18px_50px_rgba(0,0,0,0.35)]`}>
-              <div className="absolute inset-0 bg-[#0A0A0A]/35" />
-              <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
-              <div className="relative z-10 min-h-[86px] flex flex-col justify-center">
-                <p className="text-white text-[17px] font-black tracking-tight leading-tight">{banner.title}</p>
-                <p className="text-white/65 text-[12px] font-semibold mt-2">{banner.subtitle}</p>
+          <div key={banner.title} className="min-w-full snap-center">
+            <div className={`relative h-[210px] overflow-hidden border-y border-white/[0.06] bg-gradient-to-br ${banner.accent}`}>
+              <img
+                src={banner.image}
+                alt={banner.title}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-black/15" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A]/85 via-transparent to-black/20" />
+              <div className="relative z-10 h-full flex flex-col justify-end px-5 pb-7">
+                <p className="text-white text-[24px] font-black tracking-tight leading-[1.02] max-w-[280px]">{banner.title}</p>
+                <p className="text-white/72 text-[13px] font-semibold mt-2">{banner.subtitle}</p>
               </div>
             </div>
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-center gap-1.5 mt-3">
+      <div className="flex items-center justify-center gap-1.5 mt-2.5">
         {FEATURED_BANNERS.map((banner, index) => (
           <button
             key={banner.title}
@@ -671,7 +680,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
 
   return (
     <div
-      className="p-4 pt-24 sm:p-6 sm:pt-24 md:p-10 md:pt-10 space-y-8 md:space-y-10 pb-28 md:pb-10"
+      className="p-4 pt-3 sm:p-6 sm:pt-4 md:p-10 md:pt-10 space-y-4 md:space-y-10 pb-28 md:pb-10"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
