@@ -158,7 +158,7 @@ function FeaturedBannerCarousel() {
         }
         return next;
       });
-    }, 3600);
+    }, 6000);
 
     return () => {
       window.clearInterval(timer);
@@ -176,7 +176,7 @@ function FeaturedBannerCarousel() {
     if (resumeTimerRef.current !== null) window.clearTimeout(resumeTimerRef.current);
     resumeTimerRef.current = window.setTimeout(() => {
       isInteractingRef.current = false;
-    }, 1400);
+    }, 4000);
   };
 
   const scrollToBanner = (index: number) => {
