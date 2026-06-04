@@ -258,6 +258,7 @@ function MobileSearchInput({
   containerRef,
   onChange,
   onFocus,
+  onBlur,
   onClear,
   onSubmit,
   onSelectSuggestion,
@@ -272,6 +273,7 @@ function MobileSearchInput({
   containerRef: React.RefObject<HTMLDivElement | null>;
   onChange: (value: string) => void;
   onFocus: () => void;
+  onBlur: () => void;
   onClear: () => void;
   onSubmit: () => void;
   onSelectSuggestion: (title: string) => void;
@@ -284,6 +286,7 @@ function MobileSearchInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onFocus={onFocus}
+        onBlur={onBlur}
         onKeyDown={(event) => {
           if (event.key === 'Enter') onSubmit();
         }}
@@ -325,12 +328,17 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [searchSource, setSearchSource] = useState<'mobile' | 'desktop' | null>(null);
+  const [mobileSearchFocused, setMobileSearchFocused] = useState(false);
   const [desktopSuggestionBox, setDesktopSuggestionBox] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [mobileControlsVisible, setMobileControlsVisible] = useState(true);
+  const [mobileControlsTop, setMobileControlsTop] = useState(128);
   const [page, setPage] = useState(1);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastScrollTopRef = useRef(0);
+  const scrollStopTimerRef = useRef<number | null>(null);
   const isDesktopList = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
@@ -471,6 +479,21 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
     requestAnimationFrame(() => input?.blur());
   };
 
+  const updateMobileControlsTop = () => {
+    if (isDesktopList) return;
+    const header = document.querySelector('header') as HTMLElement | null;
+    const headerBottom = header?.getBoundingClientRect().bottom || 0;
+    const possibleBanner = header?.nextElementSibling as HTMLElement | null;
+    const bannerRect = possibleBanner?.getBoundingClientRect();
+    const bannerBottom =
+      bannerRect && bannerRect.bottom > headerBottom && bannerRect.top < window.innerHeight
+        ? bannerRect.bottom
+        : headerBottom;
+
+    const nextTop = Math.max(76, Math.round(bannerBottom + 10));
+    setMobileControlsTop((current) => (current === nextTop ? current : nextTop));
+  };
+
   useEffect(() => {
     setSearchQuery('');
     closeSuggestions();
@@ -538,6 +561,17 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   }, [searchQuery]);
 
   useEffect(() => {
+    updateMobileControlsTop();
+    window.addEventListener('resize', updateMobileControlsTop);
+    window.addEventListener('scroll', updateMobileControlsTop, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMobileControlsTop);
+      window.removeEventListener('scroll', updateMobileControlsTop, true);
+    };
+  }, [isDesktopList]);
+
+  useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       const targetElement = event.target as Element | null;
@@ -555,6 +589,75 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       document.removeEventListener('touchstart', handlePointerDown);
     };
   }, []);
+
+  useEffect(() => {
+    const scroller = document.querySelector('main');
+
+    const getScrollTop = () => {
+      const mainScroll = scroller?.scrollTop || 0;
+      return mainScroll || window.scrollY || document.documentElement.scrollTop || 0;
+    };
+
+    const keepVisible = () => {
+      setMobileControlsVisible(true);
+      if (scrollStopTimerRef.current) {
+        window.clearTimeout(scrollStopTimerRef.current);
+      }
+    };
+
+    const showAfterScrollStop = () => {
+      if (scrollStopTimerRef.current) {
+        window.clearTimeout(scrollStopTimerRef.current);
+      }
+      scrollStopTimerRef.current = window.setTimeout(() => {
+        setMobileControlsVisible(true);
+      }, 300);
+    };
+
+    const handleScroll = () => {
+      if (isDesktopList) return;
+      updateMobileControlsTop();
+
+      if (mobileSearchFocused || document.activeElement === mobileSearchInputRef.current || suggestionsOpen) {
+        keepVisible();
+        return;
+      }
+
+      const nextScrollTop = getScrollTop();
+      const delta = nextScrollTop - lastScrollTopRef.current;
+
+      if (nextScrollTop < 36 || delta < -4) {
+        setMobileControlsVisible(true);
+      } else if (Math.abs(delta) > 2) {
+        setMobileControlsVisible(false);
+        showAfterScrollStop();
+      }
+
+      lastScrollTopRef.current = nextScrollTop;
+    };
+
+    const handleNearTopTouch = (event: TouchEvent) => {
+      if (isDesktopList) return;
+      const y = event.touches[0]?.clientY || 0;
+      if (y <= mobileControlsTop + 180) {
+        setMobileControlsVisible(true);
+      }
+    };
+
+    lastScrollTopRef.current = getScrollTop();
+    scroller?.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('touchstart', handleNearTopTouch, { passive: true });
+
+    return () => {
+      scroller?.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('touchstart', handleNearTopTouch);
+      if (scrollStopTimerRef.current) {
+        window.clearTimeout(scrollStopTimerRef.current);
+      }
+    };
+  }, [isDesktopList, mobileControlsTop, mobileSearchFocused, suggestionsOpen]);
 
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (isDesktopList) return;
@@ -611,9 +714,15 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
             onCategoryChange={setSelectedCategory}
           />
         </div>
-      </div>
 
-      <div className="md:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-[#0A0A0A]/95 backdrop-blur-xl border-y border-white/[0.04] shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+      <div
+        className={`md:hidden fixed left-3 right-3 z-40 rounded-[26px] border border-white/[0.06] bg-[#0A0A0A]/92 px-3 py-3 shadow-[0_18px_50px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-[opacity,transform] duration-300 ease-out ${
+          mobileControlsVisible || suggestionsOpen || mobileSearchFocused
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            : 'opacity-0 -translate-y-3 pointer-events-none'
+        }`}
+        style={{ top: mobileControlsTop }}
+      >
         <div className="space-y-3">
           <ModeSwitch marketMode={marketMode} onModeChange={handleModeChange} className="w-full" compact />
           <MobileSearchInput
@@ -627,9 +736,11 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
             containerRef={mobileSearchRef}
             onChange={handleMobileSearchChange}
             onFocus={() => {
+              setMobileSearchFocused(true);
               setSearchSource('mobile');
               setSuggestionsOpen(searchQuery.trim().length >= 2);
             }}
+            onBlur={() => setMobileSearchFocused(false)}
             onClear={() => {
               setSearchQuery('');
               closeSuggestions();
@@ -646,6 +757,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
           onCategoryChange={setSelectedCategory}
           className="mt-4"
         />
+      </div>
       </div>
 
       {isDesktopList && suggestionsOpen && searchSource === 'desktop' && searchActive && desktopSuggestionBox && (
