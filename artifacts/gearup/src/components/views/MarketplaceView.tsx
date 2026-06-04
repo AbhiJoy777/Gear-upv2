@@ -158,7 +158,13 @@ function FeaturedBannerCarousel() {
   }, [activeBanner]);
 
   return (
-    <div className="md:hidden -mx-4 overflow-hidden">
+    <div
+      data-marketplace-hero-carousel
+      className="md:hidden -mx-4 overflow-hidden"
+      onTouchStart={(event) => event.stopPropagation()}
+      onTouchMove={(event) => event.stopPropagation()}
+      onTouchEnd={(event) => event.stopPropagation()}
+    >
       <div
         ref={scrollerRef}
         className="flex snap-x snap-mandatory overflow-x-auto scrollbar-hide"
@@ -646,7 +652,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (isDesktopList) return;
     const target = event.target as Element | null;
-    if (target?.closest('input, textarea, select, button, [data-marketplace-search-suggestions]')) {
+    if (target?.closest('input, textarea, select, button, [data-marketplace-search-suggestions], [data-marketplace-hero-carousel]')) {
       swipeStartRef.current = null;
       return;
     }
