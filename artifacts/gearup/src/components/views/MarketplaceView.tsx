@@ -296,7 +296,7 @@ function DesktopPromoPanel() {
   const promo = DESKTOP_PROMOS[activePromo];
 
   return (
-    <div className="hidden lg:block relative h-[190px] xl:h-[210px] overflow-hidden rounded-[24px] border border-white/[0.07] bg-[#101010] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+    <div className="hidden lg:block relative h-[220px] xl:h-[240px] -mx-10 overflow-hidden bg-[#0B0B0B]">
       <AnimatePresence mode="wait">
         <motion.div
           key={promo.title}
@@ -306,10 +306,10 @@ function DesktopPromoPanel() {
           transition={{ duration: 0.55, ease: 'easeInOut' }}
           className={`absolute inset-0 bg-gradient-to-br ${promo.accent}`}
         >
-          <img src={promo.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-55" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/15" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/20" />
-          <div className="relative z-10 h-full flex flex-col justify-end p-6">
+          <img src={promo.image} alt="" className="absolute right-0 inset-y-0 w-[62%] h-full object-cover opacity-70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#080808] via-[#080808]/90 to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/25" />
+          <div className="absolute right-10 xl:right-14 top-1/2 -translate-y-1/2 z-10 w-[30%] min-w-[300px]">
             <p className="text-[#2DD4BF] text-[10px] font-black uppercase tracking-[0.22em] mb-2">Featured</p>
             <p className="text-white text-[22px] xl:text-[25px] font-black tracking-tight leading-[1.05] max-w-[340px]">
               {promo.title}
@@ -318,7 +318,13 @@ function DesktopPromoPanel() {
           </div>
         </motion.div>
       </AnimatePresence>
-      <div className="absolute right-5 bottom-5 z-20 flex items-center gap-1.5">
+      <div className="absolute left-10 xl:left-14 inset-y-0 z-20 w-[62%] flex items-center">
+        <h2 className="text-6xl xl:text-[82px] font-black tracking-tighter leading-[0.92] max-w-[760px]">
+          <span className="text-white">Explore the </span>
+          <span className="text-[#2DD4BF] italic">Armory.</span>
+        </h2>
+      </div>
+      <div className="absolute right-10 xl:right-14 bottom-6 z-20 flex items-center gap-1.5">
         {DESKTOP_PROMOS.map((item, index) => (
           <button
             key={item.title}
@@ -845,13 +851,7 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       <FeaturedBannerCarousel />
 
       <div className="mb-2">
-        <div className="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(0,2.15fr)_minmax(360px,1fr)] gap-8 items-stretch mb-8">
-          <div className="flex items-center">
-            <h2 className="text-7xl xl:text-[82px] font-black tracking-tighter leading-[0.92]">
-              <span className="text-white">Explore the </span>
-              <span className="text-[#2DD4BF] italic">Armory.</span>
-            </h2>
-          </div>
+        <div className="hidden lg:block mb-8">
           <DesktopPromoPanel />
         </div>
 
