@@ -279,6 +279,7 @@ function FeaturedBannerCarousel() {
 
 function DesktopPromoPanel() {
   const [activePromo, setActivePromo] = useState(0);
+  const [rotationReset, setRotationReset] = useState(0);
   const isDesktopPromo = useMediaQuery('(min-width: 1024px)');
 
   useEffect(() => {
@@ -289,14 +290,22 @@ function DesktopPromoPanel() {
     }, 6000);
 
     return () => window.clearInterval(timer);
-  }, [isDesktopPromo]);
+  }, [isDesktopPromo, rotationReset]);
 
   if (!isDesktopPromo) return null;
 
   const promo = DESKTOP_PROMOS[activePromo];
+  const showNextPromo = () => {
+    setActivePromo((current) => (current + 1) % DESKTOP_PROMOS.length);
+    setRotationReset((current) => current + 1);
+  };
+  const selectPromo = (index: number) => {
+    setActivePromo(index);
+    setRotationReset((current) => current + 1);
+  };
 
   return (
-    <div className="hidden lg:block relative h-[220px] xl:h-[240px] -mx-10 overflow-hidden bg-[#0B0B0B]">
+    <div className="hidden lg:block group relative h-[220px] xl:h-[240px] -mx-10 overflow-hidden bg-[#0B0B0B]">
       <AnimatePresence mode="wait">
         <motion.div
           key={promo.title}
@@ -329,12 +338,20 @@ function DesktopPromoPanel() {
           <button
             key={item.title}
             type="button"
-            onClick={() => setActivePromo(index)}
+            onClick={() => selectPromo(index)}
             className={`h-1.5 rounded-full transition-all ${activePromo === index ? 'w-5 bg-[#2DD4BF]' : 'w-1.5 bg-white/30 hover:bg-white/55'}`}
             aria-label={`Show promotion ${index + 1}`}
           />
         ))}
       </div>
+      <button
+        type="button"
+        onClick={showNextPromo}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/55 border border-white/10 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:border-white/25 hover:scale-105 transition-all duration-300"
+        aria-label="Show next promotion"
+      >
+        <ChevronRight size={22} />
+      </button>
     </div>
   );
 }
