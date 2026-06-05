@@ -41,6 +41,32 @@ const FEATURED_BANNERS = [
     image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1100&q=80',
   },
 ];
+const DESKTOP_PROMOS = [
+  {
+    title: 'Rent High-End Gaming PCs',
+    subtitle: 'RTX 4070 • RTX 4080 • RTX 4090',
+    image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=1100&q=80',
+    accent: 'from-[#2DD4BF]/40 via-[#0F766E]/10 to-[#A855F7]/25',
+  },
+  {
+    title: 'Earn From Idle Gear',
+    subtitle: 'Turn unused tech into income',
+    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1100&q=80',
+    accent: 'from-[#A855F7]/40 via-[#7C3AED]/10 to-[#2DD4BF]/20',
+  },
+  {
+    title: 'Hyderabad Tech Rentals',
+    subtitle: 'Browse local listings',
+    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1100&q=80',
+    accent: 'from-[#06B6D4]/35 via-[#111827]/10 to-[#A855F7]/25',
+  },
+  {
+    title: 'Student Friendly Pricing',
+    subtitle: 'Gaming • AI • Editing',
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1100&q=80',
+    accent: 'from-[#F59E0B]/30 via-[#A855F7]/15 to-[#2DD4BF]/20',
+  },
+];
 const XBOX_THUMBNAIL =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 900 600%22%3E%3Cdefs%3E%3CradialGradient id=%22g%22 cx=%2255%25%22 cy=%2230%25%22 r=%2270%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%2316a34a%22 stop-opacity=%22.95%22/%3E%3Cstop offset=%2240%25%22 stop-color=%22%230f172a%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23020617%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22x%22 x1=%220%22 x2=%221%22%3E%3Cstop stop-color=%22%231f2937%22/%3E%3Cstop offset=%221%22 stop-color=%22%23030508%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22900%22 height=%22600%22 fill=%22url(%23g)%22/%3E%3Crect x=%22560%22 y=%22105%22 width=%22118%22 height=%22385%22 rx=%2218%22 fill=%22url(%23x)%22 stroke=%22%2334d399%22 stroke-opacity=%22.35%22 stroke-width=%223%22/%3E%3Ccircle cx=%22619%22 cy=%22158%22 r=%2229%22 fill=%22%23050a07%22 stroke=%22%2322c55e%22 stroke-width=%224%22/%3E%3Cpath d=%22M601 140c21 11 37 28 47 51%22 fill=%22none%22 stroke=%22%2316a34a%22 stroke-width=%224%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M220 342c28-62 84-96 154-86l71 13 71-13c70-10 126 24 154 86l28 61c13 28-6 61-37 61h-70c-21 0-40-11-51-29l-24-39H374l-24 39c-11 18-30 29-51 29h-70c-31 0-50-33-37-61l28-61z%22 fill=%22%23101419%22 stroke=%22%23e5e7eb%22 stroke-opacity=%22.2%22 stroke-width=%223%22/%3E%3Ccircle cx=%22321%22 cy=%22358%22 r=%2228%22 fill=%22%23111827%22 stroke=%22%234ade80%22 stroke-width=%225%22/%3E%3Cpath d=%22M296 358h50M321 333v50%22 stroke=%22%234ade80%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%22576%22 cy=%22335%22 r=%2211%22 fill=%22%2322c55e%22/%3E%3Ccircle cx=%22610%22 cy=%22360%22 r=%2211%22 fill=%22%2384cc16%22/%3E%3Ccircle cx=%22542%22 cy=%22360%22 r=%2211%22 fill=%22%2316a34a%22/%3E%3Ccircle cx=%22576%22 cy=%22386%22 r=%2211%22 fill=%22%23bbf7d0%22/%3E%3Ctext x=%2272%22 y=%22110%22 fill=%22%23dcfce7%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2252%22 font-weight=%22700%22%3EXbox%3C/text%3E%3Ctext x=%2274%22 y=%22152%22 fill=%22%2386efac%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2224%22 font-weight=%22700%22 letter-spacing=%224%22%3ESERIES X%7CS%3C/text%3E%3C/svg%3E';
 const CATEGORY_VISUALS = {
@@ -244,6 +270,62 @@ function FeaturedBannerCarousel() {
             onClick={() => scrollToBanner(index)}
             className={`h-1.5 rounded-full transition-all ${activeBanner === index ? 'w-5 bg-[#2DD4BF]' : 'w-1.5 bg-white/20'}`}
             aria-label={`Show banner ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DesktopPromoPanel() {
+  const [activePromo, setActivePromo] = useState(0);
+  const isDesktopPromo = useMediaQuery('(min-width: 1024px)');
+
+  useEffect(() => {
+    if (!isDesktopPromo) return;
+
+    const timer = window.setInterval(() => {
+      setActivePromo((current) => (current + 1) % DESKTOP_PROMOS.length);
+    }, 6000);
+
+    return () => window.clearInterval(timer);
+  }, [isDesktopPromo]);
+
+  if (!isDesktopPromo) return null;
+
+  const promo = DESKTOP_PROMOS[activePromo];
+
+  return (
+    <div className="hidden lg:block relative h-[190px] xl:h-[210px] overflow-hidden rounded-[24px] border border-white/[0.07] bg-[#101010] shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={promo.title}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.55, ease: 'easeInOut' }}
+          className={`absolute inset-0 bg-gradient-to-br ${promo.accent}`}
+        >
+          <img src={promo.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-55" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/15" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/20" />
+          <div className="relative z-10 h-full flex flex-col justify-end p-6">
+            <p className="text-[#2DD4BF] text-[10px] font-black uppercase tracking-[0.22em] mb-2">Featured</p>
+            <p className="text-white text-[22px] xl:text-[25px] font-black tracking-tight leading-[1.05] max-w-[340px]">
+              {promo.title}
+            </p>
+            <p className="text-white/65 text-[12px] font-semibold mt-2">{promo.subtitle}</p>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+      <div className="absolute right-5 bottom-5 z-20 flex items-center gap-1.5">
+        {DESKTOP_PROMOS.map((item, index) => (
+          <button
+            key={item.title}
+            type="button"
+            onClick={() => setActivePromo(index)}
+            className={`h-1.5 rounded-full transition-all ${activePromo === index ? 'w-5 bg-[#2DD4BF]' : 'w-1.5 bg-white/30 hover:bg-white/55'}`}
+            aria-label={`Show promotion ${index + 1}`}
           />
         ))}
       </div>
@@ -763,7 +845,17 @@ const MarketplaceView = memo(({ selectedCity }: { selectedCity: string }) => {
       <FeaturedBannerCarousel />
 
       <div className="mb-2">
-        <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-5 md:mb-10 tracking-tighter leading-[0.95]">
+        <div className="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(0,2.15fr)_minmax(360px,1fr)] gap-8 items-stretch mb-8">
+          <div className="flex items-center">
+            <h2 className="text-7xl xl:text-[82px] font-black tracking-tighter leading-[0.92]">
+              <span className="text-white">Explore the </span>
+              <span className="text-[#2DD4BF] italic">Armory.</span>
+            </h2>
+          </div>
+          <DesktopPromoPanel />
+        </div>
+
+        <h2 className="lg:hidden text-4xl sm:text-5xl md:text-7xl font-black mb-5 md:mb-10 tracking-tighter leading-[0.95]">
           <span className="text-white">Explore the </span>
           <span className="text-[#2DD4BF] italic">Armory.</span>
         </h2>
