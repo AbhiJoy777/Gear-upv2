@@ -5,6 +5,9 @@ import { ThemeLayout } from "@/components/layout/ThemeLayout";
 import Home from "@/pages/Home";
 import LoginPage from "@/pages/Login";
 import SignupPage from "@/pages/Signup";
+import TermsPage from "@/pages/Terms";
+import PrivacyPage from "@/pages/Privacy";
+import ContactPage from "@/pages/Contact";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -13,6 +16,9 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/contact" component={ContactPage} />
       <Route component={NotFound} />
     </Switch>
   );

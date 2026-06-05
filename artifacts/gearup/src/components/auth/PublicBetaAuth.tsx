@@ -5,6 +5,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, type Confirm
 import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { useToast } from '@/context/ToastContext';
+import { Link } from 'wouter';
 
 const BETA_RECAPTCHA_CONTAINER_ID = 'beta-phone-recaptcha-container';
 
@@ -295,6 +296,18 @@ export default function PublicBetaAuth() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <p className="text-center text-[11px] leading-relaxed text-white/35 mt-6">
+        By continuing, you agree to GearUp&apos;s{' '}
+        <Link href="/terms" className="text-white/60 hover:text-white underline underline-offset-2 transition-colors">
+          Terms
+        </Link>{' '}
+        and{' '}
+        <Link href="/privacy" className="text-white/60 hover:text-white underline underline-offset-2 transition-colors">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   );
 }
