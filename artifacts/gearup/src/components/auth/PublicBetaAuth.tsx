@@ -4,7 +4,7 @@ import { Loader2, Phone, ShieldCheck } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { signInWithGearUpGoogle } from '@/lib/googleAuth';
+import { getGearUpGoogleErrorMessage, signInWithGearUpGoogle } from '@/lib/googleAuth';
 import { useToast } from '@/context/ToastContext';
 import { Link } from 'wouter';
 
@@ -105,9 +105,9 @@ export default function PublicBetaAuth() {
     setLoadingGoogle(true);
     try {
       await signInWithGearUpGoogle();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google beta auth failed:', err);
-      showToast('Google sign-in failed. Please try again.', 'error');
+      showToast(getGearUpGoogleErrorMessage(err), 'error');
     } finally {
       setLoadingGoogle(false);
     }

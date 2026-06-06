@@ -9,7 +9,7 @@ import { useToast } from '@/context/ToastContext';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
-import { linkGearUpGoogle } from '@/lib/googleAuth';
+import { getGearUpGoogleErrorMessage, linkGearUpGoogle } from '@/lib/googleAuth';
 
 const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const { user, profile } = useAuth();
@@ -147,7 +147,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
         showToast('Google account is already connected.', 'info');
         return;
       }
-      showToast('Could not connect Google account. Please try again.', 'error');
+      showToast(getGearUpGoogleErrorMessage(err, true), 'error');
     }
   };
 

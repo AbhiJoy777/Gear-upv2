@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/context/ToastContext';
-import { signInWithGearUpGoogle } from '@/lib/googleAuth';
+import { getGearUpGoogleErrorMessage, signInWithGearUpGoogle } from '@/lib/googleAuth';
 
 export default function SignupForm() {
   const { showToast } = useToast();
@@ -77,7 +77,7 @@ export default function SignupForm() {
             try {
               await signInWithGearUpGoogle();
             } catch (err: any) {
-              showToast('Google sign-in failed. Please try again.', 'error');
+              showToast(getGearUpGoogleErrorMessage(err), 'error');
             }
           }}
           className="w-full h-12 flex items-center justify-center gap-2 bg-transparent text-white font-semibold rounded-xl border border-white/10 hover:border-white/30 active:scale-95 transition-all text-sm cursor-pointer"
