@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Phone, ShieldCheck } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, type ConfirmationResult } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import { arrayUnion, doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { signInWithGearUpGoogle } from '@/lib/googleAuth';
 import { useToast } from '@/context/ToastContext';
 import { Link } from 'wouter';
 
@@ -103,7 +104,7 @@ export default function PublicBetaAuth() {
   const handleGoogle = async () => {
     setLoadingGoogle(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithGearUpGoogle();
     } catch (err) {
       console.error('Google beta auth failed:', err);
       showToast('Google sign-in failed. Please try again.', 'error');

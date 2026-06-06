@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { auth, googleProvider } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/context/ToastContext';
+import { signInWithGearUpGoogle } from '@/lib/googleAuth';
 
 export default function SignupForm() {
   const { showToast } = useToast();
@@ -74,7 +75,7 @@ export default function SignupForm() {
           type="button"
           onClick={async () => {
             try {
-              await signInWithPopup(auth, googleProvider);
+              await signInWithGearUpGoogle();
             } catch (err: any) {
               showToast('Google sign-in failed. Please try again.', 'error');
             }

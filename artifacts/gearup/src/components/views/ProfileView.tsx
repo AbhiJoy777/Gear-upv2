@@ -3,13 +3,13 @@ import { useAuth } from '@/context/AuthContext';
 import { useAuthActions } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Shield, LogOut, ChevronRight, Phone, Pencil, X, Save, MapPin, Plus, Home, Briefcase, Wallet, Trash2 } from 'lucide-react';
-import { db, googleProvider } from '@/lib/firebase';
-import { linkWithPopup } from 'firebase/auth';
+import { db } from '@/lib/firebase';
 import { arrayUnion, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/context/ToastContext';
 import PhoneVerificationModal from '../modals/PhoneVerificationModal';
 import AddressModal from '../modals/AddressModal';
 import { GearUpAddress, getDefaultAddress, mapsUrl } from '@/lib/address';
+import { linkGearUpGoogle } from '@/lib/googleAuth';
 
 const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const { user, profile } = useAuth();
@@ -125,7 +125,7 @@ const ProfileView = memo(({ onOpenWallet }: { onOpenWallet?: () => void }) => {
   const handleConnectGoogle = async () => {
     if (!user) return;
     try {
-      const result = await linkWithPopup(user, googleProvider);
+      const result = await linkGearUpGoogle(user);
       await setDoc(doc(db, 'users', user.uid), {
         email: result.user.email,
         emailVerified: Boolean(result.user.emailVerified || result.user.providerData.some((provider) => provider.providerId === 'google.com')),
