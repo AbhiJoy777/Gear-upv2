@@ -1,22 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Laptop, Monitor, Gamepad, Cpu, Server, Plus, UploadCloud, Search, ChevronDown, Navigation } from 'lucide-react';
+import { X, Plus, UploadCloud, Search, ChevronDown, Navigation } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { formatAddress, GearUpAddress, getDefaultAddress } from '@/lib/address';
 import { BETA_LAUNCH_MODE, canListDuringBeta, getBetaListingGateMessage } from '@/lib/beta';
+import { RENTAL_CATEGORIES, getRentalCategoryMaxPrice, isGpuCategory, isLaptopCategory, isMacBookCategory, isSimpleBrandModelCategory } from '@/lib/listingCategories';
 
 const CITIES = ['Hyderabad', 'Bangalore', 'Mumbai'];
-const CATS = [
-  { name: 'Laptops', Icon: Laptop },
-  { name: 'Desktops', Icon: Monitor },
-  { name: 'GPUs', Icon: Cpu },
-  { name: 'Consoles', Icon: Server },
-  { name: 'Monitors', Icon: Monitor },
-  { name: 'Controllers', Icon: Gamepad }
-];
 
 const NVIDIA_MODELS = [
   'RTX 5090', 'RTX 5080', 'RTX 5070', 'RTX 5060', 'RTX 5050',
@@ -36,13 +29,17 @@ const INTEL_ARC_MODELS = [
   'Arc A350M', 'Arc A370M', 'Arc A550M', 'Arc A730M', 'Arc A770M'
 ];
 
-const VRAM_OPTS = ['4GB', '6GB', '8GB', '10GB', '12GB', '16GB', '24GB'];
+const VRAM_OPTS = ['4GB', '6GB', '8GB', '10GB', '12GB', '16GB', '24GB', 'Other'];
 
-const CPU_PLATFORMS = ['Intel', 'AMD'];
-const INTEL_CPUS = ['i3', 'i5', 'i7', 'i9'];
-const AMD_CPUS = ['Ryzen 3', 'Ryzen 5', 'Ryzen 7', 'Ryzen 9'];
-const RAM_OPTS = ['4GB', '8GB', '16GB', '32GB', '64GB', '128GB'];
-const GPU_PLATFORMS = ['Nvidia', 'AMD', 'Intel Arc', 'Integrated'];
+const CPU_PLATFORMS = ['Intel', 'AMD', 'Other'];
+const INTEL_CPUS = ['i3', 'i5', 'i7', 'i9', 'Other'];
+const AMD_CPUS = ['Ryzen 3', 'Ryzen 5', 'Ryzen 7', 'Ryzen 9', 'Other'];
+const RAM_OPTS = ['4GB', '8GB', '16GB', '32GB', '64GB', '128GB', 'Other'];
+const GPU_PLATFORMS = ['Nvidia', 'AMD', 'Intel Arc', 'Integrated', 'Other'];
+const MACBOOK_MODELS = ['MacBook Air', 'MacBook Pro', 'Other'];
+const MACBOOK_CHIPS = ['M1', 'M2', 'M3', 'M4', 'Other'];
+const STORAGE_OPTS = ['128GB', '256GB', '512GB', '1TB', '2TB', '4TB', 'Other'];
+const BRAND_OPTS = ['Apple', 'Sony', 'Canon', 'Nikon', 'GoPro', 'Meta', 'HTC', 'Samsung', 'LG', 'BenQ', 'Epson', 'Yamaha', 'Fender', 'Shure', 'Rode', 'Elgato', 'DJI', 'Other'];
 
 function getScore(cpuP: string, cpuM: string, ram: string, gpuP: string, gpuM: string, vram: string) {
   let score = 0;
@@ -96,6 +93,9 @@ const GpuModelSelect = ({ val, set, platform, disabled }: any) => {
   if (platform === 'Nvidia') modelsList = NVIDIA_MODELS;
   else if (platform === 'AMD') modelsList = AMD_MODELS;
   else if (platform === 'Intel Arc') modelsList = INTEL_ARC_MODELS;
+  else if (platform === 'Other') modelsList = ['Other'];
+
+  if (modelsList.length > 0 && !modelsList.includes('Other')) modelsList = [...modelsList, 'Other'];
 
   const filtered = modelsList.filter(m => m.toLowerCase().includes(search.toLowerCase()));
 
@@ -200,6 +200,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const [load, setLoad] = useState(false);
   
   const [c, setC] = useState('');
+  const [pricePerDay, setPricePerDay] = useState('');
   
   const [cpuPlatform, setCpuPlatform] = useState('');
   const [cpuModel, setCpuModel] = useState('');
@@ -214,6 +215,11 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [otherCpu, setOtherCpu] = useState('');
   const [numControllers, setNumControllers] = useState('');
+  const [macModel, setMacModel] = useState('');
+  const [macChip, setMacChip] = useState('');
+  const [storage, setStorage] = useState('');
+  const [simpleBrand, setSimpleBrand] = useState('');
+  const [simpleModel, setSimpleModel] = useState('');
 
   const [houseOrBuilding, setHouseOrBuilding] = useState('');
   const [city, setCity] = useState(selectedCity || 'Hyderabad');
@@ -306,16 +312,19 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
   const title = useMemo(() => {
     if (!c) return 'Gear Title';
-    if (c === 'Laptops' || c === 'Desktops') {
-      const gpuDesc = gpuPlatform === 'Integrated' ? 'Integrated Gfx' : gpuModel;
-      return `${c.slice(0,-1)} - ${[cpuPlatform + ' ' + cpuModel, ram, gpuDesc].filter(x => x && x.trim() !== 'undefined').join(' / ')}`;
+    if (isMacBookCategory(c)) {
+      return `MacBook - ${[macModel, macChip, ram, storage].filter(Boolean).join(' / ') || 'Apple Laptop'}`;
     }
-    if (c === 'GPUs') return `GPU - ${gpuModel || otherCpu}`;
+    if (isLaptopCategory(c)) {
+      const gpuDesc = gpuPlatform === 'Integrated' ? 'Integrated Gfx' : gpuModel;
+      return `${c === 'MacBooks' ? 'MacBook' : c.slice(0,-1)} - ${[cpuPlatform + ' ' + cpuModel, ram, gpuDesc].filter(x => x && x.trim() !== 'undefined').join(' / ')}`;
+    }
+    if (isGpuCategory(c)) return `GPU - ${gpuModel || otherCpu}`;
     if (c === 'Consoles') return `Console - ${otherCpu}`;
     if (c === 'Monitors') return `Monitor - ${monSize} ${monRes}`;
     if (c === 'Controllers') return `Controller - ${controllerModel || 'Standard'}`;
-    return 'Professional Controller';
-  }, [c, cpuPlatform, cpuModel, ram, gpuPlatform, gpuModel, otherCpu, monSize, monRes, controllerModel]);
+    return `${c} - ${[simpleBrand, simpleModel].filter(Boolean).join(' ') || otherCpu || 'Rental Gear'}`;
+  }, [c, macModel, macChip, ram, storage, cpuPlatform, cpuModel, gpuPlatform, gpuModel, otherCpu, monSize, monRes, controllerModel, simpleBrand, simpleModel]);
 
   let totalScore = getScore(cpuPlatform, cpuModel, ram, gpuPlatform, gpuModel, vram);
   
@@ -359,67 +368,63 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
   }
 
   let tier = 'Low';
-  let base = 600;
   
-  if (c === 'GPUs') {
+  if (isGpuCategory(c)) {
     if (totalScore >= 120) {
       tier = 'High';
-      base = 1500;
     } else if (totalScore >= 70) {
       tier = 'Mid';
-      base = 800;
     } else {
       tier = 'Low';
-      base = 400;
     }
   } else if (c === 'Monitors') {
     if (totalScore >= 160 || ((monRes === '4K' || monRes === '4k') && monRefresh === '> 360Hz')) {
       tier = 'High';
-      base = 2000;
     } else if (totalScore >= 90) {
       tier = 'Mid';
-      base = 1000;
     } else {
       tier = 'Low';
-      base = 500;
     }
   } else if (c === 'Controllers') {
     if (totalScore >= 100) {
       tier = 'High';
-      base = 500;
     } else {
       tier = 'Mid';
-      base = 250;
     }
   } else if (totalScore >= 180 || otherCpu.includes('4K')) {
     tier = 'High';
-    base = 2500;
   } else if (totalScore >= 90 || otherCpu.includes('1440p')) {
     tier = 'Mid';
-    base = 1200;
   }
+
+  const categoryMaxPrice = getRentalCategoryMaxPrice(c);
+  const parsedPricePerDay = Number(pricePerDay);
+  const hasValidPrice = Number.isFinite(parsedPricePerDay) && parsedPricePerDay > 0 && parsedPricePerDay <= categoryMaxPrice;
+  const previewPricePerDay = Number.isFinite(parsedPricePerDay) && parsedPricePerDay > 0 ? parsedPricePerDay : 0;
 
   const isValid = () => {
     if (step === 1) return !!c;
     if (step === 2) {
-      if (c === 'Laptops' || c === 'Desktops') {
+      if (isMacBookCategory(c)) return !!macModel && !!macChip && !!ram && !!storage;
+      if (isLaptopCategory(c)) {
         const cpuOk = !!cpuPlatform && !!cpuModel;
         const ramOk = !!ram;
         const gpuOk = !!gpuPlatform && (gpuPlatform === 'Integrated' || (!!gpuModel && !!vram));
         return cpuOk && ramOk && gpuOk;
       }
-      if (c === 'GPUs') return !!gpuPlatform && !!gpuModel && !!vram;
+      if (isGpuCategory(c)) return !!gpuPlatform && !!gpuModel && !!vram;
       if (c === 'Consoles') return !!otherCpu && !!numControllers;
       if (c === 'Monitors') return !!monSize && !!monRefresh && !!monRes;
       if (c === 'Controllers') return !!controllerPlatform && !!controllerModel;
-      return true;
+      if (isSimpleBrandModelCategory(c)) return !!simpleBrand && !!simpleModel.trim();
+      return !!otherCpu.trim();
     }
     if (step === 3 && c === 'Desktops') {
       return !incMonitor || (!!monSize && !!monRefresh && !!monRes);
     }
     if (step === 4) return imgs.length > 0;
     if (step === 5) return !!city && !!houseOrBuilding.trim() && !!area.trim() && !!landmark.trim();
-    if (step === 6) return description.trim().length >= 20;
+    if (step === 6) return description.trim().length >= 20 && hasValidPrice;
     return true;
   };
 
@@ -443,7 +448,12 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setLoad(true);
     try {
       let specData: any = {};
-      if (['Laptops', 'Desktops'].includes(c)) {
+      if (isMacBookCategory(c)) {
+        specData.model = macModel ?? '';
+        specData.chip = macChip ?? '';
+        specData.ram = ram ?? '';
+        specData.storage = storage ?? '';
+      } else if (isLaptopCategory(c)) {
         specData.cpu = cpuPlatform ? cpuPlatform + ' ' + cpuModel : '';
         specData.ram = ram ?? '';
         specData.gpuType = gpuPlatform === 'Integrated' ? 'Integrated' : (gpuModel ?? '');
@@ -456,7 +466,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             monitor: incMonitor ? { size: monSize ?? '', res: monRes ?? '', refresh: monRefresh ?? '' } : null
           };
         }
-      } else if (c === 'GPUs') {
+      } else if (isGpuCategory(c)) {
         specData.gpuPlatform = gpuPlatform ?? '';
         specData.gpuModel = gpuModel ?? '';
         specData.vram = vram ?? '';
@@ -470,6 +480,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       } else if (c === 'Controllers') {
         specData.controllerPlatform = controllerPlatform ?? '';
         specData.controllerModel = controllerModel ?? '';
+      } else if (isSimpleBrandModelCategory(c)) {
+        specData.brand = simpleBrand ?? '';
+        specData.model = simpleModel.trim();
       } else {
         specData.model = otherCpu ?? '';
       }
@@ -488,13 +501,13 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
       };
 
       const payload: any = {
-        title, category: c, pricePerDay: base,
+        title, category: c, pricePerDay: Math.round(parsedPricePerDay),
         tier, imageUrl: imgs[0] || '',
         images: imgs,
         description: description.trim(),
         specs: specData,
         score: totalScore,
-        isGaming: ['Laptops', 'Desktops'].includes(c) && !!gpuPlatform && gpuPlatform !== 'Integrated',
+        isGaming: c === 'Gaming Laptops' || (isLaptopCategory(c) && !!gpuPlatform && gpuPlatform !== 'Integrated'),
         logisticsType: 'Self-Pickup',
         city,
         location,
@@ -522,8 +535,10 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
 
   const reset = () => { 
     setStep(1); setC(''); 
+    setPricePerDay('');
     setCpuPlatform(''); setCpuModel(''); setRam(''); 
     setGpuPlatform(''); setGpuModel(''); setVram(''); setOtherCpu(''); setNumControllers('');
+    setMacModel(''); setMacChip(''); setStorage(''); setSimpleBrand(''); setSimpleModel('');
     setMonSize(''); setMonRefresh(''); setMonRes('');
     setControllerPlatform(''); setControllerModel('');
     setHouseOrBuilding('');
@@ -545,6 +560,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     if (!isOpen || !editItem) return;
     const specs = editItem.specs || {};
     setC(editItem.category || '');
+    setPricePerDay(editItem.pricePerDay ? String(editItem.pricePerDay) : '');
     setImgs((editItem.images || (editItem.imageUrl ? [editItem.imageUrl] : [])).slice(0, 3));
     setDescription(editItem.description || '');
     const existingLocation = typeof editItem.location === 'object' ? editItem.location : {};
@@ -556,7 +572,12 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     setLat(typeof existingLocation.lat === 'number' ? existingLocation.lat : null);
     setLng(typeof existingLocation.lng === 'number' ? existingLocation.lng : null);
     setLocationSource(existingLocation.source || 'manual');
-    if (['Laptops', 'Desktops'].includes(editItem.category)) {
+    if (isMacBookCategory(editItem.category)) {
+      setMacModel(specs.model || '');
+      setMacChip(specs.chip || '');
+      setRam(specs.ram || '');
+      setStorage(specs.storage || '');
+    } else if (isLaptopCategory(editItem.category)) {
       const cpuParts = (specs.cpu || '').split(' ');
       setCpuPlatform(cpuParts[0] || '');
       setCpuModel(cpuParts.slice(1).join(' ') || '');
@@ -580,7 +601,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
           setMonRes(specs.peripherals.monitor.res || '');
         }
       }
-    } else if (editItem.category === 'GPUs') {
+    } else if (isGpuCategory(editItem.category)) {
       setGpuPlatform(specs.gpuPlatform || '');
       setGpuModel(specs.gpuModel || '');
       setVram(specs.vram || '');
@@ -594,6 +615,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
     } else if (editItem.category === 'Controllers') {
       setControllerPlatform(specs.controllerPlatform || '');
       setControllerModel(specs.controllerModel || '');
+    } else if (isSimpleBrandModelCategory(editItem.category)) {
+      setSimpleBrand(specs.brand || '');
+      setSimpleModel(specs.model || '');
     }
     setStep(1);
   }, [isOpen, editItem]);
@@ -657,7 +681,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                    <p className="text-white/50 text-[13px]">What type of gear are you listing?</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {CATS.map((cat) => (
+                  {RENTAL_CATEGORIES.map((cat) => (
                     <button key={cat.name} onClick={() => setC(cat.name)} className={`flex flex-col items-center gap-3 p-5 rounded-[24px] border border-transparent transition-all cursor-pointer ${c === cat.name ? 'bg-[#A855F7]/10 border-[#A855F7] text-white shadow-[0_0_20px_rgba(168,85,247,0.15)]' : 'bg-white/5 border-white/5 text-white/50 hover:text-white hover:border-white/20'}`}>
                       <cat.Icon size={28} className={c === cat.name ? 'text-[#A855F7]' : ''} />
                       <span className="text-[13px] font-medium">{cat.name}</span>
@@ -671,15 +695,26 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 relative">
                 <div className="text-center space-y-1 mb-6">
                    <h3 className="text-white font-bold text-[18px]">Select Specifications</h3>
-                   <p className="text-white/50 text-[13px]">We use this to auto-tier and value your gear.</p>
+                   <p className="text-white/50 text-[13px]">Add the details borrowers should see.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4 pb-2">
-                  {(c === 'Laptops' || c === 'Desktops') ? (
+                  {isMacBookCategory(c) ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <Select label="Model" val={macModel} set={setMacModel} opts={MACBOOK_MODELS} />
+                        <Select label="Chip" val={macChip} set={setMacChip} opts={MACBOOK_CHIPS} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Select label="RAM" val={ram} set={setRam} opts={RAM_OPTS} />
+                        <Select label="Storage" val={storage} set={setStorage} opts={STORAGE_OPTS} />
+                      </div>
+                    </div>
+                  ) : isLaptopCategory(c) ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <Select label="CPU Platform" val={cpuPlatform} set={setCpuPlatform} opts={CPU_PLATFORMS} />
-                        <Select label="CPU Model" val={cpuModel} set={setCpuModel} opts={cpuPlatform === 'Intel' ? INTEL_CPUS : cpuPlatform === 'AMD' ? AMD_CPUS : []} disabled={!cpuPlatform} />
+                        <Select label="CPU Model" val={cpuModel} set={setCpuModel} opts={cpuPlatform === 'Intel' ? INTEL_CPUS : cpuPlatform === 'AMD' ? AMD_CPUS : cpuPlatform === 'Other' ? ['Other'] : []} disabled={!cpuPlatform} />
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4">
@@ -703,9 +738,9 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                         />
                       </div>
                     </div>
-                  ) : c === 'GPUs' ? (
+                  ) : isGpuCategory(c) ? (
                      <div className="space-y-4">
-                        <Select label="GPU Platform" val={gpuPlatform} set={setGpuPlatform} opts={['Nvidia', 'AMD', 'Intel Arc']} />
+                        <Select label="GPU Platform" val={gpuPlatform} set={setGpuPlatform} opts={['Nvidia', 'AMD', 'Intel Arc', 'Other']} />
                         <div className="grid grid-cols-2 gap-4 relative z-[50]">
                           <GpuModelSelect 
                              val={gpuModel} 
@@ -724,30 +759,50 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                      </div>
                   ) : c === 'Consoles' ? (
                     <div className="space-y-4">
-                      <Select label="Model" val={otherCpu} set={setOtherCpu} opts={['PS5 Pro', 'PlayStation 5', 'Xbox Series X', 'Xbox Series S', 'Nintendo Switch 2', 'Nintendo Switch OLED', 'ASUS ROG Ally']} />
-                      <Select label="Controllers" val={numControllers} set={setNumControllers} opts={['None', '1 Controller', '2 Controllers', '3 Controllers', '4 Controllers']} />
+                      <Select label="Model" val={otherCpu} set={setOtherCpu} opts={['PS5 Pro', 'PlayStation 5', 'Xbox Series X', 'Xbox Series S', 'Nintendo Switch 2', 'Nintendo Switch OLED', 'ASUS ROG Ally', 'Other']} />
+                      <Select label="Controllers" val={numControllers} set={setNumControllers} opts={['None', '1 Controller', '2 Controllers', '3 Controllers', '4 Controllers', 'Other']} />
                     </div>
                   ) : c === 'Monitors' ? (
                     <div className="space-y-4">
-                      <Select label="Monitor Size" val={monSize} set={setMonSize} opts={['< 24"', '24"-27"', '28"-38"', '39"-49"', '> 49"']} />
+                      <Select label="Monitor Size" val={monSize} set={setMonSize} opts={['< 24"', '24"-27"', '28"-38"', '39"-49"', '> 49"', 'Other']} />
                       <div className="grid grid-cols-2 gap-4">
-                        <Select label="Refresh Rate" val={monRefresh} set={setMonRefresh} opts={['< 120Hz', '120Hz-180Hz', '200Hz-360Hz', '> 360Hz']} />
-                        <Select label="Resolution" val={monRes} set={setMonRes} opts={['1080p', '2K', '4K']} />
+                        <Select label="Refresh Rate" val={monRefresh} set={setMonRefresh} opts={['< 120Hz', '120Hz-180Hz', '200Hz-360Hz', '> 360Hz', 'Other']} />
+                        <Select label="Resolution" val={monRes} set={setMonRes} opts={['1080p', '2K', '4K', 'Other']} />
                       </div>
                     </div>
                   ) : c === 'Controllers' ? (
                     <div className="space-y-4">
-                      <Select label="Controller Platform" val={controllerPlatform} set={setControllerPlatform} opts={['PlayStation', 'Xbox', 'Other Brands']} />
+                      <Select label="Controller Platform" val={controllerPlatform} set={setControllerPlatform} opts={['PlayStation', 'Xbox', 'Other Brands', 'Other']} />
                       <Select label="Controller Model" val={controllerModel} set={setControllerModel} opts={
                         controllerPlatform === 'PlayStation' ? ['DualSense (PS5)', 'DualSense Edge Pro'] :
                         controllerPlatform === 'Xbox' ? ['Xbox Wireless Controller', 'Xbox Elite Series 2 Pro'] :
-                        controllerPlatform === 'Other Brands' ? ['Pro Controller', 'Standard Controller'] :
+                        controllerPlatform === 'Other Brands' ? ['Pro Controller', 'Standard Controller', 'Other'] :
+                        controllerPlatform === 'Other' ? ['Other'] :
                         []
                       } disabled={!controllerPlatform} />
                     </div>
+                  ) : isSimpleBrandModelCategory(c) ? (
+                    <div className="space-y-4">
+                      <Select label="Brand" val={simpleBrand} set={setSimpleBrand} opts={BRAND_OPTS} />
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider">Model</label>
+                        <input
+                          value={simpleModel}
+                          onChange={(event) => setSimpleModel(event.target.value)}
+                          placeholder={`Enter ${c.toLowerCase()} model`}
+                          className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                        />
+                      </div>
+                    </div>
                   ) : (
-                    <div className="text-center py-10">
-                      <p className="text-white/50 text-[13px]">No advanced specs required for {c}.</p>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider">Model / Item Name</label>
+                      <input
+                        value={otherCpu}
+                        onChange={(event) => setOtherCpu(event.target.value)}
+                        placeholder={`Enter ${c.toLowerCase()} model or name`}
+                        className="w-full bg-[#121212] text-white border border-white/10 rounded-[12px] p-3 text-[13px] focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                      />
                     </div>
                   )}
                 </div>
@@ -959,7 +1014,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             {step === 6 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="text-center space-y-1 mb-8">
-                   <h3 className="text-white font-bold text-[22px]">Valuation Ready</h3>
+                   <h3 className="text-white font-bold text-[22px]">Pricing & Details</h3>
                    <p className={`text-[13px] font-bold tracking-wider uppercase ${tier === 'High' ? 'text-[#2DD4BF]' : tier === 'Mid' ? 'text-[#A855F7]' : 'text-white/70'}`}>
                      {tier} TIER ASSET
                    </p>
@@ -987,26 +1042,40 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
                 <div className="grid grid-cols-1 gap-4">
                    <div className="bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-[24px] p-6 text-center relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent"></div>
-                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Base Daily Rate</p>
-                      <h4 className="text-[36px] font-black text-white tracking-tighter leading-none mb-4">₹{base}</h4>
+                      <p className="text-[12px] font-bold text-[#A855F7] uppercase tracking-wider mb-2">Daily Rental Price</p>
+                      <div className="relative mb-3">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 font-bold">₹</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max={categoryMaxPrice}
+                          value={pricePerDay}
+                          onChange={(event) => setPricePerDay(event.target.value)}
+                          placeholder="Enter price per day"
+                          className="w-full bg-[#121212] text-white border border-white/10 rounded-[16px] py-4 pl-9 pr-4 text-center text-[24px] font-black tracking-tight focus:border-[#A855F7] outline-none placeholder:text-white/25"
+                        />
+                      </div>
+                      <p className={`text-[12px] font-medium mb-4 ${pricePerDay && !hasValidPrice ? 'text-[#F59E0B]' : 'text-white/45'}`}>
+                        Maximum for {c}: ₹{categoryMaxPrice}/day
+                      </p>
                       <div className="flex justify-between items-center text-[13px] border-t border-[#A855F7]/20 pt-4 mb-4">
                          <span className="text-white/70 font-medium">Platform Fee (5%)</span>
-                         <span className="text-white/70">-₹{base * 0.05}</span>
+                         <span className="text-white/70">-₹{Math.round(previewPricePerDay * 0.05)}</span>
                       </div>
                       <div className="flex justify-between items-center text-[14px] pt-4 border-t border-[#A855F7]/20">
                          <span className="text-[#2DD4BF] font-bold">You Earn (Per Day)</span>
-                         <span className="text-[#2DD4BF] font-black">₹{base * 0.95}</span>
+                         <span className="text-[#2DD4BF] font-black">₹{Math.round(previewPricePerDay * 0.95)}</span>
                       </div>
                    </div>
 
                    <div className="grid grid-cols-2 gap-4">
                      <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
                         <p className="text-[11px] text-[#A855F7] font-bold tracking-wider uppercase mb-1">3-Day (25% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(base * 3 * 0.75)}</p>
+                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(previewPricePerDay * 3 * 0.75)}</p>
                      </div>
                      <div className="bg-[#121212] border border-white/10 rounded-[20px] p-5 text-center">
                         <p className="text-[11px] text-[#2DD4BF] font-bold tracking-wider uppercase mb-1">30-Day (50% Off)</p>
-                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(base * 30 * 0.5)}</p>
+                        <p className="text-[20px] text-white font-bold tracking-tight">₹{Math.round(previewPricePerDay * 30 * 0.5)}</p>
                      </div>
                    </div>
                 </div>
@@ -1021,7 +1090,7 @@ export default function ListGearModal({ isOpen, onClose, editItem, selectedCity 
             </button>
             {step < 6 ? (
               <button onClick={nextStep} disabled={!isValid()} className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-[13px] rounded-[24px] disabled:opacity-50 transition-all active:scale-95 cursor-pointer">
-                {step === 5 ? 'View Valuation' : 'Next Step'}
+                {step === 5 ? 'Set Price' : 'Next Step'}
               </button>
             ) : (
               <button onClick={submit} disabled={!isValid() || load} className="px-8 py-3 bg-[#A855F7] text-white font-bold text-[13px] rounded-[24px] shadow-[0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 cursor-pointer">
