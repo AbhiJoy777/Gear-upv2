@@ -51,9 +51,29 @@ export function getRentalCategoryMaxPrice(category: string) {
 }
 
 export function isLaptopCategory(category: string) {
-  return ['Laptops', 'Gaming Laptops', 'MacBooks', 'Desktops'].includes(category);
+  return ['Laptops', 'Gaming Laptops', 'Desktops'].includes(category);
 }
 
 export function isGpuCategory(category: string) {
   return category === 'GPU' || category === 'GPUs';
+}
+
+export function isMacBookCategory(category: string) {
+  return category === 'MacBooks';
+}
+
+export function isSimpleBrandModelCategory(category: string) {
+  return [
+    'Cameras',
+    'VR Headsets',
+    'Musical Instruments',
+    'Music Gear',
+    'TVs',
+    'Projectors',
+    'Streaming Equipment',
+    'Podcast Equipment',
+    'Microphones',
+    'Camera Lenses',
+    'Action Cameras',
+  ].includes(category);
 }

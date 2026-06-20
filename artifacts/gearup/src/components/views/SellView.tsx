@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Camera, CheckCircle2, Cpu, Gamepad2, ImagePlus, Laptop, MessageCircle, Monitor, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Camera, CheckCircle2, Cpu, ImagePlus, MessageCircle, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { addDoc, arrayUnion, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -10,14 +10,11 @@ import ConfirmModal from '../modals/ConfirmModal';
 import SaleChatModal from '../modals/SaleChatModal';
 import AddressModal from '../modals/AddressModal';
 import { canListDuringBeta, getBetaListingGateMessage } from '@/lib/beta';
+import { RENTAL_CATEGORIES } from '@/lib/listingCategories';
 
 const SELL_CATEGORIES = [
-  { name: 'Laptops', Icon: Laptop },
-  { name: 'GPUs', Icon: Cpu },
-  { name: 'Consoles', Icon: Gamepad2 },
+  ...RENTAL_CATEGORIES.map(({ name, Icon }) => ({ name, Icon })),
   { name: 'Gaming PCs', Icon: Cpu },
-  { name: 'Monitors', Icon: Monitor },
-  { name: 'Cameras', Icon: Camera },
   { name: 'Camera Gear', Icon: Camera },
   { name: 'Accessories', Icon: Package },
   { name: 'Other Tech Gear', Icon: Package },
